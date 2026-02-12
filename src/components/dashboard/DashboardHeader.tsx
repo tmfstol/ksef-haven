@@ -1,6 +1,7 @@
-import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings } from "lucide-react";
+import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import type { Company } from "@/types/company";
 
 interface DashboardHeaderProps {
   isConnected: boolean;
@@ -8,7 +9,9 @@ interface DashboardHeaderProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onSync: () => void;
-  companyNip?: string;
+  onSyncAll?: () => void;
+  isSyncingAll?: boolean;
+  activeCompany?: Company | null;
 }
 
 export function DashboardHeader({
@@ -17,7 +20,9 @@ export function DashboardHeader({
   searchQuery,
   onSearchChange,
   onSync,
-  companyNip,
+  onSyncAll,
+  isSyncingAll,
+  activeCompany,
 }: DashboardHeaderProps) {
   const navigate = useNavigate();
 
@@ -41,13 +46,18 @@ export function DashboardHeader({
         )}
       </div>
 
-      {/* Aktywny NIP */}
-      {companyNip && (
+      {/* Aktywna firma */}
+      {activeCompany && (
         <>
           <div className="h-5 w-px bg-border/60" />
-          <div className="text-sm">
-            <span className="text-muted-foreground">NIP:</span>{" "}
-            <span className="font-semibold text-foreground">{companyNip}</span>
+          <div className="text-sm flex items-center gap-2">
+            <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+              {activeCompany.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <span className="font-semibold text-foreground">{activeCompany.name}</span>
+              <span className="text-muted-foreground ml-1.5">NIP: {activeCompany.nip}</span>
+            </div>
           </div>
         </>
       )}
@@ -77,6 +87,23 @@ export function DashboardHeader({
       >
         <Settings className="h-4 w-4" />
       </Button>
+
+      {/* Sync All */}
+      {onSyncAll && (
+        <Button
+          variant="outline"
+          onClick={onSyncAll}
+          disabled={isSyncingAll}
+          className="rounded-xl px-4 gap-2"
+        >
+          {isSyncingAll ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Zap className="h-4 w-4" />
+          )}
+          Sync. wszystkich
+        </Button>
+      )}
 
       {/* Synchronizacja */}
       <Button
