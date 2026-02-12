@@ -27,14 +27,14 @@ export function useSync() {
       return res.json();
     },
     onSuccess: () => {
-      toast.success("Synchronization complete", {
-        description: "All invoices have been synced with KSeF.",
+      toast.success("Synchronizacja zakończona", {
+        description: "Wszystkie faktury zostały zsynchronizowane z KSeF.",
       });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
     onError: () => {
-      toast.error("Synchronization failed", {
-        description: "Could not connect to KSeF. Please check your token.",
+      toast.error("Synchronizacja nieudana", {
+        description: "Nie można połączyć się z KSeF. Sprawdź swój token.",
       });
     },
   });

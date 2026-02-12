@@ -51,7 +51,6 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
         {!isOnboarding && (
           <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl">
@@ -60,18 +59,18 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
         )}
         <div>
           <h1 className="text-lg font-semibold text-foreground">
-            {isOnboarding ? "Welcome to KSeF Archive" : "Settings"}
+            {isOnboarding ? "Witaj w KSeF Archiwum" : "Ustawienia"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isOnboarding
-              ? "Configure your connection to get started."
-              : "Manage your KSeF connection and storage settings."}
+              ? "Skonfiguruj połączenie, aby rozpocząć."
+              : "Zarządzaj ustawieniami połączenia KSeF i ścieżką archiwum."}
           </p>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto p-6 space-y-6">
-        {/* Company NIP */}
+        {/* NIP firmy */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -83,13 +82,13 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
               <Building2 className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-foreground">Company NIP</h2>
-              <p className="text-xs text-muted-foreground">Your company's tax identification number</p>
+              <h2 className="text-sm font-semibold text-foreground">NIP firmy</h2>
+              <p className="text-xs text-muted-foreground">Numer identyfikacji podatkowej Twojej firmy</p>
             </div>
           </div>
           <input
             type="text"
-            placeholder="e.g. 1234567890"
+            placeholder="np. 1234567890"
             value={companyNip}
             onChange={(e) => setCompanyNip(e.target.value)}
             maxLength={10}
@@ -97,7 +96,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
           />
         </motion.div>
 
-        {/* KSeF Token */}
+        {/* Token KSeF */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -109,20 +108,20 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
               <Shield className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-foreground">KSeF Auth Token</h2>
-              <p className="text-xs text-muted-foreground">Your authorization token from the KSeF portal</p>
+              <h2 className="text-sm font-semibold text-foreground">Token autoryzacji KSeF</h2>
+              <p className="text-xs text-muted-foreground">Token autoryzacyjny z portalu KSeF</p>
             </div>
           </div>
           <input
             type="password"
-            placeholder="Enter your KSeF token"
+            placeholder="Wprowadź token KSeF"
             value={ksefToken}
             onChange={(e) => setKsefToken(e.target.value)}
             className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
           />
         </motion.div>
 
-        {/* Storage Path */}
+        {/* Ścieżka archiwum */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -134,8 +133,8 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
               <FolderOpen className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-foreground">Storage Path</h2>
-              <p className="text-xs text-muted-foreground">Network path to the invoice archive</p>
+              <h2 className="text-sm font-semibold text-foreground">Ścieżka archiwum</h2>
+              <p className="text-xs text-muted-foreground">Ścieżka sieciowa do archiwum faktur</p>
             </div>
           </div>
           <input
@@ -147,7 +146,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
           />
         </motion.div>
 
-        {/* Actions */}
+        {/* Przyciski */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -164,7 +163,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {isOnboarding ? "Get Started" : "Save Settings"}
+            {isOnboarding ? "Rozpocznij" : "Zapisz ustawienia"}
           </Button>
 
           <Button
@@ -178,7 +177,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
             ) : (
               <Wifi className="h-4 w-4" />
             )}
-            Test Connection
+            Testuj połączenie
           </Button>
         </motion.div>
       </main>

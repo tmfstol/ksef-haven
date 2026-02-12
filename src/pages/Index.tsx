@@ -73,7 +73,7 @@ const Index = () => {
             <div className="flex-1 flex items-center justify-center h-full">
               <div className="text-center">
                 <Loader2 className="h-8 w-8 animate-spin-slow text-primary mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">Loading invoices...</p>
+                <p className="text-sm text-muted-foreground">Ładowanie faktur...</p>
               </div>
             </div>
           ) : isError || !invoices || invoices.length === 0 ? (

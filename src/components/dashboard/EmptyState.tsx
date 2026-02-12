@@ -21,12 +21,12 @@ export function EmptyState({ isError, onRetry }: EmptyStateProps) {
         </div>
 
         <h2 className="text-2xl font-bold text-foreground mb-2">
-          {isError ? "Connection Error" : "Welcome to KSeF Archive"}
+          {isError ? "Błąd połączenia" : "Witaj w KSeF Archiwum"}
         </h2>
         <p className="text-muted-foreground mb-8 leading-relaxed">
           {isError
-            ? "Could not connect to the local server. Make sure the KSeF service is running on localhost:4000."
-            : "Connect your KSeF authorization token to start synchronizing invoices from the National e-Invoice System."}
+            ? "Nie można połączyć się z lokalnym serwerem. Upewnij się, że usługa KSeF działa na localhost:4000."
+            : "Podłącz swój token autoryzacji KSeF, aby rozpocząć synchronizację faktur z Krajowego Systemu e-Faktur."}
         </p>
 
         <Button
@@ -34,7 +34,7 @@ export function EmptyState({ isError, onRetry }: EmptyStateProps) {
           className="rounded-xl px-6 gap-2 shadow-sm"
         >
           <Key className="h-4 w-4" />
-          {isError ? "Retry Connection" : "Connect Token"}
+          {isError ? "Ponów próbę" : "Podłącz token"}
         </Button>
       </motion.div>
     </div>
