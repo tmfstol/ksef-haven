@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useInvoices, useSync, extractVendors } from "@/hooks/useInvoices";
+import { useSettings } from "@/hooks/useSettings";
 import { VendorSidebar } from "@/components/dashboard/VendorSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { InvoiceTable } from "@/components/dashboard/InvoiceTable";
@@ -8,10 +10,19 @@ import { StatsBar } from "@/components/dashboard/StatsBar";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { data: settings, isLoading: settingsLoading } = useSettings();
   const { data: invoices, isLoading, isError, refetch } = useInvoices();
   const syncMutation = useSync();
   const [selectedNip, setSelectedNip] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Redirect to onboarding if settings are missing
+  useEffect(() => {
+    if (!settingsLoading && !settings) {
+      navigate("/onboarding", { replace: true });
+    }
+  }, [settings, settingsLoading, navigate]);
 
   const vendors = useMemo(() => extractVendors(invoices), [invoices]);
 
@@ -31,16 +42,22 @@ const Index = () => {
     return result;
   }, [invoices, selectedNip, searchQuery]);
 
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar */}
       <VendorSidebar
         vendors={vendors}
         selectedNip={selectedNip}
         onSelectVendor={setSelectedNip}
       />
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         <DashboardHeader
           isConnected={!isError}
@@ -48,6 +65,7 @@ const Index = () => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onSync={() => syncMutation.mutate()}
+          companyNip={settings?.companyNip}
         />
 
         <main className="flex-1 overflow-y-auto scrollbar-thin p-6">

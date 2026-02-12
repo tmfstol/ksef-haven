@@ -1,4 +1,5 @@
-import { RefreshCw, Search, Wifi, WifiOff, Loader2 } from "lucide-react";
+import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 interface DashboardHeaderProps {
@@ -7,6 +8,7 @@ interface DashboardHeaderProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onSync: () => void;
+  companyNip?: string;
 }
 
 export function DashboardHeader({
@@ -15,7 +17,10 @@ export function DashboardHeader({
   searchQuery,
   onSearchChange,
   onSync,
+  companyNip,
 }: DashboardHeaderProps) {
+  const navigate = useNavigate();
+
   return (
     <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
       {/* Connection Status */}
@@ -36,6 +41,17 @@ export function DashboardHeader({
         )}
       </div>
 
+      {/* Active NIP */}
+      {companyNip && (
+        <>
+          <div className="h-5 w-px bg-border/60" />
+          <div className="text-sm">
+            <span className="text-muted-foreground">NIP:</span>{" "}
+            <span className="font-semibold text-foreground">{companyNip}</span>
+          </div>
+        </>
+      )}
+
       {/* Separator */}
       <div className="h-5 w-px bg-border/60" />
 
@@ -53,6 +69,16 @@ export function DashboardHeader({
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Settings */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => navigate("/settings")}
+        className="rounded-xl"
+      >
+        <Settings className="h-4 w-4" />
+      </Button>
 
       {/* Sync Button */}
       <Button
