@@ -1,16 +1,29 @@
-import { Building2, Search } from "lucide-react";
+import { Building2, Search, Plus, Check } from "lucide-react";
 import { useState } from "react";
 import type { Vendor } from "@/types/invoice";
+import type { Company } from "@/types/company";
 import { motion, AnimatePresence } from "framer-motion";
+import { AddCompanyModal } from "./AddCompanyModal";
 
 interface VendorSidebarProps {
   vendors: Vendor[];
   selectedNip: string | null;
   onSelectVendor: (nip: string | null) => void;
+  companies: Company[];
+  activeCompanyId: string | null;
+  onSelectCompany: (id: string) => void;
 }
 
-export function VendorSidebar({ vendors, selectedNip, onSelectVendor }: VendorSidebarProps) {
+export function VendorSidebar({
+  vendors,
+  selectedNip,
+  onSelectVendor,
+  companies,
+  activeCompanyId,
+  onSelectCompany,
+}: VendorSidebarProps) {
   const [search, setSearch] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const filtered = vendors.filter(
     (v) =>
@@ -18,11 +31,82 @@ export function VendorSidebar({ vendors, selectedNip, onSelectVendor }: VendorSi
       v.nip.includes(search)
   );
 
+  const emptySlots = Math.max(0, 4 - companies.length);
+
   return (
     <aside className="w-72 flex-shrink-0 glass-panel border-r border-border/50 flex flex-col h-full">
-      {/* Sidebar Header */}
+      {/* Company Profiles */}
       <div className="p-4 border-b border-border/50">
-        <h2 className="text-sm font-semibold text-foreground tracking-wide uppercase mb-3">
+        <h2 className="text-xs font-semibold text-muted-foreground tracking-widest uppercase mb-3">
+          Profile firm
+        </h2>
+        <div className="space-y-1">
+          {companies.map((company) => (
+            <button
+              key={company.id}
+              onClick={() => onSelectCompany(company.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
+                activeCompanyId === company.id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-foreground hover:bg-secondary/80"
+              }`}
+            >
+              <div
+                className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  activeCompanyId === company.id
+                    ? "bg-primary-foreground/20 text-primary-foreground"
+                    : "bg-accent/10 text-accent"
+                }`}
+              >
+                {company.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="font-medium truncate text-sm">{company.name}</p>
+                <p
+                  className={`text-xs ${
+                    activeCompanyId === company.id
+                      ? "text-primary-foreground/70"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  NIP: {company.nip}
+                </p>
+              </div>
+              {activeCompanyId === company.id && (
+                <Check className="h-4 w-4 flex-shrink-0" />
+              )}
+            </button>
+          ))}
+
+          {/* Empty slots */}
+          {Array.from({ length: emptySlots }).map((_, i) => (
+            <button
+              key={`empty-${i}`}
+              onClick={() => setShowAddModal(true)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground/50 border border-dashed border-border/50 hover:border-primary/30 hover:text-muted-foreground transition-all duration-200"
+            >
+              <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-secondary/30 flex-shrink-0">
+                <Plus className="h-3.5 w-3.5" />
+              </div>
+              <span className="text-xs">Wolny slot</span>
+            </button>
+          ))}
+
+          {companies.length < 4 && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-primary hover:bg-primary/5 transition-all duration-200 mt-1"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Dodaj firmę
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Vendor Search */}
+      <div className="p-4 border-b border-border/50">
+        <h2 className="text-xs font-semibold text-muted-foreground tracking-widest uppercase mb-3">
           Kontrahenci
         </h2>
         <div className="relative">
@@ -49,11 +133,13 @@ export function VendorSidebar({ vendors, selectedNip, onSelectVendor }: VendorSi
         >
           <Building2 className="h-4 w-4 flex-shrink-0" />
           <span className="truncate">Wszyscy kontrahenci</span>
-          <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full ${
-            selectedNip === null
-              ? "bg-primary-foreground/20 text-primary-foreground"
-              : "bg-secondary text-muted-foreground"
-          }`}>
+          <span
+            className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full ${
+              selectedNip === null
+                ? "bg-primary-foreground/20 text-primary-foreground"
+                : "bg-secondary text-muted-foreground"
+            }`}
+          >
             {vendors.reduce((sum, v) => sum + v.invoiceCount, 0)}
           </span>
         </button>
@@ -72,34 +158,42 @@ export function VendorSidebar({ vendors, selectedNip, onSelectVendor }: VendorSi
                   : "text-foreground hover:bg-secondary/80"
               }`}
             >
-              <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                selectedNip === vendor.nip
-                  ? "bg-primary-foreground/20 text-primary-foreground"
-                  : "bg-accent/10 text-accent"
-              }`}>
+              <div
+                className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  selectedNip === vendor.nip
+                    ? "bg-primary-foreground/20 text-primary-foreground"
+                    : "bg-accent/10 text-accent"
+                }`}
+              >
                 {vendor.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 text-left min-w-0">
                 <p className="font-medium truncate">{vendor.name}</p>
-                <p className={`text-xs ${
-                  selectedNip === vendor.nip
-                    ? "text-primary-foreground/70"
-                    : "text-muted-foreground"
-                }`}>
+                <p
+                  className={`text-xs ${
+                    selectedNip === vendor.nip
+                      ? "text-primary-foreground/70"
+                      : "text-muted-foreground"
+                  }`}
+                >
                   NIP: {vendor.nip}
                 </p>
               </div>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                selectedNip === vendor.nip
-                  ? "bg-primary-foreground/20 text-primary-foreground"
-                  : "bg-secondary text-muted-foreground"
-              }`}>
+              <span
+                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                  selectedNip === vendor.nip
+                    ? "bg-primary-foreground/20 text-primary-foreground"
+                    : "bg-secondary text-muted-foreground"
+                }`}
+              >
                 {vendor.invoiceCount}
               </span>
             </motion.button>
           ))}
         </AnimatePresence>
       </div>
+
+      <AddCompanyModal open={showAddModal} onOpenChange={setShowAddModal} />
     </aside>
   );
 }

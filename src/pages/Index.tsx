@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInvoices, useSync, extractVendors } from "@/hooks/useInvoices";
-import { useSettings } from "@/hooks/useSettings";
+import { useCompanies, useSyncAllCompanies } from "@/hooks/useCompanies";
 import { VendorSidebar } from "@/components/dashboard/VendorSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { InvoiceTable } from "@/components/dashboard/InvoiceTable";
@@ -11,24 +11,44 @@ import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { data: settings, isLoading: settingsLoading } = useSettings();
+  const { data: companies, isLoading: companiesLoading } = useCompanies();
   const { data: invoices, isLoading, isError, refetch } = useInvoices();
   const syncMutation = useSync();
+  const syncAllMutation = useSyncAllCompanies();
+  const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const [selectedNip, setSelectedNip] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Redirect to onboarding if settings are missing
+  // Redirect to onboarding if no companies configured
   useEffect(() => {
-    if (!settingsLoading && !settings) {
+    if (!companiesLoading && (!companies || companies.length === 0)) {
       navigate("/onboarding", { replace: true });
     }
-  }, [settings, settingsLoading, navigate]);
+  }, [companies, companiesLoading, navigate]);
+
+  // Auto-select first company
+  useEffect(() => {
+    if (companies && companies.length > 0 && !activeCompanyId) {
+      setActiveCompanyId(companies[0].id);
+    }
+  }, [companies, activeCompanyId]);
+
+  const activeCompany = useMemo(
+    () => companies?.find((c) => c.id === activeCompanyId) ?? null,
+    [companies, activeCompanyId]
+  );
 
   const vendors = useMemo(() => extractVendors(invoices), [invoices]);
 
   const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
     let result = invoices;
+    // Filter by active company NIP
+    if (activeCompany) {
+      result = result.filter((i) => i.nip === activeCompany.nip || true);
+      // Note: If backend filters by company, remove client filter.
+      // For now we show all invoices for the active company context.
+    }
     if (selectedNip) result = result.filter((i) => i.nip === selectedNip);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -40,9 +60,9 @@ const Index = () => {
       );
     }
     return result;
-  }, [invoices, selectedNip, searchQuery]);
+  }, [invoices, activeCompany, selectedNip, searchQuery]);
 
-  if (settingsLoading) {
+  if (companiesLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -56,6 +76,12 @@ const Index = () => {
         vendors={vendors}
         selectedNip={selectedNip}
         onSelectVendor={setSelectedNip}
+        companies={companies || []}
+        activeCompanyId={activeCompanyId}
+        onSelectCompany={(id) => {
+          setActiveCompanyId(id);
+          setSelectedNip(null);
+        }}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -65,7 +91,9 @@ const Index = () => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onSync={() => syncMutation.mutate()}
-          companyNip={settings?.companyNip}
+          onSyncAll={() => syncAllMutation.mutate()}
+          isSyncingAll={syncAllMutation.isPending}
+          activeCompany={activeCompany}
         />
 
         <main className="flex-1 overflow-y-auto scrollbar-thin p-6">
