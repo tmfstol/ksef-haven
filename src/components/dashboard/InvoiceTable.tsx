@@ -17,9 +17,9 @@ const statusStyles: Record<Invoice["status"], string> = {
 };
 
 const statusLabels: Record<Invoice["status"], string> = {
-  new: "New",
-  processed: "Processed",
-  error: "Error",
+  new: "Nowa",
+  processed: "Przetworzona",
+  error: "Błąd",
 };
 
 function formatCurrency(amount: number) {
@@ -75,22 +75,22 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
         <thead>
           <tr className="border-b border-border/50">
             <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
-              <SortHeader label="Date" sortKeyName="date" />
+              <SortHeader label="Data" sortKeyName="date" />
             </th>
             <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
-              <SortHeader label="Vendor" sortKeyName="vendor" />
+              <SortHeader label="Kontrahent" sortKeyName="vendor" />
             </th>
             <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
               NIP
             </th>
             <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
-              <SortHeader label="Gross Amount" sortKeyName="grossAmount" />
+              <SortHeader label="Kwota brutto" sortKeyName="grossAmount" />
             </th>
             <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
               Status
             </th>
             <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
-              Actions
+              Akcje
             </th>
           </tr>
         </thead>

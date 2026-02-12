@@ -10,13 +10,12 @@ export function StatsBar({ invoices }: StatsBarProps) {
   const processed = invoices.filter((i) => i.status === "processed").length;
   const newCount = invoices.filter((i) => i.status === "new").length;
   const errors = invoices.filter((i) => i.status === "error").length;
-  const totalGross = invoices.reduce((sum, i) => sum + i.grossAmount, 0);
 
   const stats = [
-    { label: "Total Invoices", value: total, icon: FileText, color: "text-primary" },
-    { label: "Processed", value: processed, icon: CheckCircle2, color: "text-success" },
-    { label: "New", value: newCount, icon: Clock, color: "text-warning" },
-    { label: "Errors", value: errors, icon: AlertCircle, color: "text-destructive" },
+    { label: "Wszystkie faktury", value: total, icon: FileText, color: "text-primary" },
+    { label: "Przetworzone", value: processed, icon: CheckCircle2, color: "text-success" },
+    { label: "Nowe", value: newCount, icon: Clock, color: "text-warning" },
+    { label: "Błędy", value: errors, icon: AlertCircle, color: "text-destructive" },
   ];
 
   return (

@@ -34,14 +34,14 @@ export function useSaveSettings() {
       return res.json();
     },
     onSuccess: () => {
-      toast.success("Settings saved", {
-        description: "Your configuration has been updated successfully.",
+      toast.success("Ustawienia zapisane", {
+        description: "Konfiguracja została pomyślnie zaktualizowana.",
       });
       queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
     onError: () => {
-      toast.error("Failed to save settings", {
-        description: "Could not reach the local server. Please check if it's running.",
+      toast.error("Nie udało się zapisać ustawień", {
+        description: "Nie można połączyć się z lokalnym serwerem. Sprawdź czy jest uruchomiony.",
       });
     },
   });
@@ -55,13 +55,13 @@ export function useTestConnection() {
       return res.json();
     },
     onSuccess: () => {
-      toast.success("Connection successful", {
-        description: "The local backend is responding correctly.",
+      toast.success("Połączenie udane", {
+        description: "Lokalny serwer odpowiada poprawnie.",
       });
     },
     onError: () => {
-      toast.error("Connection failed", {
-        description: "Could not reach the local server at localhost:4000.",
+      toast.error("Połączenie nieudane", {
+        description: "Nie można połączyć się z serwerem na localhost:4000.",
       });
     },
   });
