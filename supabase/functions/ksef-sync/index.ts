@@ -297,17 +297,18 @@ async function redeemToken(baseUrl: string, authToken: string) {
     },
     body: JSON.stringify({}),
   });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Token redeem failed (${res.status}): ${text}`);
-  try {
-    const data = JSON.parse(text);
-    console.log(`[ksef-sync] Redeem response keys: ${JSON.stringify(Object.keys(data))}`);
-    console.log(`[ksef-sync] accessToken present: ${!!data.accessToken}, token present: ${!!data.token}`);
-    if (data.accessToken) console.log(`[ksef-sync] accessToken prefix: ${data.accessToken.substring(0, 40)}...`);
-    return data;
-  } catch {
-    throw new Error(`Token redeem not JSON: ${text.substring(0, 200)}`);
-  }
+  const rawText = await res.text();
+  // Strip BOM and trim whitespace
+  const text = rawText.replace(/^\uFEFF/, "").trim();
+  if (!res.ok) throw new Error(`Token redeem failed (${res.status}): ${text.substring(0, 300)}`);
+  const data = JSON.parse(text);
+  // accessToken may be nested: {accessToken: {token: "jwt..."}} or flat {accessToken: "jwt..."}
+  const at = data.accessToken;
+  const accessToken = typeof at === "object" && at?.token ? at.token : at;
+  const rt = data.refreshToken;
+  const refreshToken = typeof rt === "object" && rt?.token ? rt.token : rt;
+  console.log(`[ksef-sync] Got accessToken (${accessToken ? accessToken.length : 0} chars)`);
+  return { accessToken, refreshToken };
 }
 
 // Step 7: Query invoices using accessToken - try multiple endpoint variants
