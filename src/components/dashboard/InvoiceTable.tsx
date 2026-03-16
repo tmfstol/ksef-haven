@@ -138,7 +138,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                     size="sm"
                     className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
                     onClick={() => {
-                      if (invoice.pdfPath) window.open(invoice.pdfPath);
+                      if (invoice.pdf_path) window.open(invoice.pdf_path);
                     }}
                   >
                     <FileText className="h-3.5 w-3.5" />
