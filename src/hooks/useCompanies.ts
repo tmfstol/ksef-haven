@@ -1,19 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import type { Company } from "@/types/company";
-
-const API_BASE = "http://localhost:4000/api";
 
 export function useCompanies() {
   return useQuery<Company[]>({
     queryKey: ["companies"],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/companies`);
-      if (!res.ok) {
-        if (res.status === 404) return [];
-        throw new Error("Failed to fetch companies");
-      }
-      return res.json();
+      const { data, error } = await supabase
+        .from("companies")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data as Company[];
     },
     retry: 1,
     refetchOnWindowFocus: false,
@@ -24,25 +23,29 @@ export function useAddCompany() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (company: Omit<Company, "id">) => {
-      const res = await fetch(`${API_BASE}/companies`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(company),
-      });
-      if (!res.ok) throw new Error("Failed to add company");
-      return res.json();
+    mutationFn: async (company: { name: string; nip: string; ksefToken: string; storagePath: string }) => {
+      const { data, error } = await supabase
+        .from("companies")
+        .insert({
+          name: company.name,
+          nip: company.nip,
+          ksef_token: company.ksefToken,
+          storage_path: company.storagePath,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       toast.success("Firma dodana", {
         description: "Nowa firma została pomyślnie dodana.",
       });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
     onError: () => {
       toast.error("Nie udało się dodać firmy", {
-        description: "Sprawdź połączenie z serwerem.",
+        description: "Sprawdź połączenie z bazą danych.",
       });
     },
   });
@@ -52,25 +55,30 @@ export function useUpdateCompany() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (company: Company) => {
-      const res = await fetch(`${API_BASE}/companies/${company.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(company),
-      });
-      if (!res.ok) throw new Error("Failed to update company");
-      return res.json();
+    mutationFn: async (company: { id: string; name: string; nip: string; ksefToken: string; storagePath: string }) => {
+      const { data, error } = await supabase
+        .from("companies")
+        .update({
+          name: company.name,
+          nip: company.nip,
+          ksef_token: company.ksefToken,
+          storage_path: company.storagePath,
+        })
+        .eq("id", company.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       toast.success("Firma zaktualizowana", {
         description: "Dane firmy zostały zapisane.",
       });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
     onError: () => {
       toast.error("Nie udało się zaktualizować firmy", {
-        description: "Sprawdź połączenie z serwerem.",
+        description: "Sprawdź połączenie z bazą danych.",
       });
     },
   });
@@ -81,11 +89,11 @@ export function useDeleteCompany() {
 
   return useMutation({
     mutationFn: async (companyId: string) => {
-      const res = await fetch(`${API_BASE}/companies/${companyId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete company");
-      return res.json();
+      const { error } = await supabase
+        .from("companies")
+        .delete()
+        .eq("id", companyId);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Firma usunięta", {
@@ -104,7 +112,8 @@ export function useSyncAllCompanies() {
 
   return useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${API_BASE}/sync/all`, { method: "POST" });
+      // Sync is still handled by local server if available
+      const res = await fetch("http://localhost:4000/api/sync/all", { method: "POST" });
       if (!res.ok) throw new Error("Sync all failed");
       return res.json();
     },
