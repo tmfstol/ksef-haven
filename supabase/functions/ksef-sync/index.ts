@@ -111,12 +111,7 @@ async function importRsaPublicKey(pemOrBase64: string): Promise<CryptoKey> {
     ["encrypt"]
   );
 }
-      { name: "RSA-OAEP", hash: "SHA-256" },
-      false,
-      ["encrypt"]
-    );
-  }
-}
+
 
 // Retry wrapper for fetch with exponential backoff
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
