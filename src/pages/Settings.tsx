@@ -46,8 +46,8 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     setEditingCompany(company);
     setName(company.name);
     setNip(company.nip);
-    setKsefToken(company.ksefToken);
-    setStoragePath(company.storagePath);
+    setKsefToken(company.ksef_token);
+    setStoragePath(company.storage_path);
   };
 
   const handleNewCompany = () => {
