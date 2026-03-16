@@ -310,7 +310,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
               className="rounded-xl px-5 gap-2"
             >
               {testMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wifi className="h-4 w-4" />}
-              Testuj połączenie
+              Testuj bazę danych
             </Button>
 
             {editingCompany && (

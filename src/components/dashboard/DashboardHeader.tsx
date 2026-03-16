@@ -115,7 +115,7 @@ export function DashboardHeader({
         ) : (
           <RefreshCw className="h-4 w-4" />
         )}
-        {isSyncing ? "Synchronizuję..." : "Synchronizuj z KSeF"}
+        {isSyncing ? "Synchronizuję..." : "Synchronizuj lokalnie"}
       </Button>
     </header>
   );
