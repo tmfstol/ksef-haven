@@ -143,7 +143,20 @@ async function getChallenge(baseUrl: string, nip: string) {
   const text = await res.text();
   if (!res.ok) throw new Error(`Challenge failed (${res.status}): ${text}`);
   try {
-    return JSON.parse(text);
+    const data = JSON.parse(text);
+    console.log(`[ksef-sync] Challenge response keys: ${Object.keys(data).join(", ")}`);
+    // Extract timestamp from challenge response (used for token encryption)
+    let challengeTimestamp: number;
+    if (data.timestampMs) {
+      challengeTimestamp = parseInt(data.timestampMs);
+    } else if (data.timestamp) {
+      challengeTimestamp = Math.floor(new Date(data.timestamp).getTime());
+    } else {
+      challengeTimestamp = Date.now();
+      console.log(`[ksef-sync] WARNING: No timestamp in challenge response, using Date.now()`);
+    }
+    data._challengeTimestamp = challengeTimestamp;
+    return data;
   } catch {
     throw new Error(`Challenge response not JSON: ${text.substring(0, 200)}`);
   }
