@@ -198,8 +198,11 @@ async function getPublicKey(baseUrl: string): Promise<string> {
 
 // Step 3: Encrypt token with RSA-OAEP
 async function encryptToken(token: string, publicKeyPem: string): Promise<string> {
+  // KSeF expects: token|timestamp where timestamp is Unix milliseconds
   const timestamp = Date.now();
   const plaintext = `${token}|${timestamp}`;
+  console.log(`[ksef-sync] Encrypting plaintext (${plaintext.length} chars): ${plaintext.substring(0, 60)}...`);
+  
   const encoder = new TextEncoder();
   const data = encoder.encode(plaintext);
 
