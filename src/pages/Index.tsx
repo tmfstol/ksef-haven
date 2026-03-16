@@ -12,7 +12,7 @@ import { Loader2 } from "lucide-react";
 const Index = () => {
   const navigate = useNavigate();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
-  const { data: invoices, isLoading, isError, refetch } = useInvoices();
+  const { data: invoices, isLoading, isError, refetch } = useInvoices(activeCompanyId);
   const syncMutation = useSync();
   const syncAllMutation = useSyncAllCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
