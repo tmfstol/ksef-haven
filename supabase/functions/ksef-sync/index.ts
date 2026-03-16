@@ -315,19 +315,16 @@ async function redeemToken(baseUrl: string, authToken: string) {
 async function queryInvoices(baseUrl: string, accessToken: string, nip: string) {
   const now = new Date();
   const sixMonthsAgo = new Date(now);
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 3);
 
-  // v2 API uses /v2/invoices/query/metadata with different body format
-  const url = `${baseUrl}/v2/invoices/query/metadata`;
+  const url = `${baseUrl}/api/v2/invoices/query/metadata`;
   const queryBody = {
-    filters: {
-      subjectType: "subject2",
-      dateRange: {
-        dateFrom: sixMonthsAgo.toISOString().split("T")[0],
-        dateTo: now.toISOString().split("T")[0],
-      },
+    subjectType: "subject2",
+    dateRange: {
+      dateType: "issue",
+      from: sixMonthsAgo.toISOString(),
+      to: now.toISOString(),
     },
-    pageSize: 100,
   };
 
   console.log(`[ksef-sync] POST ${url} body: ${JSON.stringify(queryBody)}`);
@@ -342,7 +339,7 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
   });
   const rawText = await res.text();
   const text = rawText.replace(/^\uFEFF/, "").trim();
-  console.log(`[ksef-sync] Invoice query response (${res.status}): ${text.substring(0, 300)}`);
+  console.log(`[ksef-sync] Invoice query response (${res.status}): ${text.substring(0, 500)}`);
   if (!res.ok) throw new Error(`Invoice query failed (${res.status}): ${text.substring(0, 300)}`);
   return JSON.parse(text);
 }
