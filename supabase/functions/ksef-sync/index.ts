@@ -453,13 +453,7 @@ async function syncCompany(
       console.log(`[ksef-sync] SUCCESS with candidate ${ci}! Got accessToken`);
 
       // Step 7: Query invoices
-      let queryResult;
-      try {
-        queryResult = await queryInvoices(baseUrl, accessToken, company.nip);
-      } catch (e) {
-        console.log(`[ksef-sync] V2 query failed, trying v1: ${e}`);
-        queryResult = await queryInvoicesV1(baseUrl, accessToken);
-      }
+      const queryResult = await queryInvoices(baseUrl, accessToken, company.nip);
 
       const invoiceRefs =
         queryResult?.invoiceHeaderList ||
