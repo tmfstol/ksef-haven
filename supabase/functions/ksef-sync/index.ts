@@ -142,7 +142,7 @@ async function getChallenge(baseUrl: string, nip: string) {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
-      contextIdentifier: { type: "onip", identifier: nip },
+      contextIdentifier: { type: "Nip", value: nip },
     }),
   });
   const text = await res.text();
