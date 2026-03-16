@@ -10,7 +10,21 @@ interface EmptyStateProps {
   actionLabel?: string;
 }
 
-export function EmptyState({ isError, onRetry }: EmptyStateProps) {
+export function EmptyState({
+  isError,
+  onRetry,
+  title,
+  description,
+  actionLabel,
+}: EmptyStateProps) {
+  const resolvedTitle = title ?? (isError ? "Błąd połączenia" : "Witaj w KSeF Archiwum");
+  const resolvedDescription =
+    description ??
+    (isError
+      ? "Nie można połączyć się z lokalnym serwerem. Upewnij się, że usługa KSeF działa na localhost:4000."
+      : "Podłącz swój token autoryzacji KSeF, aby rozpocząć synchronizację faktur z Krajowego Systemu e-Faktur.");
+  const resolvedActionLabel = actionLabel ?? (isError ? "Ponów próbę" : "Podłącz token");
+
   return (
     <div className="flex-1 flex items-center justify-center p-8">
       <motion.div
@@ -23,21 +37,12 @@ export function EmptyState({ isError, onRetry }: EmptyStateProps) {
           <ShieldCheck className="h-10 w-10 text-primary" />
         </div>
 
-        <h2 className="text-2xl font-bold text-foreground mb-2">
-          {isError ? "Błąd połączenia" : "Witaj w KSeF Archiwum"}
-        </h2>
-        <p className="text-muted-foreground mb-8 leading-relaxed">
-          {isError
-            ? "Nie można połączyć się z lokalnym serwerem. Upewnij się, że usługa KSeF działa na localhost:4000."
-            : "Podłącz swój token autoryzacji KSeF, aby rozpocząć synchronizację faktur z Krajowego Systemu e-Faktur."}
-        </p>
+        <h2 className="text-2xl font-bold text-foreground mb-2">{resolvedTitle}</h2>
+        <p className="text-muted-foreground mb-8 leading-relaxed">{resolvedDescription}</p>
 
-        <Button
-          onClick={onRetry}
-          className="rounded-xl px-6 gap-2 shadow-sm"
-        >
+        <Button onClick={onRetry} className="rounded-xl px-6 gap-2 shadow-sm">
           <Key className="h-4 w-4" />
-          {isError ? "Ponów próbę" : "Podłącz token"}
+          {resolvedActionLabel}
         </Button>
       </motion.div>
     </div>
