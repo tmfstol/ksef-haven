@@ -8,7 +8,7 @@ interface InvoiceTableProps {
   invoices: Invoice[];
 }
 
-type SortKey = "date" | "vendor" | "grossAmount";
+type SortKey = "date" | "vendor" | "gross_amount";
 
 const statusStyles: Record<Invoice["status"], string> = {
   new: "bg-primary/10 text-primary",
