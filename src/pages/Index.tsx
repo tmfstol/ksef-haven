@@ -12,10 +12,10 @@ import { Loader2 } from "lucide-react";
 const Index = () => {
   const navigate = useNavigate();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
-  const { data: invoices, isLoading, isError, refetch } = useInvoices();
+  const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
+  const { data: invoices, isLoading, isError, refetch } = useInvoices(activeCompanyId);
   const syncMutation = useSync();
   const syncAllMutation = useSyncAllCompanies();
-  const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const [selectedNip, setSelectedNip] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -43,12 +43,6 @@ const Index = () => {
   const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
     let result = invoices;
-    // Filter by active company NIP
-    if (activeCompany) {
-      result = result.filter((i) => i.nip === activeCompany.nip || true);
-      // Note: If backend filters by company, remove client filter.
-      // For now we show all invoices for the active company context.
-    }
     if (selectedNip) result = result.filter((i) => i.nip === selectedNip);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();

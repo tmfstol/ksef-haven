@@ -47,6 +47,59 @@ export type Database = {
         }
         Relationships: []
       }
+      invoices: {
+        Row: {
+          company_id: string
+          created_at: string
+          date: string
+          gross_amount: number
+          id: string
+          ksef_number: string | null
+          nip: string
+          pdf_path: string | null
+          status: string
+          updated_at: string
+          vendor: string
+          xml_path: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          date: string
+          gross_amount?: number
+          id?: string
+          ksef_number?: string | null
+          nip: string
+          pdf_path?: string | null
+          status?: string
+          updated_at?: string
+          vendor: string
+          xml_path?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          date?: string
+          gross_amount?: number
+          id?: string
+          ksef_number?: string | null
+          nip?: string
+          pdf_path?: string | null
+          status?: string
+          updated_at?: string
+          vendor?: string
+          xml_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

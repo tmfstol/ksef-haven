@@ -1,12 +1,16 @@
 export interface Invoice {
   id: string;
+  company_id: string;
   date: string;
   vendor: string;
   nip: string;
-  grossAmount: number;
+  gross_amount: number;
   status: "new" | "processed" | "error";
-  xmlPath?: string;
-  pdfPath?: string;
+  xml_path?: string | null;
+  pdf_path?: string | null;
+  ksef_number?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Vendor {

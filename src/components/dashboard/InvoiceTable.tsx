@@ -8,7 +8,7 @@ interface InvoiceTableProps {
   invoices: Invoice[];
 }
 
-type SortKey = "date" | "vendor" | "grossAmount";
+type SortKey = "date" | "vendor" | "gross_amount";
 
 const statusStyles: Record<Invoice["status"], string> = {
   new: "bg-primary/10 text-primary",
@@ -45,7 +45,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
     let cmp = 0;
     if (sortKey === "date") cmp = a.date.localeCompare(b.date);
     else if (sortKey === "vendor") cmp = a.vendor.localeCompare(b.vendor);
-    else cmp = a.grossAmount - b.grossAmount;
+    else cmp = a.gross_amount - b.gross_amount;
     return sortAsc ? cmp : -cmp;
   });
 
@@ -84,7 +84,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
               NIP
             </th>
             <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
-              <SortHeader label="Kwota brutto" sortKeyName="grossAmount" />
+              <SortHeader label="Kwota brutto" sortKeyName="gross_amount" />
             </th>
             <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
               Status
@@ -113,7 +113,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                 {invoice.nip}
               </td>
               <td className="px-5 py-3.5 text-sm text-foreground text-right font-semibold tabular-nums">
-                {formatCurrency(invoice.grossAmount)}
+                {formatCurrency(invoice.gross_amount)}
               </td>
               <td className="px-5 py-3.5 text-center">
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[invoice.status]}`}>
@@ -127,7 +127,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                     size="sm"
                     className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
                     onClick={() => {
-                      if (invoice.xmlPath) window.open(invoice.xmlPath);
+                      if (invoice.xml_path) window.open(invoice.xml_path);
                     }}
                   >
                     <FileCode className="h-3.5 w-3.5" />
@@ -138,7 +138,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                     size="sm"
                     className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
                     onClick={() => {
-                      if (invoice.pdfPath) window.open(invoice.pdfPath);
+                      if (invoice.pdf_path) window.open(invoice.pdf_path);
                     }}
                   >
                     <FileText className="h-3.5 w-3.5" />
