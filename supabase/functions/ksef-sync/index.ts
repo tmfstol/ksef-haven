@@ -19,19 +19,104 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+// Extract public key from X.509 certificate DER bytes
+// X.509 structure: SEQUENCE { tbsCertificate { ... subjectPublicKeyInfo { ... } } }
+// We need to find the SubjectPublicKeyInfo which is itself a SEQUENCE containing
+// the algorithm identifier and the public key
+function extractSpkiFromCert(certDer: Uint8Array): Uint8Array {
+  // Parse ASN.1 to find SubjectPublicKeyInfo
+  // In X.509, the structure is:
+  // SEQUENCE {
+  //   SEQUENCE (tbsCertificate) {
+  //     [0] version, serialNumber, signature, issuer, validity, subject,
+  //     SEQUENCE (subjectPublicKeyInfo) { ... }
+  //   }
+  //   ...
+  // }
+  
+  let offset = 0;
+  
+  function readTag(data: Uint8Array, pos: number) {
+    const tag = data[pos];
+    pos++;
+    let length = data[pos];
+    pos++;
+    if (length & 0x80) {
+      const numBytes = length & 0x7f;
+      length = 0;
+      for (let i = 0; i < numBytes; i++) {
+        length = (length << 8) | data[pos];
+        pos++;
+      }
+    }
+    return { tag, length, headerEnd: pos };
+  }
+  
+  // Outer SEQUENCE
+  const outer = readTag(certDer, 0);
+  // tbsCertificate SEQUENCE
+  const tbs = readTag(certDer, outer.headerEnd);
+  
+  let pos = tbs.headerEnd;
+  const tbsEnd = tbs.headerEnd + tbs.length;
+  
+  // Skip through tbsCertificate fields to find SubjectPublicKeyInfo
+  // Fields: [0] version (optional), serialNumber, signature, issuer, validity, subject, subjectPublicKeyInfo
+  let fieldCount = 0;
+  const targetField = 6; // subjectPublicKeyInfo is the 7th field (0-indexed: 6)
+  
+  while (pos < tbsEnd && fieldCount <= targetField) {
+    const field = readTag(certDer, pos);
+    
+    if (fieldCount === targetField) {
+      // This should be SubjectPublicKeyInfo - extract the whole TLV
+      const spkiStart = pos;
+      const spkiEnd = field.headerEnd + field.length;
+      return certDer.slice(spkiStart, spkiEnd);
+    }
+    
+    // Check if first field is the optional [0] version
+    if (fieldCount === 0 && (field.tag & 0xa0) === 0xa0) {
+      // This is the version tag, don't count it as a regular field
+      pos = field.headerEnd + field.length;
+      continue;
+    }
+    
+    pos = field.headerEnd + field.length;
+    fieldCount++;
+  }
+  
+  throw new Error("Could not find SubjectPublicKeyInfo in certificate");
+}
+
 async function importRsaPublicKey(pem: string): Promise<CryptoKey> {
+  // Handle both certificate and public key PEM formats
+  const isCert = pem.includes("BEGIN CERTIFICATE");
+  
   const pemContents = pem
-    .replace(/-----BEGIN PUBLIC KEY-----/, "")
-    .replace(/-----END PUBLIC KEY-----/, "")
+    .replace(/-----BEGIN (PUBLIC KEY|CERTIFICATE)-----/, "")
+    .replace(/-----END (PUBLIC KEY|CERTIFICATE)-----/, "")
     .replace(/\s/g, "");
+    
   const binaryString = atob(pemContents);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
+  
+  let keyData: ArrayBuffer;
+  if (isCert) {
+    // Extract SPKI from X.509 certificate
+    console.log(`[ksef-sync] Extracting public key from X.509 certificate (${bytes.length} bytes)`);
+    const spki = extractSpkiFromCert(bytes);
+    keyData = spki.buffer.slice(spki.byteOffset, spki.byteOffset + spki.byteLength);
+  } else {
+    keyData = bytes.buffer;
+  }
+  
   return crypto.subtle.importKey(
     "spki",
-    bytes.buffer,
+    keyData,
     { name: "RSA-OAEP", hash: "SHA-256" },
     false,
     ["encrypt"]
