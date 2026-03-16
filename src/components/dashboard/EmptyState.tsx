@@ -5,6 +5,9 @@ import { motion } from "framer-motion";
 interface EmptyStateProps {
   isError?: boolean;
   onRetry?: () => void;
+  title?: string;
+  description?: string;
+  actionLabel?: string;
 }
 
 export function EmptyState({ isError, onRetry }: EmptyStateProps) {
