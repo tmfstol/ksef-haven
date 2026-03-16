@@ -84,7 +84,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
               NIP
             </th>
             <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
-              <SortHeader label="Kwota brutto" sortKeyName="grossAmount" />
+              <SortHeader label="Kwota brutto" sortKeyName="gross_amount" />
             </th>
             <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
               Status
