@@ -63,7 +63,7 @@ function extractSpkiFromCert(certDer: Uint8Array): Uint8Array {
   // Skip through tbsCertificate fields to find SubjectPublicKeyInfo
   // Fields: [0] version (optional), serialNumber, signature, issuer, validity, subject, subjectPublicKeyInfo
   let fieldCount = 0;
-  const targetField = 6; // subjectPublicKeyInfo is the 7th field (0-indexed: 6)
+  const targetField = 5; // subjectPublicKeyInfo is field index 5 (after version skip)
   
   while (pos < tbsEnd && fieldCount <= targetField) {
     const field = readTag(certDer, pos);
