@@ -76,44 +76,49 @@ async function getChallenge(baseUrl: string, nip: string) {
 
 // Step 2: Get KSeF public RSA key
 async function getPublicKey(baseUrl: string): Promise<string> {
-  // Try known endpoints
-  const endpoints = [
-    `${baseUrl}/api/v2/auth/public-key/rsa`,
-    `${baseUrl}/api/v2/online/Session/Key/RSA`,
-  ];
+  const url = `${baseUrl}/api/v2/security/public-key-certificates`;
+  console.log(`[ksef-sync] GET ${url}`);
+  const res = await fetchWithRetry(url, {
+    headers: { Accept: "application/json" },
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Public key fetch failed (${res.status}): ${text.substring(0, 200)}`);
 
-  for (const url of endpoints) {
-    console.log(`[ksef-sync] Trying public key: ${url}`);
-    try {
-      const res = await fetchWithRetry(url, {
-        headers: { Accept: "application/json, application/octet-stream, text/plain" },
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        console.log(`[ksef-sync] Public key ${url} returned ${res.status}: ${t.substring(0, 100)}`);
-        continue;
-      }
-      const text = await res.text();
-      if (text.includes("BEGIN PUBLIC KEY")) return text;
-      try {
-        const json = JSON.parse(text);
-        if (json.key) return json.key;
-        if (json.publicKey) return json.publicKey;
-        if (json.rsaPublicKey) return json.rsaPublicKey;
-        // If the JSON has a base64 encoded key
-        if (json.value) return json.value;
-        console.log(`[ksef-sync] Public key JSON keys: ${Object.keys(json).join(", ")}`);
-        // Return the first string value that looks like a key
-        for (const v of Object.values(json)) {
-          if (typeof v === "string" && v.length > 100) return v;
+  try {
+    const json = JSON.parse(text);
+    // Find certificate with KsefTokenEncryption usage
+    const certs = json.certificates || json.items || json;
+    if (Array.isArray(certs)) {
+      for (const cert of certs) {
+        const usage = cert.usage || [];
+        if (Array.isArray(usage) && usage.includes("KsefTokenEncryption")) {
+          const pem = cert.certificate || cert.publicKey || cert.pem || cert.value;
+          if (pem) {
+            console.log(`[ksef-sync] Found KsefTokenEncryption certificate`);
+            return pem;
+          }
         }
-      } catch { /* not json, use raw text */ }
-      if (text.length > 100) return text;
-    } catch (err) {
-      console.log(`[ksef-sync] Public key ${url} error: ${err}`);
+      }
+      // Fallback: use the first certificate
+      if (certs.length > 0) {
+        const first = certs[0];
+        const pem = first.certificate || first.publicKey || first.pem || first.value;
+        if (pem) {
+          console.log(`[ksef-sync] Using first certificate (no KsefTokenEncryption found)`);
+          console.log(`[ksef-sync] Available usages: ${certs.map((c: any) => JSON.stringify(c.usage)).join(", ")}`);
+          return pem;
+        }
+      }
     }
+    // Log full structure for debugging
+    console.log(`[ksef-sync] Certificate response structure: ${JSON.stringify(json).substring(0, 500)}`);
+    throw new Error("No usable certificate found in response");
+  } catch (e) {
+    if (e instanceof SyntaxError) {
+      throw new Error(`Public key response not JSON: ${text.substring(0, 200)}`);
+    }
+    throw e;
   }
-  throw new Error("Could not fetch KSeF RSA public key from any endpoint");
 }
 
 // Step 3: Encrypt token with RSA-OAEP
