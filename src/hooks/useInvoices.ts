@@ -1,16 +1,37 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import type { Invoice, Vendor } from "@/types/invoice";
 
-const API_BASE = "http://localhost:4000/api";
-
-export function useInvoices() {
+export function useInvoices(companyId?: string | null) {
   return useQuery<Invoice[]>({
-    queryKey: ["invoices"],
+    queryKey: ["invoices", companyId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/invoices`);
-      if (!res.ok) throw new Error("Failed to fetch invoices");
-      return res.json();
+      let query = supabase
+        .from("invoices")
+        .select("*")
+        .order("date", { ascending: false });
+
+      if (companyId) {
+        query = query.eq("company_id", companyId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data as any[]).map((row) => ({
+        id: row.id,
+        company_id: row.company_id,
+        date: row.date,
+        vendor: row.vendor,
+        nip: row.nip,
+        gross_amount: Number(row.gross_amount),
+        status: row.status,
+        xml_path: row.xml_path,
+        pdf_path: row.pdf_path,
+        ksef_number: row.ksef_number,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      })) as Invoice[];
     },
     retry: 1,
     refetchOnWindowFocus: false,
@@ -22,7 +43,8 @@ export function useSync() {
 
   return useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${API_BASE}/sync`, { method: "POST" });
+      // Sync still requires the local server for KSeF API access
+      const res = await fetch("http://localhost:4000/api/sync", { method: "POST" });
       if (!res.ok) throw new Error("Sync failed");
       return res.json();
     },
@@ -34,7 +56,7 @@ export function useSync() {
     },
     onError: () => {
       toast.error("Synchronizacja nieudana", {
-        description: "Nie można połączyć się z KSeF. Sprawdź swój token.",
+        description: "Nie można połączyć się z KSeF. Sprawdź czy lokalny serwer jest uruchomiony.",
       });
     },
   });
