@@ -315,7 +315,7 @@ async function redeemToken(baseUrl: string, authToken: string) {
 async function queryInvoices(baseUrl: string, accessToken: string, nip: string) {
   const now = new Date();
   const sixMonthsAgo = new Date(now);
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 3);
 
   const url = `${baseUrl}/api/v2/invoices/query/metadata`;
   const queryBody = {
