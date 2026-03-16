@@ -112,20 +112,26 @@ export function useSyncAllCompanies() {
 
   return useMutation({
     mutationFn: async () => {
-      const res = await fetch("http://localhost:4000/api/sync/all", { method: "POST" });
-      if (!res.ok) throw new Error("LOCAL_SYNC_FAILED");
-      return res.json();
+      const { data, error } = await supabase.functions.invoke("ksef-sync", {
+        body: {},
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const newCount = data?.summary?.totalNewInvoices ?? 0;
+      const companyCount = data?.summary?.totalCompanies ?? 0;
       toast.success("Synchronizacja wszystkich firm zakończona", {
-        description: "Faktury ze wszystkich firm zostały zapisane w bazie danych.",
+        description: newCount > 0
+          ? `Pobrano ${newCount} nowych faktur z ${companyCount} firm.`
+          : `Brak nowych faktur w ${companyCount} firmach.`,
       });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
-    onError: () => {
-      toast.error("Synchronizacja lokalna niedostępna", {
-        description:
-          "Pobieranie faktur dla wszystkich firm nadal wymaga lokalnego modułu synchronizacji na localhost:4000.",
+    onError: (error: Error) => {
+      toast.error("Błąd synchronizacji z KSeF", {
+        description: error.message || "Sprawdź tokeny KSeF w ustawieniach firm.",
       });
     },
   });
