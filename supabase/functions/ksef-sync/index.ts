@@ -227,7 +227,7 @@ async function authWithKsefToken(
     body: JSON.stringify({
       encryptedToken,
       challenge,
-      contextIdentifier: { type: "onip", identifier: nip },
+      contextIdentifier: { type: "Nip", value: nip },
     }),
   });
   const text = await res.text();
