@@ -14,7 +14,7 @@ const Index = () => {
   const { data: companies, isLoading: companiesLoading } = useCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const { data: invoices, isLoading, isError, refetch } = useInvoices(activeCompanyId);
-  const syncMutation = useSync();
+  const syncMutation = useSync(activeCompanyId);
   const syncAllMutation = useSyncAllCompanies();
   const [selectedNip, setSelectedNip] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
