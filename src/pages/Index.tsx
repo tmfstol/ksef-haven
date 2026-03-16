@@ -17,7 +17,6 @@ const Index = () => {
   const syncMutation = useSync();
   const syncAllMutation = useSyncAllCompanies();
   const [selectedNip, setSelectedNip] = useState<string | null>(null);
-  const [selectedNip, setSelectedNip] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Redirect to onboarding if no companies configured
