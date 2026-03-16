@@ -6,23 +6,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// KSeF API base URLs
-const KSEF_API_PROD = "https://ksef.mf.gov.pl/api";
-const KSEF_API_TEST = "https://ksef-test.mf.gov.pl/api";
+// KSeF API 2.0 base URLs
+const KSEF_URLS: Record<string, string> = {
+  prod: "https://api.ksef.mf.gov.pl",
+  test: "https://api-test.ksef.mf.gov.pl",
+  demo: "https://api-demo.ksef.mf.gov.pl",
+};
 
-// Use test environment by default - can be changed via request body
-function getKsefBaseUrl(env: string = "test") {
-  return env === "prod" ? KSEF_API_PROD : KSEF_API_TEST;
-}
-
-// Helper: base64 encode Uint8Array
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary);
 }
 
-// Helper: parse PEM public key to CryptoKey
 async function importRsaPublicKey(pem: string): Promise<CryptoKey> {
   const pemContents = pem
     .replace(/-----BEGIN PUBLIC KEY-----/, "")
@@ -42,318 +38,410 @@ async function importRsaPublicKey(pem: string): Promise<CryptoKey> {
   );
 }
 
-// Step 1: Get authorisation challenge
+// Retry wrapper for fetch with exponential backoff
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, options);
+      return res;
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      console.log(`[ksef-sync] Retry ${i + 1}/${retries} for ${url}`);
+      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+  throw new Error("Unreachable");
+}
+
+// === KSeF v2 Auth Flow ===
+
+// Step 1: Get auth challenge
 async function getChallenge(baseUrl: string, nip: string) {
-  const res = await fetch(`${baseUrl}/online/Session/AuthorisationChallenge`, {
+  console.log(`[ksef-sync] POST ${baseUrl}/api/v2/auth/challenge`);
+  const res = await fetchWithRetry(`${baseUrl}/api/v2/auth/challenge`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
       contextIdentifier: { type: "onip", identifier: nip },
     }),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Challenge failed (${res.status}): ${text}`);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Challenge failed (${res.status}): ${text}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Challenge response not JSON: ${text.substring(0, 200)}`);
   }
-  return await res.json();
 }
 
 // Step 2: Get KSeF public RSA key
-async function getPublicKey(baseUrl: string) {
-  // Try multiple known endpoints for the public key
+async function getPublicKey(baseUrl: string): Promise<string> {
+  // Try known endpoints
   const endpoints = [
-    `${baseUrl}/online/Session/Key/RSA`,
+    `${baseUrl}/api/v2/auth/public-key/rsa`,
+    `${baseUrl}/api/v2/online/Session/Key/RSA`,
   ];
-  
+
   for (const url of endpoints) {
-    const res = await fetch(url, {
-      headers: { Accept: "application/octet-stream, application/json" },
-    });
-    if (res.ok) {
+    console.log(`[ksef-sync] Trying public key: ${url}`);
+    try {
+      const res = await fetchWithRetry(url, {
+        headers: { Accept: "application/json, application/octet-stream, text/plain" },
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        console.log(`[ksef-sync] Public key ${url} returned ${res.status}: ${t.substring(0, 100)}`);
+        continue;
+      }
       const text = await res.text();
-      // If it's PEM formatted, return as is
       if (text.includes("BEGIN PUBLIC KEY")) return text;
-      // If it's JSON with a key field
       try {
         const json = JSON.parse(text);
         if (json.key) return json.key;
         if (json.publicKey) return json.publicKey;
-      } catch { /* not json */ }
-      return text;
+        if (json.rsaPublicKey) return json.rsaPublicKey;
+        // If the JSON has a base64 encoded key
+        if (json.value) return json.value;
+        console.log(`[ksef-sync] Public key JSON keys: ${Object.keys(json).join(", ")}`);
+        // Return the first string value that looks like a key
+        for (const v of Object.values(json)) {
+          if (typeof v === "string" && v.length > 100) return v;
+        }
+      } catch { /* not json, use raw text */ }
+      if (text.length > 100) return text;
+    } catch (err) {
+      console.log(`[ksef-sync] Public key ${url} error: ${err}`);
     }
   }
-  throw new Error("Could not fetch KSeF public RSA key");
+  throw new Error("Could not fetch KSeF RSA public key from any endpoint");
 }
 
 // Step 3: Encrypt token with RSA-OAEP
-async function encryptToken(token: string, publicKeyPem: string, challenge: string): Promise<string> {
+async function encryptToken(token: string, publicKeyPem: string): Promise<string> {
   const timestamp = Date.now();
   const plaintext = `${token}|${timestamp}`;
   const encoder = new TextEncoder();
   const data = encoder.encode(plaintext);
-  
+
   const cryptoKey = await importRsaPublicKey(publicKeyPem);
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "RSA-OAEP" },
-    cryptoKey,
-    data
-  );
-  
+  const encrypted = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, cryptoKey, data);
   return toBase64(new Uint8Array(encrypted));
 }
 
-// Step 4: Init session with encrypted token (v1 API - /api/online/Session/InitToken)
-async function initSession(baseUrl: string, nip: string, encryptedToken: string, challenge: string) {
-  // Build the XML body for InitToken
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-<ns3:InitSessionTokenRequest xmlns="http://ksef.mf.gov.pl/schema/gtw/svc/online/types/2021/10/01/0001"
-  xmlns:ns2="http://ksef.mf.gov.pl/schema/gtw/svc/types/2021/10/01/0001"
-  xmlns:ns3="http://ksef.mf.gov.pl/schema/gtw/svc/online/auth/request/2021/10/01/0001">
-  <ns3:Context>
-    <Challenge>${challenge}</Challenge>
-    <ns2:Identifier xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="ns2:SubjectIdentifierByCompanyType">
-      <ns2:Identifier>${nip}</ns2:Identifier>
-    </ns2:Identifier>
-    <ns2:DocumentType>
-      <ns2:Service>KSeF</ns2:Service>
-      <ns2:FormCode>
-        <ns2:SystemCode>FA (2)</ns2:SystemCode>
-        <ns2:SchemaVersion>1-0E</ns2:SchemaVersion>
-        <ns2:TargetNamespace>http://crd.gov.pl/wzor/2023/06/29/12648/</ns2:TargetNamespace>
-        <ns2:Value>FA</ns2:Value>
-      </ns2:FormCode>
-    </ns2:DocumentType>
-    <ns2:Token>${encryptedToken}</ns2:Token>
-  </ns3:Context>
-</ns3:InitSessionTokenRequest>`;
-
-  const res = await fetch(`${baseUrl}/online/Session/InitToken`, {
+// Step 4: Authenticate with KSeF token
+async function authWithKsefToken(
+  baseUrl: string,
+  nip: string,
+  encryptedToken: string,
+  challenge: string
+) {
+  console.log(`[ksef-sync] POST ${baseUrl}/api/v2/auth/ksef-token`);
+  const res = await fetchWithRetry(`${baseUrl}/api/v2/auth/ksef-token`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/octet-stream",
-      Accept: "application/json",
-    },
-    body: xmlBody,
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      encryptedToken,
+      challenge,
+      contextIdentifier: { type: "onip", identifier: nip },
+    }),
   });
-  
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`InitToken failed (${res.status}): ${text}`);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Auth ksef-token failed (${res.status}): ${text}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Auth response not JSON: ${text.substring(0, 200)}`);
   }
-  return await res.json();
 }
 
-// Step 5: Query invoices
-async function queryInvoices(baseUrl: string, sessionToken: string, pageSize = 100, pageOffset = 0) {
+// Step 5: Poll auth status until ready
+async function pollAuthStatus(
+  baseUrl: string,
+  referenceNumber: string,
+  authToken: string,
+  maxAttempts = 10
+) {
+  for (let i = 0; i < maxAttempts; i++) {
+    console.log(`[ksef-sync] Polling auth status attempt ${i + 1}/${maxAttempts}`);
+    const res = await fetchWithRetry(`${baseUrl}/api/v2/auth/${referenceNumber}`, {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        Accept: "application/json",
+      },
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Auth status check failed (${res.status}): ${text}`);
+
+    try {
+      const data = JSON.parse(text);
+      const statusCode = data?.status?.code || data?.processingCode;
+      console.log(`[ksef-sync] Auth status code: ${statusCode}`);
+      if (statusCode === 200 || statusCode === "200") return data;
+      if (statusCode !== 100 && statusCode !== "100") {
+        throw new Error(`Auth failed with status ${statusCode}: ${text}`);
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("Auth failed")) throw e;
+      throw new Error(`Auth status not JSON: ${text.substring(0, 200)}`);
+    }
+
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error("Auth polling timed out after max attempts");
+}
+
+// Step 6: Redeem access token
+async function redeemToken(baseUrl: string, authToken: string) {
+  console.log(`[ksef-sync] POST ${baseUrl}/api/v2/auth/token/redeem`);
+  const res = await fetchWithRetry(`${baseUrl}/api/v2/auth/token/redeem`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Token redeem failed (${res.status}): ${text}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Token redeem not JSON: ${text.substring(0, 200)}`);
+  }
+}
+
+// Step 7: Query invoices using accessToken
+async function queryInvoices(baseUrl: string, accessToken: string, nip: string) {
   const now = new Date();
   const threeMonthsAgo = new Date(now);
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-  const res = await fetch(
-    `${baseUrl}/online/Query/Invoice/Sync?PageSize=${pageSize}&PageOffset=${pageOffset}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        SessionToken: sessionToken,
+  console.log(`[ksef-sync] POST ${baseUrl}/api/v2/invoices/query`);
+  const res = await fetchWithRetry(`${baseUrl}/api/v2/invoices/query`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      queryCriteria: {
+        subjectType: "subject1",
+        type: "incremental",
+        acquisitionTimestampThresholdFrom: threeMonthsAgo.toISOString(),
+        acquisitionTimestampThresholdTo: now.toISOString(),
       },
-      body: JSON.stringify({
-        queryCriteria: {
-          subjectType: "subject1",
-          type: "incremental",
-          acquisitionTimestampThresholdFrom: threeMonthsAgo.toISOString(),
-          acquisitionTimestampThresholdTo: now.toISOString(),
-        },
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Query invoices failed (${res.status}): ${text}`);
+    }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Invoice query failed (${res.status}): ${text}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Invoice query not JSON: ${text.substring(0, 200)}`);
   }
-  return await res.json();
 }
 
-// Step 6: Get single invoice details
-async function getInvoice(baseUrl: string, sessionToken: string, ksefNumber: string) {
-  const res = await fetch(
-    `${baseUrl}/online/Invoice/Get/${ksefNumber}`,
-    {
-      headers: {
-        Accept: "application/octet-stream",
-        SessionToken: sessionToken,
+// Alternative: Try v1-style sync query if v2 doesn't work
+async function queryInvoicesV1(baseUrl: string, sessionToken: string) {
+  const now = new Date();
+  const threeMonthsAgo = new Date(now);
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+  const url = `${baseUrl}/api/online/Query/Invoice/Sync?PageSize=100&PageOffset=0`;
+  console.log(`[ksef-sync] POST ${url}`);
+  const res = await fetchWithRetry(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      SessionToken: sessionToken,
+    },
+    body: JSON.stringify({
+      queryCriteria: {
+        subjectType: "subject1",
+        type: "incremental",
+        acquisitionTimestampThresholdFrom: threeMonthsAgo.toISOString(),
+        acquisitionTimestampThresholdTo: now.toISOString(),
       },
-    }
-  );
+    }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`V1 query failed (${res.status}): ${text}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`V1 query not JSON: ${text.substring(0, 200)}`);
+  }
+}
+
+// Get single invoice
+async function getInvoice(baseUrl: string, accessToken: string, ksefNumber: string) {
+  const res = await fetchWithRetry(`${baseUrl}/api/v2/invoices/${ksefNumber}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/octet-stream, application/json",
+    },
+  });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Get invoice ${ksefNumber} failed (${res.status}): ${text}`);
   }
-  return await res.text(); // Returns XML
-}
-
-// Step 7: Terminate session
-async function terminateSession(baseUrl: string, sessionToken: string) {
-  try {
-    await fetch(`${baseUrl}/online/Session/Terminate`, {
-      method: "GET",
-      headers: { SessionToken: sessionToken, Accept: "application/json" },
-    });
-  } catch {
-    // Best effort - don't fail if terminate fails
-  }
+  return await res.text();
 }
 
 // Parse invoice XML to extract key fields
 function parseInvoiceXml(xml: string) {
-  // Simple XML parsing using regex for the key fields
   const getTag = (tag: string) => {
     const match = xml.match(new RegExp(`<[^>]*${tag}[^>]*>([^<]+)<`, "i"));
     return match ? match[1].trim() : null;
   };
-  
   const getAmount = (tag: string) => {
     const val = getTag(tag);
     return val ? parseFloat(val) : 0;
   };
 
-  // Try to extract vendor name, NIP, date, and amounts
-  // The FA XML schema uses specific element names
-  const vendor =
-    getTag("DaneIdentyfikacyjne>.*?Nazwa") ||
-    getTag("Nazwa") ||
-    "Nieznany kontrahent";
-  
-  const nip =
-    getTag("DaneIdentyfikacyjne>.*?NIP") ||
-    getTag("NrNIP") ||
-    getTag("NIP") ||
-    "";
-  
-  const date =
-    getTag("P_1") || // Data wystawienia in FA schema
-    getTag("DataWystawienia") ||
-    new Date().toISOString().split("T")[0];
-  
-  const grossAmount =
-    getAmount("P_15") || // Kwota brutto in FA schema
-    getAmount("BruttoPrzych662") ||
-    getAmount("KwotaBrutto") ||
-    0;
+  const vendor = getTag("Nazwa") || "Nieznany kontrahent";
+  const nip = getTag("NrNIP") || getTag("NIP") || "";
+  const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
+  const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
 
   return { vendor, nip, date, grossAmount };
 }
 
-// Main sync function for a single company
+// Main sync for single company
 async function syncCompany(
   supabase: ReturnType<typeof createClient>,
   company: { id: string; nip: string; ksef_token: string },
   ksefEnv: string
 ) {
-  const baseUrl = getKsefBaseUrl(ksefEnv);
-  let sessionToken: string | null = null;
-  
+  const baseUrl = KSEF_URLS[ksefEnv] || KSEF_URLS.prod;
+
+  // Extract the raw token - the stored value may include metadata like "token|nip-xxx|hash"
+  // The actual KSeF auth token is the first part before the first pipe
+  const rawToken = company.ksef_token.split("|")[0].trim();
+  console.log(`[ksef-sync] Using KSeF env: ${ksefEnv}, base: ${baseUrl}`);
+  console.log(`[ksef-sync] Token prefix: ${rawToken.substring(0, 20)}...`);
+
+  // Step 1: Get challenge
+  console.log(`[ksef-sync] Step 1: Getting challenge for NIP: ${company.nip}`);
+  const challengeData = await getChallenge(baseUrl, company.nip);
+  const challenge = challengeData.challenge;
+  console.log(`[ksef-sync] Got challenge: ${challenge?.substring(0, 20)}...`);
+
+  // Step 2: Get public key
+  console.log(`[ksef-sync] Step 2: Getting RSA public key`);
+  const publicKeyPem = await getPublicKey(baseUrl);
+  console.log(`[ksef-sync] Got public key (${publicKeyPem.length} chars)`);
+
+  // Step 3: Encrypt token
+  console.log(`[ksef-sync] Step 3: Encrypting token`);
+  // Use full token for encryption (token|timestamp format is handled by encryptToken)
+  const encryptedToken = await encryptToken(company.ksef_token, publicKeyPem);
+
+  // Step 4: Authenticate
+  console.log(`[ksef-sync] Step 4: Authenticating with KSeF token`);
+  const authResult = await authWithKsefToken(baseUrl, company.nip, encryptedToken, challenge);
+  const authToken = authResult?.authenticationToken?.token || authResult?.authenticationToken;
+  const refNumber = authResult?.referenceNumber;
+
+  if (!authToken) {
+    throw new Error(`No authenticationToken received. Response: ${JSON.stringify(authResult).substring(0, 300)}`);
+  }
+  console.log(`[ksef-sync] Got authToken, refNumber: ${refNumber}`);
+
+  // Step 5: Poll until auth is complete
+  console.log(`[ksef-sync] Step 5: Polling auth status`);
+  await pollAuthStatus(baseUrl, refNumber, authToken);
+
+  // Step 6: Redeem access token
+  console.log(`[ksef-sync] Step 6: Redeeming access token`);
+  const tokenData = await redeemToken(baseUrl, authToken);
+  const accessToken = tokenData?.accessToken || tokenData?.token;
+
+  if (!accessToken) {
+    throw new Error(`No accessToken received. Response: ${JSON.stringify(tokenData).substring(0, 300)}`);
+  }
+  console.log(`[ksef-sync] Got accessToken`);
+
+  // Step 7: Query invoices
+  console.log(`[ksef-sync] Step 7: Querying invoices`);
+  let queryResult;
   try {
-    // Step 1: Get challenge
-    console.log(`[ksef-sync] Getting challenge for NIP: ${company.nip}`);
-    const challengeData = await getChallenge(baseUrl, company.nip);
-    const challenge = challengeData.challenge;
+    queryResult = await queryInvoices(baseUrl, accessToken, company.nip);
+  } catch (e) {
+    console.log(`[ksef-sync] V2 query failed, trying v1: ${e}`);
+    queryResult = await queryInvoicesV1(baseUrl, accessToken);
+  }
 
-    // Step 2: Get public key
-    console.log("[ksef-sync] Getting RSA public key");
-    const publicKeyPem = await getPublicKey(baseUrl);
+  const invoiceRefs =
+    queryResult?.invoiceHeaderList ||
+    queryResult?.invoicesList ||
+    queryResult?.items ||
+    [];
+  console.log(`[ksef-sync] Found ${invoiceRefs.length} invoices`);
 
-    // Step 3: Encrypt token
-    console.log("[ksef-sync] Encrypting token");
-    const encryptedToken = await encryptToken(company.ksef_token, publicKeyPem, challenge);
+  // Step 8: Upsert invoices
+  let upsertedCount = 0;
+  for (const ref of invoiceRefs) {
+    const ksefNumber =
+      ref.ksefReferenceNumber || ref.invoiceReferenceNumber || ref.referenceNumber;
+    if (!ksefNumber) continue;
 
-    // Step 4: Init session
-    console.log("[ksef-sync] Initializing session");
-    const sessionData = await initSession(baseUrl, company.nip, encryptedToken, challenge);
-    sessionToken = sessionData.sessionToken?.token || sessionData.sessionToken;
-    
-    if (!sessionToken) {
-      throw new Error("No session token received from KSeF");
-    }
+    try {
+      const { data: existing } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("ksef_number", ksefNumber)
+        .eq("company_id", company.id)
+        .maybeSingle();
 
-    // Step 5: Query invoices (paginated)
-    console.log("[ksef-sync] Querying invoices");
-    let allInvoiceRefs: any[] = [];
-    let pageOffset = 0;
-    const pageSize = 100;
+      if (existing) continue;
 
-    while (true) {
-      const queryResult = await queryInvoices(baseUrl, sessionToken, pageSize, pageOffset);
-      const items = queryResult.invoiceHeaderList || [];
-      allInvoiceRefs = allInvoiceRefs.concat(items);
-      
-      if (items.length < pageSize) break;
-      pageOffset += pageSize;
-    }
-
-    console.log(`[ksef-sync] Found ${allInvoiceRefs.length} invoices`);
-
-    // Step 6: For each invoice, get details and upsert
-    let upsertedCount = 0;
-    
-    for (const ref of allInvoiceRefs) {
-      const ksefNumber = ref.ksefReferenceNumber || ref.invoiceReferenceNumber;
-      if (!ksefNumber) continue;
+      // Try to get full invoice XML for details
+      let vendor = ref.subjectName || ref.vendorName || "Nieznany";
+      let nip = ref.subjectNip || ref.nip || company.nip;
+      let date = ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
+      let grossAmount = ref.grossValue || ref.grossAmount || 0;
 
       try {
-        // Check if already exists
-        const { data: existing } = await supabase
-          .from("invoices")
-          .select("id")
-          .eq("ksef_number", ksefNumber)
-          .eq("company_id", company.id)
-          .maybeSingle();
-        
-        if (existing) continue; // Skip already imported invoices
-
-        // Fetch full invoice XML
-        const xml = await getInvoice(baseUrl, sessionToken, ksefNumber);
+        const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
         const parsed = parseInvoiceXml(xml);
-
-        // Insert into database
-        const { error: insertError } = await supabase.from("invoices").insert({
-          company_id: company.id,
-          date: parsed.date,
-          vendor: parsed.vendor,
-          nip: parsed.nip || company.nip,
-          gross_amount: parsed.grossAmount,
-          ksef_number: ksefNumber,
-          status: "new",
-        });
-
-        if (insertError) {
-          console.error(`[ksef-sync] Insert error for ${ksefNumber}:`, insertError);
-        } else {
-          upsertedCount++;
-        }
-      } catch (invoiceError) {
-        console.error(`[ksef-sync] Error processing invoice ${ksefNumber}:`, invoiceError);
+        if (parsed.vendor) vendor = parsed.vendor;
+        if (parsed.nip) nip = parsed.nip;
+        if (parsed.date) date = parsed.date;
+        if (parsed.grossAmount) grossAmount = parsed.grossAmount;
+      } catch (xmlErr) {
+        console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
       }
-    }
 
-    // Step 7: Terminate session
-    await terminateSession(baseUrl, sessionToken);
+      const { error: insertError } = await supabase.from("invoices").insert({
+        company_id: company.id,
+        date,
+        vendor,
+        nip,
+        gross_amount: grossAmount,
+        ksef_number: ksefNumber,
+        status: "new",
+      });
 
-    return {
-      companyId: company.id,
-      companyNip: company.nip,
-      totalFound: allInvoiceRefs.length,
-      newInvoices: upsertedCount,
-    };
-  } catch (error) {
-    // Try to terminate session if we got one
-    if (sessionToken) {
-      await terminateSession(baseUrl, sessionToken);
+      if (insertError) {
+        console.error(`[ksef-sync] Insert error for ${ksefNumber}:`, insertError);
+      } else {
+        upsertedCount++;
+      }
+    } catch (invErr) {
+      console.error(`[ksef-sync] Error processing ${ksefNumber}:`, invErr);
     }
-    throw error;
   }
+
+  return {
+    companyId: company.id,
+    companyNip: company.nip,
+    totalFound: invoiceRefs.length,
+    newInvoices: upsertedCount,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -368,14 +456,11 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const companyId = body.company_id || null;
-    const ksefEnv = body.ksef_env || "test"; // "test" or "prod"
+    const ksefEnv = body.ksef_env || "prod";
 
-    // Fetch companies to sync
     let query = supabase.from("companies").select("id, nip, ksef_token");
-    if (companyId) {
-      query = query.eq("id", companyId);
-    }
-    
+    if (companyId) query = query.eq("id", companyId);
+
     const { data: companies, error: companiesError } = await query;
     if (companiesError) throw new Error(`DB error: ${companiesError.message}`);
     if (!companies || companies.length === 0) {
@@ -385,8 +470,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Filter out companies without ksef_token
-    const validCompanies = companies.filter((c: any) => c.ksef_token && c.ksef_token.trim().length > 0);
+    const validCompanies = companies.filter(
+      (c: any) => c.ksef_token && c.ksef_token.trim().length > 0
+    );
     if (validCompanies.length === 0) {
       return new Response(
         JSON.stringify({ error: "Żadna firma nie ma skonfigurowanego tokenu KSeF" }),
@@ -402,7 +488,7 @@ Deno.serve(async (req) => {
         const result = await syncCompany(supabase, company, ksefEnv);
         results.push(result);
       } catch (err) {
-        console.error(`[ksef-sync] Error syncing company ${company.nip}:`, err);
+        console.error(`[ksef-sync] Error syncing ${company.nip}:`, err);
         errors.push({
           companyId: company.id,
           companyNip: company.nip,
