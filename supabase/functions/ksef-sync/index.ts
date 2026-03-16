@@ -90,12 +90,17 @@ function extractSpkiFromCert(certDer: Uint8Array): Uint8Array {
 }
 
 async function importRsaPublicKey(pem: string): Promise<CryptoKey> {
-  // Handle both certificate and public key PEM formats
-  const isCert = pem.includes("BEGIN CERTIFICATE");
+  console.log(`[ksef-sync] Key/cert starts with: ${pem.substring(0, 60)}`);
+  console.log(`[ksef-sync] Key/cert length: ${pem.length}`);
   
+  // Determine format
+  const isCert = pem.includes("BEGIN CERTIFICATE");
+  const isPubKey = pem.includes("BEGIN PUBLIC KEY");
+  
+  // Strip PEM headers and whitespace
   const pemContents = pem
-    .replace(/-----BEGIN (PUBLIC KEY|CERTIFICATE)-----/, "")
-    .replace(/-----END (PUBLIC KEY|CERTIFICATE)-----/, "")
+    .replace(/-----BEGIN [^-]+-----/g, "")
+    .replace(/-----END [^-]+-----/g, "")
     .replace(/\s/g, "");
     
   const binaryString = atob(pemContents);
@@ -103,24 +108,46 @@ async function importRsaPublicKey(pem: string): Promise<CryptoKey> {
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
-  
-  let keyData: ArrayBuffer;
-  if (isCert) {
-    // Extract SPKI from X.509 certificate
-    console.log(`[ksef-sync] Extracting public key from X.509 certificate (${bytes.length} bytes)`);
-    const spki = extractSpkiFromCert(bytes);
-    keyData = spki.buffer.slice(spki.byteOffset, spki.byteOffset + spki.byteLength);
-  } else {
-    keyData = bytes.buffer;
+
+  // If it's a raw public key (SPKI), import directly
+  if (isPubKey || (!isCert && bytes.length < 600)) {
+    console.log(`[ksef-sync] Importing as raw SPKI public key`);
+    return crypto.subtle.importKey(
+      "spki",
+      bytes.buffer,
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      false,
+      ["encrypt"]
+    );
   }
+
+  // It's an X.509 certificate - extract the SPKI
+  console.log(`[ksef-sync] Extracting SPKI from X.509 cert (${bytes.length} bytes), first bytes: ${Array.from(bytes.slice(0, 10)).map(b => b.toString(16)).join(" ")}`);
   
-  return crypto.subtle.importKey(
-    "spki",
-    keyData,
-    { name: "RSA-OAEP", hash: "SHA-256" },
-    false,
-    ["encrypt"]
-  );
+  try {
+    const spki = extractSpkiFromCert(bytes);
+    console.log(`[ksef-sync] Extracted SPKI (${spki.length} bytes), first bytes: ${Array.from(spki.slice(0, 10)).map(b => b.toString(16)).join(" ")}`);
+    const buf = new ArrayBuffer(spki.length);
+    new Uint8Array(buf).set(spki);
+    return crypto.subtle.importKey(
+      "spki",
+      buf,
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      false,
+      ["encrypt"]
+    );
+  } catch (spkiErr) {
+    console.error(`[ksef-sync] SPKI extraction failed: ${spkiErr}`);
+    // Fallback: try importing the raw bytes as SPKI (maybe it's not actually a cert)
+    console.log(`[ksef-sync] Fallback: trying raw import as SPKI`);
+    return crypto.subtle.importKey(
+      "spki",
+      bytes.buffer,
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      false,
+      ["encrypt"]
+    );
+  }
 }
 
 // Retry wrapper for fetch with exponential backoff
