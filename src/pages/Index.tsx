@@ -43,12 +43,6 @@ const Index = () => {
   const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
     let result = invoices;
-    // Filter by active company NIP
-    if (activeCompany) {
-      result = result.filter((i) => i.nip === activeCompany.nip || true);
-      // Note: If backend filters by company, remove client filter.
-      // For now we show all invoices for the active company context.
-    }
     if (selectedNip) result = result.filter((i) => i.nip === selectedNip);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
