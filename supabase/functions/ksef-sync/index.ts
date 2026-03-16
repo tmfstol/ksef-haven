@@ -210,11 +210,10 @@ async function getPublicKey(baseUrl: string): Promise<string> {
 }
 
 // Step 3: Encrypt token with RSA-OAEP
-async function encryptToken(token: string, publicKeyPem: string): Promise<string> {
-  // KSeF expects: token|timestamp where timestamp is Unix milliseconds
-  const timestamp = Date.now();
-  const plaintext = `${token}|${timestamp}`;
-  console.log(`[ksef-sync] Encrypting plaintext (${plaintext.length} chars): ${plaintext.substring(0, 60)}...`);
+async function encryptToken(token: string, publicKeyPem: string, challengeTimestamp: number): Promise<string> {
+  // KSeF expects: token|timestamp where timestamp is from the challenge response (Unix ms)
+  const plaintext = `${token}|${challengeTimestamp}`;
+  console.log(`[ksef-sync] Encrypting plaintext (${plaintext.length} chars): ${plaintext.substring(0, 80)}...`);
   
   const encoder = new TextEncoder();
   const data = encoder.encode(plaintext);
