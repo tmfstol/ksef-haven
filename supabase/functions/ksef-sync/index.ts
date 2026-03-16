@@ -441,6 +441,7 @@ async function syncCompany(
       const queryResult = await queryInvoices(baseUrl, accessToken, company.nip);
 
       const invoiceRefs =
+        queryResult?.invoices ||
         queryResult?.invoiceHeaderList ||
         queryResult?.invoicesList ||
         queryResult?.items ||
@@ -451,7 +452,10 @@ async function syncCompany(
       let upsertedCount = 0;
       for (const ref of invoiceRefs) {
         const ksefNumber =
-          ref.ksefReferenceNumber || ref.invoiceReferenceNumber || ref.referenceNumber;
+          ref.ksefNumber ||
+          ref.ksefReferenceNumber ||
+          ref.invoiceReferenceNumber ||
+          ref.referenceNumber;
         if (!ksefNumber) continue;
 
         try {
@@ -464,10 +468,10 @@ async function syncCompany(
 
           if (existing) continue;
 
-          let vendor = ref.subjectName || ref.vendorName || "Nieznany";
-          let nip = ref.subjectNip || ref.nip || company.nip;
-          let date = ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
-          let grossAmount = ref.grossValue || ref.grossAmount || 0;
+          let vendor = ref.seller?.name || ref.subjectName || ref.vendorName || "Nieznany";
+          let nip = ref.seller?.nip || ref.subjectNip || ref.nip || company.nip;
+          let date = ref.issueDate || ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
+          let grossAmount = ref.grossAmount || ref.grossValue || ref.grossAmount || 0;
 
           try {
             const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
