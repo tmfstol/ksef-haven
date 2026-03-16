@@ -413,132 +413,143 @@ async function syncCompany(
 ) {
   const baseUrl = KSEF_URLS[ksefEnv] || KSEF_URLS.prod;
 
-  // KSeF token from MCU portal stored as "reference|nip-xxx|tokenHash"
-  // The token reference (first part) is what gets encrypted for auth
-  const parts = company.ksef_token.trim().split("|");
-  // Try the reference number (first part) as the actual auth token
-  const rawToken = parts[0];
+  // Try multiple token interpretations - the stored value may be "reference|nip-xxx|hash"
+  const fullToken = company.ksef_token.trim();
+  const parts = fullToken.split("|");
+  // Candidates: full token, first part (reference), last part (hash)
+  const tokenCandidates = parts.length === 3
+    ? [parts[0], parts[2], fullToken]
+    : [fullToken];
+
   console.log(`[ksef-sync] Using KSeF env: ${ksefEnv}, base: ${baseUrl}`);
-  console.log(`[ksef-sync] Token parts: ${parts.length}, token part 0: ${parts[0]?.substring(0, 30)}, part 2: ${parts[2]?.substring(0, 30)}`);
-  console.log(`[ksef-sync] Using token value: ${rawToken}`);
+  console.log(`[ksef-sync] Token candidates: ${tokenCandidates.length}`);
 
-  // Step 1: Get challenge
-  console.log(`[ksef-sync] Step 1: Getting challenge for NIP: ${company.nip}`);
-  const challengeData = await getChallenge(baseUrl, company.nip);
-  const challenge = challengeData.challenge;
-  console.log(`[ksef-sync] Got challenge: ${challenge?.substring(0, 20)}...`);
+  let lastError: Error | null = null;
 
-  // Step 2: Get public key
-  console.log(`[ksef-sync] Step 2: Getting RSA public key`);
-  const publicKeyPem = await getPublicKey(baseUrl);
-  console.log(`[ksef-sync] Got public key (${publicKeyPem.length} chars)`);
-
-  // Step 3: Encrypt token using challenge timestamp
-  console.log(`[ksef-sync] Step 3: Encrypting token with challenge timestamp: ${challengeData._challengeTimestamp}`);
-  const encryptedToken = await encryptToken(rawToken, publicKeyPem, challengeData._challengeTimestamp);
-
-  // Step 4: Authenticate
-  console.log(`[ksef-sync] Step 4: Authenticating with KSeF token`);
-  const authResult = await authWithKsefToken(baseUrl, company.nip, encryptedToken, challenge);
-  const authToken = authResult?.authenticationToken?.token || authResult?.authenticationToken;
-  const refNumber = authResult?.referenceNumber;
-
-  if (!authToken) {
-    throw new Error(`No authenticationToken received. Response: ${JSON.stringify(authResult).substring(0, 300)}`);
-  }
-  console.log(`[ksef-sync] Got authToken, refNumber: ${refNumber}`);
-
-  // Step 5: Poll until auth is complete
-  console.log(`[ksef-sync] Step 5: Polling auth status`);
-  await pollAuthStatus(baseUrl, refNumber, authToken);
-
-  // Step 6: Redeem access token
-  console.log(`[ksef-sync] Step 6: Redeeming access token`);
-  const tokenData = await redeemToken(baseUrl, authToken);
-  const accessToken = tokenData?.accessToken || tokenData?.token;
-
-  if (!accessToken) {
-    throw new Error(`No accessToken received. Response: ${JSON.stringify(tokenData).substring(0, 300)}`);
-  }
-  console.log(`[ksef-sync] Got accessToken`);
-
-  // Step 7: Query invoices
-  console.log(`[ksef-sync] Step 7: Querying invoices`);
-  let queryResult;
-  try {
-    queryResult = await queryInvoices(baseUrl, accessToken, company.nip);
-  } catch (e) {
-    console.log(`[ksef-sync] V2 query failed, trying v1: ${e}`);
-    queryResult = await queryInvoicesV1(baseUrl, accessToken);
-  }
-
-  const invoiceRefs =
-    queryResult?.invoiceHeaderList ||
-    queryResult?.invoicesList ||
-    queryResult?.items ||
-    [];
-  console.log(`[ksef-sync] Found ${invoiceRefs.length} invoices`);
-
-  // Step 8: Upsert invoices
-  let upsertedCount = 0;
-  for (const ref of invoiceRefs) {
-    const ksefNumber =
-      ref.ksefReferenceNumber || ref.invoiceReferenceNumber || ref.referenceNumber;
-    if (!ksefNumber) continue;
+  for (let ci = 0; ci < tokenCandidates.length; ci++) {
+    const rawToken = tokenCandidates[ci];
+    console.log(`[ksef-sync] Trying candidate ${ci}: length=${rawToken.length}, prefix=${rawToken.substring(0, 30)}...`);
 
     try {
-      const { data: existing } = await supabase
-        .from("invoices")
-        .select("id")
-        .eq("ksef_number", ksefNumber)
-        .eq("company_id", company.id)
-        .maybeSingle();
+      // Step 1: Get challenge (fresh for each attempt)
+      const challengeData = await getChallenge(baseUrl, company.nip);
+      const challenge = challengeData.challenge;
+      console.log(`[ksef-sync] Got challenge: ${challenge?.substring(0, 20)}...`);
 
-      if (existing) continue;
+      // Step 2: Get public key
+      const publicKeyPem = await getPublicKey(baseUrl);
 
-      // Try to get full invoice XML for details
-      let vendor = ref.subjectName || ref.vendorName || "Nieznany";
-      let nip = ref.subjectNip || ref.nip || company.nip;
-      let date = ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
-      let grossAmount = ref.grossValue || ref.grossAmount || 0;
+      // Step 3: Encrypt token with challenge timestamp
+      const encryptedToken = await encryptToken(rawToken, publicKeyPem, challengeData._challengeTimestamp);
 
+      // Step 4: Authenticate
+      const authResult = await authWithKsefToken(baseUrl, company.nip, encryptedToken, challenge);
+      const authToken = authResult?.authenticationToken?.token || authResult?.authenticationToken;
+      const refNumber = authResult?.referenceNumber;
+
+      if (!authToken) {
+        throw new Error(`No authenticationToken received. Response: ${JSON.stringify(authResult).substring(0, 300)}`);
+      }
+      console.log(`[ksef-sync] Got authToken, refNumber: ${refNumber}`);
+
+      // Step 5: Poll until auth is complete
+      await pollAuthStatus(baseUrl, refNumber, authToken);
+
+      // Step 6: Redeem access token
+      const tokenData = await redeemToken(baseUrl, authToken);
+      const accessToken = tokenData?.accessToken || tokenData?.token;
+
+      if (!accessToken) {
+        throw new Error(`No accessToken received. Response: ${JSON.stringify(tokenData).substring(0, 300)}`);
+      }
+      console.log(`[ksef-sync] SUCCESS with candidate ${ci}! Got accessToken`);
+
+      // Step 7: Query invoices
+      let queryResult;
       try {
-        const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
-        const parsed = parseInvoiceXml(xml);
-        if (parsed.vendor) vendor = parsed.vendor;
-        if (parsed.nip) nip = parsed.nip;
-        if (parsed.date) date = parsed.date;
-        if (parsed.grossAmount) grossAmount = parsed.grossAmount;
-      } catch (xmlErr) {
-        console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
+        queryResult = await queryInvoices(baseUrl, accessToken, company.nip);
+      } catch (e) {
+        console.log(`[ksef-sync] V2 query failed, trying v1: ${e}`);
+        queryResult = await queryInvoicesV1(baseUrl, accessToken);
       }
 
-      const { error: insertError } = await supabase.from("invoices").insert({
-        company_id: company.id,
-        date,
-        vendor,
-        nip,
-        gross_amount: grossAmount,
-        ksef_number: ksefNumber,
-        status: "new",
-      });
+      const invoiceRefs =
+        queryResult?.invoiceHeaderList ||
+        queryResult?.invoicesList ||
+        queryResult?.items ||
+        [];
+      console.log(`[ksef-sync] Found ${invoiceRefs.length} invoices`);
 
-      if (insertError) {
-        console.error(`[ksef-sync] Insert error for ${ksefNumber}:`, insertError);
-      } else {
-        upsertedCount++;
+      // Step 8: Upsert invoices
+      let upsertedCount = 0;
+      for (const ref of invoiceRefs) {
+        const ksefNumber =
+          ref.ksefReferenceNumber || ref.invoiceReferenceNumber || ref.referenceNumber;
+        if (!ksefNumber) continue;
+
+        try {
+          const { data: existing } = await supabase
+            .from("invoices")
+            .select("id")
+            .eq("ksef_number", ksefNumber)
+            .eq("company_id", company.id)
+            .maybeSingle();
+
+          if (existing) continue;
+
+          let vendor = ref.subjectName || ref.vendorName || "Nieznany";
+          let nip = ref.subjectNip || ref.nip || company.nip;
+          let date = ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
+          let grossAmount = ref.grossValue || ref.grossAmount || 0;
+
+          try {
+            const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
+            const parsed = parseInvoiceXml(xml);
+            if (parsed.vendor) vendor = parsed.vendor;
+            if (parsed.nip) nip = parsed.nip;
+            if (parsed.date) date = parsed.date;
+            if (parsed.grossAmount) grossAmount = parsed.grossAmount;
+          } catch (xmlErr) {
+            console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
+          }
+
+          const { error: insertError } = await supabase.from("invoices").insert({
+            company_id: company.id,
+            date,
+            vendor,
+            nip,
+            gross_amount: grossAmount,
+            ksef_number: ksefNumber,
+            status: "new",
+          });
+
+          if (insertError) {
+            console.error(`[ksef-sync] Insert error for ${ksefNumber}:`, insertError);
+          } else {
+            upsertedCount++;
+          }
+        } catch (invErr) {
+          console.error(`[ksef-sync] Error processing ${ksefNumber}:`, invErr);
+        }
       }
-    } catch (invErr) {
-      console.error(`[ksef-sync] Error processing ${ksefNumber}:`, invErr);
+
+      return {
+        companyId: company.id,
+        companyNip: company.nip,
+        totalFound: invoiceRefs.length,
+        newInvoices: upsertedCount,
+      };
+    } catch (err) {
+      console.log(`[ksef-sync] Candidate ${ci} failed: ${err instanceof Error ? err.message.substring(0, 100) : String(err)}`);
+      lastError = err instanceof Error ? err : new Error(String(err));
+      // Wait a bit before trying next candidate to avoid rate limiting
+      if (ci < tokenCandidates.length - 1) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
     }
   }
 
-  return {
-    companyId: company.id,
-    companyNip: company.nip,
-    totalFound: invoiceRefs.length,
-    newInvoices: upsertedCount,
-  };
+  throw lastError || new Error("All token candidates failed");
 }
 
 Deno.serve(async (req) => {
