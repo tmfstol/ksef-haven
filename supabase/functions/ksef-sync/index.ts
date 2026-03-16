@@ -300,7 +300,11 @@ async function redeemToken(baseUrl: string, authToken: string) {
   const text = await res.text();
   if (!res.ok) throw new Error(`Token redeem failed (${res.status}): ${text}`);
   try {
-    return JSON.parse(text);
+    const data = JSON.parse(text);
+    console.log(`[ksef-sync] Redeem response keys: ${JSON.stringify(Object.keys(data))}`);
+    console.log(`[ksef-sync] accessToken present: ${!!data.accessToken}, token present: ${!!data.token}`);
+    if (data.accessToken) console.log(`[ksef-sync] accessToken prefix: ${data.accessToken.substring(0, 40)}...`);
+    return data;
   } catch {
     throw new Error(`Token redeem not JSON: ${text.substring(0, 200)}`);
   }
