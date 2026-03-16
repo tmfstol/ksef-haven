@@ -320,10 +320,12 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
   // v2 API uses /v2/invoices/query/metadata with different body format
   const url = `${baseUrl}/v2/invoices/query/metadata`;
   const queryBody = {
-    queryCriteria: {
+    filters: {
       subjectType: "subject2",
-      invoicingDateFrom: sixMonthsAgo.toISOString().split("T")[0],
-      invoicingDateTo: now.toISOString().split("T")[0],
+      dateRange: {
+        dateFrom: sixMonthsAgo.toISOString().split("T")[0],
+        dateTo: now.toISOString().split("T")[0],
+      },
     },
     pageSize: 100,
   };
