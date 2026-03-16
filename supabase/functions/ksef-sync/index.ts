@@ -60,7 +60,7 @@ function extractSpkiFromCert(certDer: Uint8Array): Uint8Array {
       const totalLen = pos - seqStart + len;
       // SPKI for RSA-2048 is typically 290-300 bytes, RSA-4096 is ~550 bytes
       if (totalLen >= 200 && totalLen <= 1000) {
-        console.log(`[ksef-sync] Found SPKI at offset ${seqStart}, length ${totalLen}`);
+        console.log(`[ksef-sync] Found SPKI at offset ${seqStart}, length ${totalLen}, header bytes: ${Array.from(certDer.slice(seqStart, seqStart + 6)).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
         return certDer.slice(seqStart, seqStart + totalLen);
       }
     }
