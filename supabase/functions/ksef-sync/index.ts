@@ -417,8 +417,8 @@ async function syncCompany(
 
   // Step 3: Encrypt token
   console.log(`[ksef-sync] Step 3: Encrypting token`);
-  // Use full token for encryption (token|timestamp format is handled by encryptToken)
-  const encryptedToken = await encryptToken(company.ksef_token, publicKeyPem);
+  // Use only the raw token part (before first pipe) - the stored value may contain metadata
+  const encryptedToken = await encryptToken(rawToken, publicKeyPem);
 
   // Step 4: Authenticate
   console.log(`[ksef-sync] Step 4: Authenticating with KSeF token`);
