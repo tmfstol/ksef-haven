@@ -19,130 +19,98 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-// Extract public key from X.509 certificate DER bytes
-// X.509 structure: SEQUENCE { tbsCertificate { ... subjectPublicKeyInfo { ... } } }
-// We need to find the SubjectPublicKeyInfo which is itself a SEQUENCE containing
-// the algorithm identifier and the public key
+// Find SPKI in X.509 cert by searching for RSA OID bytes
 function extractSpkiFromCert(certDer: Uint8Array): Uint8Array {
-  // Parse ASN.1 to find SubjectPublicKeyInfo
-  // In X.509, the structure is:
-  // SEQUENCE {
-  //   SEQUENCE (tbsCertificate) {
-  //     [0] version, serialNumber, signature, issuer, validity, subject,
-  //     SEQUENCE (subjectPublicKeyInfo) { ... }
-  //   }
-  //   ...
-  // }
+  // RSA OID: 1.2.840.113549.1.1.1 = 06 09 2a 86 48 86 f7 0d 01 01 01
+  const rsaOid = [0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01];
   
-  let offset = 0;
-  
-  function readTag(data: Uint8Array, pos: number) {
-    const tag = data[pos];
-    pos++;
-    let length = data[pos];
-    pos++;
-    if (length & 0x80) {
-      const numBytes = length & 0x7f;
-      length = 0;
-      for (let i = 0; i < numBytes; i++) {
-        length = (length << 8) | data[pos];
-        pos++;
+  // Find the OID in the cert
+  for (let i = 0; i < certDer.length - rsaOid.length; i++) {
+    let found = true;
+    for (let j = 0; j < rsaOid.length; j++) {
+      if (certDer[i + j] !== rsaOid[j]) { found = false; break; }
+    }
+    if (!found) continue;
+    
+    // OID found at position i. The AlgorithmIdentifier SEQUENCE starts 2 bytes before
+    // (tag 30 + length byte). But we need the SPKI SEQUENCE which is one level up.
+    // Search backwards from the AlgorithmIdentifier to find the enclosing SEQUENCE
+    // SPKI = SEQUENCE { AlgorithmIdentifier, BIT STRING }
+    // AlgorithmIdentifier = SEQUENCE { OID, NULL }
+    // So we need to find the SEQUENCE that contains the AlgorithmIdentifier
+    
+    // The AlgorithmIdentifier SEQUENCE should be at i-2 (30 0d for RSA with NULL param)
+    // The SPKI SEQUENCE should be a few bytes before that
+    for (let back = 2; back < 10; back++) {
+      const seqStart = i - back;
+      if (seqStart < 0) continue;
+      if (certDer[seqStart] !== 0x30) continue; // Must be SEQUENCE
+      
+      // Read the length to verify this is a valid SEQUENCE containing our OID
+      let pos = seqStart + 1;
+      let len = certDer[pos]; pos++;
+      if (len & 0x80) {
+        const numBytes = len & 0x7f;
+        len = 0;
+        for (let k = 0; k < numBytes; k++) {
+          len = (len << 8) | certDer[pos]; pos++;
+        }
+      }
+      
+      const totalLen = pos - seqStart + len;
+      // SPKI for RSA-2048 is typically 290-300 bytes, RSA-4096 is ~550 bytes
+      if (totalLen >= 200 && totalLen <= 1000) {
+        console.log(`[ksef-sync] Found SPKI at offset ${seqStart}, length ${totalLen}`);
+        return certDer.slice(seqStart, seqStart + totalLen);
       }
     }
-    return { tag, length, headerEnd: pos };
   }
   
-  // Outer SEQUENCE
-  const outer = readTag(certDer, 0);
-  // tbsCertificate SEQUENCE
-  const tbs = readTag(certDer, outer.headerEnd);
-  
-  let pos = tbs.headerEnd;
-  const tbsEnd = tbs.headerEnd + tbs.length;
-  
-  // Skip through tbsCertificate fields to find SubjectPublicKeyInfo
-  // Fields: [0] version (optional), serialNumber, signature, issuer, validity, subject, subjectPublicKeyInfo
-  let fieldCount = 0;
-  const targetField = 5; // subjectPublicKeyInfo is field index 5 (after version skip)
-  
-  while (pos < tbsEnd && fieldCount <= targetField) {
-    const field = readTag(certDer, pos);
-    
-    if (fieldCount === targetField) {
-      // This should be SubjectPublicKeyInfo - extract the whole TLV
-      const spkiStart = pos;
-      const spkiEnd = field.headerEnd + field.length;
-      return certDer.slice(spkiStart, spkiEnd);
-    }
-    
-    // Check if first field is the optional [0] version
-    if (fieldCount === 0 && (field.tag & 0xa0) === 0xa0) {
-      // This is the version tag, don't count it as a regular field
-      pos = field.headerEnd + field.length;
-      continue;
-    }
-    
-    pos = field.headerEnd + field.length;
-    fieldCount++;
-  }
-  
-  throw new Error("Could not find SubjectPublicKeyInfo in certificate");
+  throw new Error("Could not find RSA SPKI in certificate");
 }
 
-async function importRsaPublicKey(pem: string): Promise<CryptoKey> {
-  console.log(`[ksef-sync] Key/cert starts with: ${pem.substring(0, 60)}`);
-  console.log(`[ksef-sync] Key/cert length: ${pem.length}`);
+async function importRsaPublicKey(pemOrBase64: string): Promise<CryptoKey> {
+  console.log(`[ksef-sync] Key/cert starts with: ${pemOrBase64.substring(0, 50)}`);
   
-  // Determine format
-  const isCert = pem.includes("BEGIN CERTIFICATE");
-  const isPubKey = pem.includes("BEGIN PUBLIC KEY");
-  
-  // Strip PEM headers and whitespace
-  const pemContents = pem
+  // Strip PEM headers if present
+  const b64 = pemOrBase64
     .replace(/-----BEGIN [^-]+-----/g, "")
     .replace(/-----END [^-]+-----/g, "")
     .replace(/\s/g, "");
     
-  const binaryString = atob(pemContents);
+  const binaryString = atob(b64);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
 
-  // If it's a raw public key (SPKI), import directly
-  if (isPubKey || (!isCert && bytes.length < 600)) {
-    console.log(`[ksef-sync] Importing as raw SPKI public key`);
-    return crypto.subtle.importKey(
+  console.log(`[ksef-sync] Decoded key/cert: ${bytes.length} bytes`);
+
+  // Try importing as raw SPKI first (works for small keys / raw SPKI format)
+  try {
+    return await crypto.subtle.importKey(
       "spki",
       bytes.buffer,
       { name: "RSA-OAEP", hash: "SHA-256" },
       false,
       ["encrypt"]
     );
+  } catch {
+    console.log(`[ksef-sync] Not raw SPKI, trying X.509 extraction`);
   }
 
-  // It's an X.509 certificate - extract the SPKI
-  console.log(`[ksef-sync] Extracting SPKI from X.509 cert (${bytes.length} bytes), first bytes: ${Array.from(bytes.slice(0, 10)).map(b => b.toString(16)).join(" ")}`);
-  
-  try {
-    const spki = extractSpkiFromCert(bytes);
-    console.log(`[ksef-sync] Extracted SPKI (${spki.length} bytes), first bytes: ${Array.from(spki.slice(0, 10)).map(b => b.toString(16)).join(" ")}`);
-    const buf = new ArrayBuffer(spki.length);
-    new Uint8Array(buf).set(spki);
-    return crypto.subtle.importKey(
-      "spki",
-      buf,
-      { name: "RSA-OAEP", hash: "SHA-256" },
-      false,
-      ["encrypt"]
-    );
-  } catch (spkiErr) {
-    console.error(`[ksef-sync] SPKI extraction failed: ${spkiErr}`);
-    // Fallback: try importing the raw bytes as SPKI (maybe it's not actually a cert)
-    console.log(`[ksef-sync] Fallback: trying raw import as SPKI`);
-    return crypto.subtle.importKey(
-      "spki",
-      bytes.buffer,
+  // Extract SPKI from X.509 certificate
+  const spki = extractSpkiFromCert(bytes);
+  const buf = new ArrayBuffer(spki.length);
+  new Uint8Array(buf).set(spki);
+  return crypto.subtle.importKey(
+    "spki",
+    buf,
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false,
+    ["encrypt"]
+  );
+}
       { name: "RSA-OAEP", hash: "SHA-256" },
       false,
       ["encrypt"]
