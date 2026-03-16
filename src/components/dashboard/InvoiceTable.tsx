@@ -113,7 +113,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                 {invoice.nip}
               </td>
               <td className="px-5 py-3.5 text-sm text-foreground text-right font-semibold tabular-nums">
-                {formatCurrency(invoice.grossAmount)}
+                {formatCurrency(invoice.gross_amount)}
               </td>
               <td className="px-5 py-3.5 text-center">
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[invoice.status]}`}>
