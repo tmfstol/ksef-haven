@@ -60,7 +60,7 @@ function extractSpkiFromCert(certDer: Uint8Array): Uint8Array {
       const totalLen = pos - seqStart + len;
       // SPKI for RSA-2048 is typically 290-300 bytes, RSA-4096 is ~550 bytes
       if (totalLen >= 200 && totalLen <= 1000) {
-        console.log(`[ksef-sync] Found SPKI at offset ${seqStart}, length ${totalLen}`);
+        console.log(`[ksef-sync] Found SPKI at offset ${seqStart}, length ${totalLen}, header bytes: ${Array.from(certDer.slice(seqStart, seqStart + 6)).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
         return certDer.slice(seqStart, seqStart + totalLen);
       }
     }
@@ -143,7 +143,20 @@ async function getChallenge(baseUrl: string, nip: string) {
   const text = await res.text();
   if (!res.ok) throw new Error(`Challenge failed (${res.status}): ${text}`);
   try {
-    return JSON.parse(text);
+    const data = JSON.parse(text);
+    console.log(`[ksef-sync] Challenge response keys: ${Object.keys(data).join(", ")}`);
+    // Extract timestamp from challenge response (used for token encryption)
+    let challengeTimestamp: number;
+    if (data.timestampMs) {
+      challengeTimestamp = parseInt(data.timestampMs);
+    } else if (data.timestamp) {
+      challengeTimestamp = Math.floor(new Date(data.timestamp).getTime());
+    } else {
+      challengeTimestamp = Date.now();
+      console.log(`[ksef-sync] WARNING: No timestamp in challenge response, using Date.now()`);
+    }
+    data._challengeTimestamp = challengeTimestamp;
+    return data;
   } catch {
     throw new Error(`Challenge response not JSON: ${text.substring(0, 200)}`);
   }
@@ -197,9 +210,11 @@ async function getPublicKey(baseUrl: string): Promise<string> {
 }
 
 // Step 3: Encrypt token with RSA-OAEP
-async function encryptToken(token: string, publicKeyPem: string): Promise<string> {
-  const timestamp = Date.now();
-  const plaintext = `${token}|${timestamp}`;
+async function encryptToken(token: string, publicKeyPem: string, challengeTimestamp: number): Promise<string> {
+  // KSeF expects: token|timestamp where timestamp is from the challenge response (Unix ms)
+  const plaintext = `${token}|${challengeTimestamp}`;
+  console.log(`[ksef-sync] Encrypting plaintext (${plaintext.length} chars): ${plaintext.substring(0, 80)}...`);
+  
   const encoder = new TextEncoder();
   const data = encoder.encode(plaintext);
 
@@ -282,78 +297,54 @@ async function redeemToken(baseUrl: string, authToken: string) {
     },
     body: JSON.stringify({}),
   });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Token redeem failed (${res.status}): ${text}`);
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`Token redeem not JSON: ${text.substring(0, 200)}`);
-  }
+  const rawText = await res.text();
+  // Strip BOM and trim whitespace
+  const text = rawText.replace(/^\uFEFF/, "").trim();
+  if (!res.ok) throw new Error(`Token redeem failed (${res.status}): ${text.substring(0, 300)}`);
+  const data = JSON.parse(text);
+  // accessToken may be nested: {accessToken: {token: "jwt..."}} or flat {accessToken: "jwt..."}
+  const at = data.accessToken;
+  const accessToken = typeof at === "object" && at?.token ? at.token : at;
+  const rt = data.refreshToken;
+  const refreshToken = typeof rt === "object" && rt?.token ? rt.token : rt;
+  console.log(`[ksef-sync] Got accessToken (${accessToken ? accessToken.length : 0} chars)`);
+  return { accessToken, refreshToken };
 }
 
 // Step 7: Query invoices using accessToken
 async function queryInvoices(baseUrl: string, accessToken: string, nip: string) {
   const now = new Date();
-  const threeMonthsAgo = new Date(now);
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  const sixMonthsAgo = new Date(now);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  console.log(`[ksef-sync] POST ${baseUrl}/api/v2/invoices/query`);
-  const res = await fetchWithRetry(`${baseUrl}/api/v2/invoices/query`, {
+  // v2 API uses /v2/invoices/query/metadata with different body format
+  const url = `${baseUrl}/v2/invoices/query/metadata`;
+  const queryBody = {
+    filters: {
+      subjectType: "subject2",
+      dateRange: {
+        dateFrom: sixMonthsAgo.toISOString().split("T")[0],
+        dateTo: now.toISOString().split("T")[0],
+      },
+    },
+    pageSize: 100,
+  };
+
+  console.log(`[ksef-sync] POST ${url} body: ${JSON.stringify(queryBody)}`);
+  const res = await fetchWithRetry(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({
-      queryCriteria: {
-        subjectType: "subject1",
-        type: "incremental",
-        acquisitionTimestampThresholdFrom: threeMonthsAgo.toISOString(),
-        acquisitionTimestampThresholdTo: now.toISOString(),
-      },
-    }),
+    body: JSON.stringify(queryBody),
   });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Invoice query failed (${res.status}): ${text}`);
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`Invoice query not JSON: ${text.substring(0, 200)}`);
-  }
-}
-
-// Alternative: Try v1-style sync query if v2 doesn't work
-async function queryInvoicesV1(baseUrl: string, sessionToken: string) {
-  const now = new Date();
-  const threeMonthsAgo = new Date(now);
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-
-  const url = `${baseUrl}/api/online/Query/Invoice/Sync?PageSize=100&PageOffset=0`;
-  console.log(`[ksef-sync] POST ${url}`);
-  const res = await fetchWithRetry(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      SessionToken: sessionToken,
-    },
-    body: JSON.stringify({
-      queryCriteria: {
-        subjectType: "subject1",
-        type: "incremental",
-        acquisitionTimestampThresholdFrom: threeMonthsAgo.toISOString(),
-        acquisitionTimestampThresholdTo: now.toISOString(),
-      },
-    }),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`V1 query failed (${res.status}): ${text}`);
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`V1 query not JSON: ${text.substring(0, 200)}`);
-  }
+  const rawText = await res.text();
+  const text = rawText.replace(/^\uFEFF/, "").trim();
+  console.log(`[ksef-sync] Invoice query response (${res.status}): ${text.substring(0, 300)}`);
+  if (!res.ok) throw new Error(`Invoice query failed (${res.status}): ${text.substring(0, 300)}`);
+  return JSON.parse(text);
 }
 
 // Get single invoice
@@ -398,131 +389,137 @@ async function syncCompany(
 ) {
   const baseUrl = KSEF_URLS[ksefEnv] || KSEF_URLS.prod;
 
-  // KSeF token from MCU portal may be stored as "reference|nip-xxx|tokenHash"
-  // The actual auth token is the last part (the hex hash)
-  const parts = company.ksef_token.trim().split("|");
-  const rawToken = parts.length === 3 ? parts[2] : company.ksef_token.trim();
+  // Try multiple token interpretations - the stored value may be "reference|nip-xxx|hash"
+  const fullToken = company.ksef_token.trim();
+  const parts = fullToken.split("|");
+  // Candidates: full token, first part (reference), last part (hash)
+  const tokenCandidates = parts.length === 3
+    ? [parts[0], parts[2], fullToken]
+    : [fullToken];
+
   console.log(`[ksef-sync] Using KSeF env: ${ksefEnv}, base: ${baseUrl}`);
-  console.log(`[ksef-sync] Token parts: ${parts.length}, using token length: ${rawToken.length}, prefix: ${rawToken.substring(0, 20)}...`);
+  console.log(`[ksef-sync] Token candidates: ${tokenCandidates.length}`);
 
-  // Step 1: Get challenge
-  console.log(`[ksef-sync] Step 1: Getting challenge for NIP: ${company.nip}`);
-  const challengeData = await getChallenge(baseUrl, company.nip);
-  const challenge = challengeData.challenge;
-  console.log(`[ksef-sync] Got challenge: ${challenge?.substring(0, 20)}...`);
+  let lastError: Error | null = null;
 
-  // Step 2: Get public key
-  console.log(`[ksef-sync] Step 2: Getting RSA public key`);
-  const publicKeyPem = await getPublicKey(baseUrl);
-  console.log(`[ksef-sync] Got public key (${publicKeyPem.length} chars)`);
-
-  // Step 3: Encrypt token
-  console.log(`[ksef-sync] Step 3: Encrypting token`);
-  // Use only the raw token part (before first pipe) - the stored value may contain metadata
-  const encryptedToken = await encryptToken(rawToken, publicKeyPem);
-
-  // Step 4: Authenticate
-  console.log(`[ksef-sync] Step 4: Authenticating with KSeF token`);
-  const authResult = await authWithKsefToken(baseUrl, company.nip, encryptedToken, challenge);
-  const authToken = authResult?.authenticationToken?.token || authResult?.authenticationToken;
-  const refNumber = authResult?.referenceNumber;
-
-  if (!authToken) {
-    throw new Error(`No authenticationToken received. Response: ${JSON.stringify(authResult).substring(0, 300)}`);
-  }
-  console.log(`[ksef-sync] Got authToken, refNumber: ${refNumber}`);
-
-  // Step 5: Poll until auth is complete
-  console.log(`[ksef-sync] Step 5: Polling auth status`);
-  await pollAuthStatus(baseUrl, refNumber, authToken);
-
-  // Step 6: Redeem access token
-  console.log(`[ksef-sync] Step 6: Redeeming access token`);
-  const tokenData = await redeemToken(baseUrl, authToken);
-  const accessToken = tokenData?.accessToken || tokenData?.token;
-
-  if (!accessToken) {
-    throw new Error(`No accessToken received. Response: ${JSON.stringify(tokenData).substring(0, 300)}`);
-  }
-  console.log(`[ksef-sync] Got accessToken`);
-
-  // Step 7: Query invoices
-  console.log(`[ksef-sync] Step 7: Querying invoices`);
-  let queryResult;
-  try {
-    queryResult = await queryInvoices(baseUrl, accessToken, company.nip);
-  } catch (e) {
-    console.log(`[ksef-sync] V2 query failed, trying v1: ${e}`);
-    queryResult = await queryInvoicesV1(baseUrl, accessToken);
-  }
-
-  const invoiceRefs =
-    queryResult?.invoiceHeaderList ||
-    queryResult?.invoicesList ||
-    queryResult?.items ||
-    [];
-  console.log(`[ksef-sync] Found ${invoiceRefs.length} invoices`);
-
-  // Step 8: Upsert invoices
-  let upsertedCount = 0;
-  for (const ref of invoiceRefs) {
-    const ksefNumber =
-      ref.ksefReferenceNumber || ref.invoiceReferenceNumber || ref.referenceNumber;
-    if (!ksefNumber) continue;
+  for (let ci = 0; ci < tokenCandidates.length; ci++) {
+    const rawToken = tokenCandidates[ci];
+    console.log(`[ksef-sync] Trying candidate ${ci}: length=${rawToken.length}, prefix=${rawToken.substring(0, 30)}...`);
 
     try {
-      const { data: existing } = await supabase
-        .from("invoices")
-        .select("id")
-        .eq("ksef_number", ksefNumber)
-        .eq("company_id", company.id)
-        .maybeSingle();
+      // Step 1: Get challenge (fresh for each attempt)
+      const challengeData = await getChallenge(baseUrl, company.nip);
+      const challenge = challengeData.challenge;
+      console.log(`[ksef-sync] Got challenge: ${challenge?.substring(0, 20)}...`);
 
-      if (existing) continue;
+      // Step 2: Get public key
+      const publicKeyPem = await getPublicKey(baseUrl);
 
-      // Try to get full invoice XML for details
-      let vendor = ref.subjectName || ref.vendorName || "Nieznany";
-      let nip = ref.subjectNip || ref.nip || company.nip;
-      let date = ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
-      let grossAmount = ref.grossValue || ref.grossAmount || 0;
+      // Step 3: Encrypt token with challenge timestamp
+      const encryptedToken = await encryptToken(rawToken, publicKeyPem, challengeData._challengeTimestamp);
 
-      try {
-        const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
-        const parsed = parseInvoiceXml(xml);
-        if (parsed.vendor) vendor = parsed.vendor;
-        if (parsed.nip) nip = parsed.nip;
-        if (parsed.date) date = parsed.date;
-        if (parsed.grossAmount) grossAmount = parsed.grossAmount;
-      } catch (xmlErr) {
-        console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
+      // Step 4: Authenticate
+      const authResult = await authWithKsefToken(baseUrl, company.nip, encryptedToken, challenge);
+      const authToken = authResult?.authenticationToken?.token || authResult?.authenticationToken;
+      const refNumber = authResult?.referenceNumber;
+
+      if (!authToken) {
+        throw new Error(`No authenticationToken received. Response: ${JSON.stringify(authResult).substring(0, 300)}`);
+      }
+      console.log(`[ksef-sync] Got authToken, refNumber: ${refNumber}`);
+
+      // Step 5: Poll until auth is complete
+      await pollAuthStatus(baseUrl, refNumber, authToken);
+
+      // Step 6: Redeem access token
+      const tokenData = await redeemToken(baseUrl, authToken);
+      const accessToken = tokenData?.accessToken || tokenData?.token;
+
+      if (!accessToken) {
+        throw new Error(`No accessToken received. Response: ${JSON.stringify(tokenData).substring(0, 300)}`);
+      }
+      console.log(`[ksef-sync] SUCCESS with candidate ${ci}! Got accessToken`);
+
+      // Step 7: Query invoices
+      const queryResult = await queryInvoices(baseUrl, accessToken, company.nip);
+
+      const invoiceRefs =
+        queryResult?.invoiceHeaderList ||
+        queryResult?.invoicesList ||
+        queryResult?.items ||
+        [];
+      console.log(`[ksef-sync] Found ${invoiceRefs.length} invoices`);
+
+      // Step 8: Upsert invoices
+      let upsertedCount = 0;
+      for (const ref of invoiceRefs) {
+        const ksefNumber =
+          ref.ksefReferenceNumber || ref.invoiceReferenceNumber || ref.referenceNumber;
+        if (!ksefNumber) continue;
+
+        try {
+          const { data: existing } = await supabase
+            .from("invoices")
+            .select("id")
+            .eq("ksef_number", ksefNumber)
+            .eq("company_id", company.id)
+            .maybeSingle();
+
+          if (existing) continue;
+
+          let vendor = ref.subjectName || ref.vendorName || "Nieznany";
+          let nip = ref.subjectNip || ref.nip || company.nip;
+          let date = ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
+          let grossAmount = ref.grossValue || ref.grossAmount || 0;
+
+          try {
+            const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
+            const parsed = parseInvoiceXml(xml);
+            if (parsed.vendor) vendor = parsed.vendor;
+            if (parsed.nip) nip = parsed.nip;
+            if (parsed.date) date = parsed.date;
+            if (parsed.grossAmount) grossAmount = parsed.grossAmount;
+          } catch (xmlErr) {
+            console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
+          }
+
+          const { error: insertError } = await supabase.from("invoices").insert({
+            company_id: company.id,
+            date,
+            vendor,
+            nip,
+            gross_amount: grossAmount,
+            ksef_number: ksefNumber,
+            status: "new",
+          });
+
+          if (insertError) {
+            console.error(`[ksef-sync] Insert error for ${ksefNumber}:`, insertError);
+          } else {
+            upsertedCount++;
+          }
+        } catch (invErr) {
+          console.error(`[ksef-sync] Error processing ${ksefNumber}:`, invErr);
+        }
       }
 
-      const { error: insertError } = await supabase.from("invoices").insert({
-        company_id: company.id,
-        date,
-        vendor,
-        nip,
-        gross_amount: grossAmount,
-        ksef_number: ksefNumber,
-        status: "new",
-      });
-
-      if (insertError) {
-        console.error(`[ksef-sync] Insert error for ${ksefNumber}:`, insertError);
-      } else {
-        upsertedCount++;
+      return {
+        companyId: company.id,
+        companyNip: company.nip,
+        totalFound: invoiceRefs.length,
+        newInvoices: upsertedCount,
+      };
+    } catch (err) {
+      console.log(`[ksef-sync] Candidate ${ci} failed: ${err instanceof Error ? err.message.substring(0, 100) : String(err)}`);
+      lastError = err instanceof Error ? err : new Error(String(err));
+      // Wait a bit before trying next candidate to avoid rate limiting
+      if (ci < tokenCandidates.length - 1) {
+        await new Promise(r => setTimeout(r, 1000));
       }
-    } catch (invErr) {
-      console.error(`[ksef-sync] Error processing ${ksefNumber}:`, invErr);
     }
   }
 
-  return {
-    companyId: company.id,
-    companyNip: company.nip,
-    totalFound: invoiceRefs.length,
-    newInvoices: upsertedCount,
-  };
+  throw lastError || new Error("All token candidates failed");
 }
 
 Deno.serve(async (req) => {
