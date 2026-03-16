@@ -98,8 +98,21 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground">Ładowanie faktur...</p>
               </div>
             </div>
-          ) : isError || !invoices || invoices.length === 0 ? (
-            <EmptyState isError={isError} onRetry={() => refetch()} />
+          ) : isError ? (
+            <EmptyState isError onRetry={() => refetch()} />
+          ) : !invoices || invoices.length === 0 ? (
+            <EmptyState
+              title={activeCompany ? `Brak faktur dla ${activeCompany.name}` : "Brak faktur"}
+              description={
+                activeCompany
+                  ? "Token KSeF zapisujesz w ustawieniach firmy. Po jego zapisaniu uruchom synchronizację z lokalnej aplikacji, aby pobrać pierwsze faktury."
+                  : "Przejdź do ustawień i dodaj firmę z tokenem KSeF, aby rozpocząć pracę."
+              }
+              actionLabel={activeCompany ? "Otwórz ustawienia firmy" : "Przejdź do ustawień"}
+              onRetry={() =>
+                navigate(activeCompany ? `/settings?company=${activeCompany.id}` : "/settings")
+              }
+            />
           ) : (
             <>
               <StatsBar invoices={filteredInvoices} />
