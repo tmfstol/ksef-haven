@@ -398,11 +398,12 @@ async function syncCompany(
 ) {
   const baseUrl = KSEF_URLS[ksefEnv] || KSEF_URLS.prod;
 
-  // The full stored value IS the KSeF token from MCU portal
-  // Format: "20260316-EC-xxx|nip-xxx|hash" - entire string is the token
-  const rawToken = company.ksef_token.trim();
+  // KSeF token from MCU portal may be stored as "reference|nip-xxx|tokenHash"
+  // The actual auth token is the last part (the hex hash)
+  const parts = company.ksef_token.trim().split("|");
+  const rawToken = parts.length === 3 ? parts[2] : company.ksef_token.trim();
   console.log(`[ksef-sync] Using KSeF env: ${ksefEnv}, base: ${baseUrl}`);
-  console.log(`[ksef-sync] Token length: ${rawToken.length}, prefix: ${rawToken.substring(0, 30)}...`);
+  console.log(`[ksef-sync] Token parts: ${parts.length}, using token length: ${rawToken.length}, prefix: ${rawToken.substring(0, 20)}...`);
 
   // Step 1: Get challenge
   console.log(`[ksef-sync] Step 1: Getting challenge for NIP: ${company.nip}`);
