@@ -112,20 +112,20 @@ export function useSyncAllCompanies() {
 
   return useMutation({
     mutationFn: async () => {
-      // Sync is still handled by local server if available
       const res = await fetch("http://localhost:4000/api/sync/all", { method: "POST" });
-      if (!res.ok) throw new Error("Sync all failed");
+      if (!res.ok) throw new Error("LOCAL_SYNC_FAILED");
       return res.json();
     },
     onSuccess: () => {
       toast.success("Synchronizacja wszystkich firm zakończona", {
-        description: "Faktury ze wszystkich firm zostały zsynchronizowane.",
+        description: "Faktury ze wszystkich firm zostały zapisane w bazie danych.",
       });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
     onError: () => {
-      toast.error("Synchronizacja nieudana", {
-        description: "Nie udało się zsynchronizować wszystkich firm.",
+      toast.error("Synchronizacja lokalna niedostępna", {
+        description:
+          "Pobieranie faktur dla wszystkich firm nadal wymaga lokalnego modułu synchronizacji na localhost:4000.",
       });
     },
   });

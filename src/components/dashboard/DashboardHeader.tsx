@@ -34,8 +34,7 @@ export function DashboardHeader({
           <>
             <Wifi className="h-4 w-4 text-success" />
             <span className="text-muted-foreground">
-              <span className="text-success font-medium">Połączono</span>
-              <span className="hidden sm:inline ml-1.5 text-muted-foreground/70">\\TB-AFS</span>
+              <span className="text-success font-medium">Baza danych online</span>
             </span>
           </>
         ) : (
@@ -116,7 +115,7 @@ export function DashboardHeader({
         ) : (
           <RefreshCw className="h-4 w-4" />
         )}
-        {isSyncing ? "Synchronizuję..." : "Synchronizuj z KSeF"}
+        {isSyncing ? "Synchronizuję..." : "Synchronizuj lokalnie"}
       </Button>
     </header>
   );

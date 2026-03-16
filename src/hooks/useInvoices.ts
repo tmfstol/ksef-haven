@@ -43,20 +43,20 @@ export function useSync() {
 
   return useMutation({
     mutationFn: async () => {
-      // Sync still requires the local server for KSeF API access
       const res = await fetch("http://localhost:4000/api/sync", { method: "POST" });
-      if (!res.ok) throw new Error("Sync failed");
+      if (!res.ok) throw new Error("LOCAL_SYNC_FAILED");
       return res.json();
     },
     onSuccess: () => {
       toast.success("Synchronizacja zakończona", {
-        description: "Wszystkie faktury zostały zsynchronizowane z KSeF.",
+        description: "Faktury zostały pobrane i zapisane w bazie danych.",
       });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
     onError: () => {
-      toast.error("Synchronizacja nieudana", {
-        description: "Nie można połączyć się z KSeF. Sprawdź czy lokalny serwer jest uruchomiony.",
+      toast.error("Synchronizacja lokalna niedostępna", {
+        description:
+          "Token KSeF może być zapisany poprawnie, ale pobieranie faktur nadal wymaga lokalnego modułu synchronizacji na localhost:4000.",
       });
     },
   });
