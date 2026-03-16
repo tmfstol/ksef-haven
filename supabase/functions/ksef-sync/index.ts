@@ -433,10 +433,9 @@ async function syncCompany(
   const publicKeyPem = await getPublicKey(baseUrl);
   console.log(`[ksef-sync] Got public key (${publicKeyPem.length} chars)`);
 
-  // Step 3: Encrypt token
-  console.log(`[ksef-sync] Step 3: Encrypting token`);
-  // Use only the raw token part (before first pipe) - the stored value may contain metadata
-  const encryptedToken = await encryptToken(rawToken, publicKeyPem);
+  // Step 3: Encrypt token using challenge timestamp
+  console.log(`[ksef-sync] Step 3: Encrypting token with challenge timestamp: ${challengeData._challengeTimestamp}`);
+  const encryptedToken = await encryptToken(rawToken, publicKeyPem, challengeData._challengeTimestamp);
 
   // Step 4: Authenticate
   console.log(`[ksef-sync] Step 4: Authenticating with KSeF token`);
