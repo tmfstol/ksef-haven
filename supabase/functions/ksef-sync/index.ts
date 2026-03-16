@@ -306,69 +306,57 @@ async function redeemToken(baseUrl: string, authToken: string) {
   }
 }
 
-// Step 7: Query invoices using accessToken
+// Step 7: Query invoices using accessToken - try multiple endpoint variants
 async function queryInvoices(baseUrl: string, accessToken: string, nip: string) {
   const now = new Date();
   const threeMonthsAgo = new Date(now);
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-  console.log(`[ksef-sync] POST ${baseUrl}/api/v2/invoices/query`);
-  const res = await fetchWithRetry(`${baseUrl}/api/v2/invoices/query`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
+  const queryBody = JSON.stringify({
+    queryCriteria: {
+      subjectType: "subject1",
+      type: "incremental",
+      acquisitionTimestampThresholdFrom: threeMonthsAgo.toISOString(),
+      acquisitionTimestampThresholdTo: now.toISOString(),
     },
-    body: JSON.stringify({
-      queryCriteria: {
-        subjectType: "subject1",
-        type: "incremental",
-        acquisitionTimestampThresholdFrom: threeMonthsAgo.toISOString(),
-        acquisitionTimestampThresholdTo: now.toISOString(),
-      },
-    }),
   });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Invoice query failed (${res.status}): ${text}`);
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`Invoice query not JSON: ${text.substring(0, 200)}`);
-  }
-}
 
-// Alternative: Try v1-style sync query if v2 doesn't work
-async function queryInvoicesV1(baseUrl: string, sessionToken: string) {
-  const now = new Date();
-  const threeMonthsAgo = new Date(now);
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  // Try multiple endpoint paths
+  const endpoints = [
+    `${baseUrl}/api/v2/invoices/query/metadata`,
+    `${baseUrl}/api/v2/invoices/query`,
+    `${baseUrl}/v2/invoices/query/metadata`,
+    `${baseUrl}/v2/invoices/query`,
+  ];
 
-  const url = `${baseUrl}/api/online/Query/Invoice/Sync?PageSize=100&PageOffset=0`;
-  console.log(`[ksef-sync] POST ${url}`);
-  const res = await fetchWithRetry(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      SessionToken: sessionToken,
-    },
-    body: JSON.stringify({
-      queryCriteria: {
-        subjectType: "subject1",
-        type: "incremental",
-        acquisitionTimestampThresholdFrom: threeMonthsAgo.toISOString(),
-        acquisitionTimestampThresholdTo: now.toISOString(),
-      },
-    }),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`V1 query failed (${res.status}): ${text}`);
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`V1 query not JSON: ${text.substring(0, 200)}`);
+  for (const url of endpoints) {
+    console.log(`[ksef-sync] Trying invoice query: POST ${url}`);
+    try {
+      const res = await fetchWithRetry(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: queryBody,
+      });
+      const text = await res.text();
+      if (res.ok) {
+        console.log(`[ksef-sync] Invoice query succeeded at ${url}`);
+        try {
+          return JSON.parse(text);
+        } catch {
+          throw new Error(`Invoice query not JSON: ${text.substring(0, 200)}`);
+        }
+      }
+      console.log(`[ksef-sync] Endpoint ${url} returned ${res.status}: ${text.substring(0, 100)}`);
+    } catch (err) {
+      console.log(`[ksef-sync] Endpoint ${url} failed: ${err}`);
+    }
   }
+
+  throw new Error("All invoice query endpoints returned errors");
 }
 
 // Get single invoice
