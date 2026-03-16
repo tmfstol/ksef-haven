@@ -45,7 +45,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
     let cmp = 0;
     if (sortKey === "date") cmp = a.date.localeCompare(b.date);
     else if (sortKey === "vendor") cmp = a.vendor.localeCompare(b.vendor);
-    else cmp = a.grossAmount - b.grossAmount;
+    else cmp = a.gross_amount - b.gross_amount;
     return sortAsc ? cmp : -cmp;
   });
 
