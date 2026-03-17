@@ -11,6 +11,7 @@ type DownloadState = { id: string; format: "xml" | "upo" | "pdf" } | null;
 
 interface InvoiceTableProps {
   invoices: Invoice[];
+  lastSeenTimestamp?: string | null;
 }
 
 type SortKey = "date" | "vendor" | "gross_amount";
