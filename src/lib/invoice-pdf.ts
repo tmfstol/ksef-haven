@@ -310,7 +310,7 @@ function fmtNum(val: string | number): string {
   return n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function generateInvoicePdf(inv: ParsedInvoice): void {
+export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pw = 210;
   const mg = 12;
