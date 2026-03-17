@@ -843,28 +843,45 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
     pdf.text("Dodatkowy opis", mg, y);
     y += 5;
 
+    // Column widths: Numer wiersza (narrow), Rodzaj informacji (medium), Treść informacji (wide)
+    const uwagiCol1W = Math.round(cw * 0.18);
+    const uwagiCol2W = Math.round(cw * 0.27);
+    const uwagiCol3W = cw - uwagiCol1W - uwagiCol2W;
+
     inv.uwagi.forEach((u) => {
-      checkPage(10);
+      // Calculate needed height based on text wrapping
+      norm(7);
+      const kluczLines = wrapText(u.klucz, uwagiCol2W - 4, 7);
+      const wartoscLines = wrapText(u.wartosc, uwagiCol3W - 4, 7);
+      const maxLines = Math.max(1, kluczLines.length, wartoscLines.length);
+      const dataRowH = Math.max(6, maxLines * 3.5 + 2);
+
+      checkPage(6 + dataRowH + 2);
+
       // Header row
-      fillRect(mg, y, cw / 3, 6);
-      fillRect(mg + cw / 3, y, cw / 3, 6);
-      fillRect(mg + 2 * cw / 3, y, cw / 3, 6);
+      fillRect(mg, y, uwagiCol1W, 6);
+      fillRect(mg + uwagiCol1W, y, uwagiCol2W, 6);
+      fillRect(mg + uwagiCol1W + uwagiCol2W, y, uwagiCol3W, 6);
 
       bold(6.5); BLACK();
       pdf.text("Numer wiersza", mg + 2, y + 4);
-      pdf.text(t("Rodzaj informacji"), mg + cw / 3 + 2, y + 4);
-      pdf.text(t("Tresc informacji"), mg + 2 * cw / 3 + 2, y + 4);
+      pdf.text(t("Rodzaj informacji"), mg + uwagiCol1W + 2, y + 4);
+      pdf.text(t("Tresc informacji"), mg + uwagiCol1W + uwagiCol2W + 2, y + 4);
       y += 6;
 
-      // Data row
-      norm(7);
-      drawRect(mg, y, cw / 3, 6);
-      drawRect(mg + cw / 3, y, cw / 3, 6);
-      drawRect(mg + 2 * cw / 3, y, cw / 3, 6);
+      // Data row with wrapping
+      norm(7); BLACK();
+      drawRect(mg, y, uwagiCol1W, dataRowH);
+      drawRect(mg + uwagiCol1W, y, uwagiCol2W, dataRowH);
+      drawRect(mg + uwagiCol1W + uwagiCol2W, y, uwagiCol3W, dataRowH);
 
-      pdf.text(t(u.klucz), mg + cw / 3 + 2, y + 4);
-      pdf.text(t(u.wartosc), mg + 2 * cw / 3 + 2, y + 4);
-      y += 8;
+      kluczLines.forEach((line: string, li: number) => {
+        pdf.text(line, mg + uwagiCol1W + 2, y + 4 + li * 3.5);
+      });
+      wartoscLines.forEach((line: string, li: number) => {
+        pdf.text(line, mg + uwagiCol1W + uwagiCol2W + 2, y + 4 + li * 3.5);
+      });
+      y += dataRowH + 2;
     });
 
     y += 4;
