@@ -523,6 +523,20 @@ Deno.serve(async (req) => {
     const xml = await invoiceRes.text();
     console.log(`[ksef-download] Got XML (${xml.length} chars)`);
 
+    if (format === "pdf") {
+      // Parse XML and generate PDF
+      console.log(`[ksef-download] Generating PDF from XML`);
+      const parsed = parseKsefXml(xml, invoice.ksef_number);
+      const pdfBase64 = generateInvoicePdf(parsed);
+      return new Response(JSON.stringify({ 
+        pdf: pdfBase64, 
+        content_type: "application/pdf",
+        ksef_number: invoice.ksef_number 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ xml, ksef_number: invoice.ksef_number }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
