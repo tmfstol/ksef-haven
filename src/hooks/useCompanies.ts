@@ -58,17 +58,21 @@ export function useUpdateCompany() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (company: { id: string; name: string; nip: string; ksefToken: string; storagePath: string }) => {
+    mutationFn: async (company: { id: string; name: string; nip: string; ksefToken?: string; storagePath: string }) => {
+      const updatePayload: Record<string, string> = {
+        name: company.name,
+        nip: company.nip,
+        storage_path: company.storagePath,
+      };
+      // Only update ksef_token if user provided a new value
+      if (company.ksefToken && company.ksefToken.trim() && company.ksefToken !== "••••••••") {
+        updatePayload.ksef_token = company.ksefToken;
+      }
       const { data, error } = await supabase
         .from("companies")
-        .update({
-          name: company.name,
-          nip: company.nip,
-          ksef_token: company.ksefToken,
-          storage_path: company.storagePath,
-        })
+        .update(updatePayload)
         .eq("id", company.id)
-        .select()
+        .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id")
         .single();
       if (error) throw error;
       return data;
