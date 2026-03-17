@@ -59,6 +59,23 @@ interface InvoiceLine {
   brutto: string;
 }
 
+interface ZamowienieLine {
+  nr: string;
+  opis: string;
+  jm: string;
+  ilosc: string;
+  cenaNetto: string;
+  wartoscNetto: string;
+  stawkaVat: string;
+}
+
+interface ZaliczkaLine {
+  nrZaliczki: string;
+  opis: string;
+  kwota: string;
+  stawkaVat: string;
+}
+
 interface ParsedInvoice {
   ksefNumber: string;
   rodzajFaktury: string;
@@ -72,6 +89,8 @@ interface ParsedInvoice {
   sprzedawca: InvoiceParty;
   nabywca: InvoiceParty;
   pozycje: InvoiceLine[];
+  zamowienie: ZamowienieLine[];
+  zaliczki: ZaliczkaLine[];
   sumaNettoWgStawek: { stawka: string; netto: string; vat: string }[];
   sumaNetto: string;
   sumaVat: string;
