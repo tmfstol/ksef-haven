@@ -314,34 +314,92 @@ async function redeemToken(baseUrl: string, authToken: string) {
 // Step 7: Query invoices using accessToken
 async function queryInvoices(baseUrl: string, accessToken: string, nip: string) {
   const now = new Date();
-  const sixMonthsAgo = new Date(now);
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 3);
+  const threeMonthsAgo = new Date(now);
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-  const url = `${baseUrl}/api/v2/invoices/query/metadata`;
-  const queryBody = {
-    subjectType: "subject2",
-    dateRange: {
-      dateType: "issue",
-      from: sixMonthsAgo.toISOString(),
-      to: now.toISOString(),
-    },
-  };
+  const url = `${baseUrl}/api/v2/invoices/query/metadata?pageSize=100`;
+  const allInvoices: any[] = [];
+  let continuationToken: string | null = null;
+  let pageNum = 0;
 
-  console.log(`[ksef-sync] POST ${url} body: ${JSON.stringify(queryBody)}`);
-  const res = await fetchWithRetry(url, {
-    method: "POST",
-    headers: {
+  while (true) {
+    const queryBody: any = {
+      subjectType: "subject2",
+      dateRange: {
+        dateType: "issue",
+        from: threeMonthsAgo.toISOString(),
+        to: now.toISOString(),
+      },
+    };
+
+    // Build headers - add continuation token for subsequent pages
+    const headers: Record<string, string> = {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       Accept: "application/json",
-    },
-    body: JSON.stringify(queryBody),
-  });
-  const rawText = await res.text();
-  const text = rawText.replace(/^\uFEFF/, "").trim();
-  console.log(`[ksef-sync] Invoice query response (${res.status}): ${text.substring(0, 500)}`);
-  if (!res.ok) throw new Error(`Invoice query failed (${res.status}): ${text.substring(0, 300)}`);
-  return JSON.parse(text);
+    };
+    if (continuationToken) {
+      headers["x-continuation-token"] = continuationToken;
+    }
+
+    // Rate limit: wait between pages
+    if (pageNum > 0) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    console.log(`[ksef-sync] POST ${url} page=${pageNum}, continuationToken=${continuationToken ? continuationToken.substring(0, 30) + '...' : 'none'}`);
+
+    let res: Response;
+    for (let retry = 0; retry < 3; retry++) {
+      res = await fetchWithRetry(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(queryBody),
+      });
+      if (res.status === 429) {
+        const wait = Math.pow(2, retry + 1) * 1000;
+        console.log(`[ksef-sync] Rate limited on page ${pageNum}, waiting ${wait}ms`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      break;
+    }
+    const rawText = await res!.text();
+    const text = rawText.replace(/^\uFEFF/, "").trim();
+    console.log(`[ksef-sync] Invoice query page ${pageNum} response (${res!.status}): ${text.substring(0, 300)}`);
+    if (!res!.ok) throw new Error(`Invoice query failed (${res!.status}): ${text.substring(0, 300)}`);
+
+    const data = JSON.parse(text);
+    
+    // Debug: log all response keys and headers
+    console.log(`[ksef-sync] Response keys: ${Object.keys(data).join(', ')}`);
+    const allHeaders: string[] = [];
+    res!.headers.forEach((v, k) => allHeaders.push(`${k}: ${v.substring(0, 50)}`));
+    console.log(`[ksef-sync] Response headers: ${allHeaders.join(' | ')}`);
+    
+    const pageInvoices = data?.invoices || data?.invoiceHeaderList || [];
+    allInvoices.push(...pageInvoices);
+
+    // Get continuation token from response headers or body
+    const resContinuationToken = res!.headers.get("x-continuation-token") || data?.continuationToken || data?.nextPageToken || null;
+
+    if (!data.hasMore || !resContinuationToken) {
+      console.log(`[ksef-sync] No more pages. hasMore=${data.hasMore}, token=${!!resContinuationToken}, invoiceCount=${pageInvoices.length}`);
+      break;
+    }
+
+    continuationToken = resContinuationToken;
+    pageNum++;
+
+    // Safety limit
+    if (pageNum > 50) {
+      console.log(`[ksef-sync] Reached page limit (50), stopping pagination`);
+      break;
+    }
+  }
+
+  console.log(`[ksef-sync] Total invoices fetched across ${pageNum + 1} pages: ${allInvoices.length}`);
+  return { invoices: allInvoices };
 }
 
 // Get single invoice
