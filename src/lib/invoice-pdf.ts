@@ -543,7 +543,10 @@ export function generateInvoicePdf(inv: ParsedInvoice): void {
 
   inv.sumaNettoWgStawek.forEach((s) => {
     norm(7); BLACK();
-    pdf.text(`${s.stawka}%`, sumX + 2, y + 2.5);
+    const stawkaLabel = ["zw", "oo", "np", "np-ue", "np-kraj", "ryczalt"].includes(s.stawka) 
+      ? s.stawka.toUpperCase() 
+      : `${s.stawka}%`;
+    pdf.text(stawkaLabel, sumX + 2, y + 2.5);
     pdf.text(fmtNum(s.netto), sumX + 30, y + 2.5, { align: "right" });
     pdf.text(fmtNum(s.vat), sumX + 55, y + 2.5, { align: "right" });
     const brutto = (parseFloat(s.netto) + parseFloat(s.vat)).toFixed(2);
