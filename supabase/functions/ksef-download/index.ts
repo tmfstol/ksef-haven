@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json().catch(() => ({}));
-    const { invoice_id, ksef_env = "prod" } = body;
+    const { invoice_id, ksef_env = "prod", format = "xml" } = body;
 
     if (!invoice_id) {
       return new Response(JSON.stringify({ error: "Brak invoice_id" }), {
