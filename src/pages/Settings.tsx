@@ -36,7 +36,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
         setEditingCompany(company);
         setName(company.name);
         setNip(company.nip);
-        setKsefToken(company.ksef_token);
+        setKsefToken("••••••••");
         setStoragePath(company.storage_path);
       }
     }
