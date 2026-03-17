@@ -43,6 +43,8 @@ interface InvoiceParty {
   adres: string;
   email: string;
   telefon: string;
+  eori: string;
+  prefiksVat: string;
 }
 
 interface InvoiceLine {
@@ -125,7 +127,7 @@ function parseAddr(adresEl: Element | null): string {
 }
 
 function parseParty(el: Element | null): InvoiceParty {
-  if (!el) return { nip: "", nazwa: "", adres: "", email: "", telefon: "" };
+  if (!el) return { nip: "", nazwa: "", adres: "", email: "", telefon: "", eori: "", prefiksVat: "" };
   const ident = getEl(el, "DaneIdentyfikacyjne");
   const adresEl = getEl(el, "Adres");
   const kontakt = getEl(el, "DaneKontaktowe");
@@ -135,6 +137,8 @@ function parseParty(el: Element | null): InvoiceParty {
     adres: parseAddr(adresEl),
     email: getText(kontakt, "Email") || "",
     telefon: getText(kontakt, "Telefon") || "",
+    eori: getText(ident, "NrEORI") || getText(el, "NrEORI") || "",
+    prefiksVat: getText(ident, "PrefiksVAT") || getText(el, "PrefiksVAT") || getText(ident, "PrefVAT") || "",
   };
 }
 
@@ -383,93 +387,68 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   const halfW = cw / 2 - 2;
   const partyStartY = y;
 
-  // Sprzedawca
-  bold(9); BLACK();
-  pdf.text("Sprzedawca", mg, y);
-  y += 5;
+  // Helper to render party details
+  const renderParty = (party: InvoiceParty, label: string, x: number, colW: number): number => {
+    let py = partyStartY;
+    bold(9); BLACK();
+    pdf.text(t(label), x, py);
+    py += 5;
 
-  norm(7); DGRAY();
-  if (inv.sprzedawca.nip) {
-    pdf.text(`NIP: ${inv.sprzedawca.nip}`, mg + 2, y);
-    y += 3.5;
-  }
-  bold(8); BLACK();
-  const sellerNameLines = wrapText(inv.sprzedawca.nazwa, halfW - 4, 8);
-  sellerNameLines.forEach((line: string) => {
-    pdf.text(line, mg + 2, y);
-    y += 3.5;
-  });
-
-  if (inv.sprzedawca.adres) {
     norm(7); DGRAY();
-    bold(7);
-    pdf.text("Adres", mg + 2, y);
-    y += 3.5;
-    norm(7);
-    const addrLines = wrapText(inv.sprzedawca.adres, halfW - 4, 7);
-    addrLines.forEach((line: string) => {
-      pdf.text(line, mg + 2, y);
-      y += 3.5;
+    if (party.eori) {
+      pdf.text(`Numer EORI: ${party.eori}`, x + 2, py);
+      py += 3.5;
+    }
+    if (party.prefiksVat) {
+      pdf.text(`Prefiks VAT: ${party.prefiksVat}`, x + 2, py);
+      py += 3.5;
+    }
+    if (party.nip) {
+      pdf.text(`NIP: ${party.nip}`, x + 2, py);
+      py += 3.5;
+    }
+    bold(8); BLACK();
+    pdf.text(t("Nazwa"), x + 2, py);
+    py += 3.5;
+    norm(7); BLACK();
+    const nameLines = wrapText(party.nazwa, colW - 4, 7);
+    nameLines.forEach((line: string) => {
+      pdf.text(line, x + 2, py);
+      py += 3.5;
     });
-  }
 
-  if (inv.sprzedawca.email) {
-    norm(7);
-    pdf.text(`Email: ${inv.sprzedawca.email}`, mg + 2, y);
-    y += 3.5;
-  }
-  if (inv.sprzedawca.telefon) {
-    norm(7);
-    pdf.text(`Tel: ${inv.sprzedawca.telefon}`, mg + 2, y);
-    y += 3.5;
-  }
+    if (party.adres) {
+      bold(7); DGRAY();
+      pdf.text("Adres", x + 2, py);
+      py += 3.5;
+      norm(7);
+      const addrLines = wrapText(party.adres, colW - 4, 7);
+      addrLines.forEach((line: string) => {
+        pdf.text(line, x + 2, py);
+        py += 3.5;
+      });
+    }
 
-  const sellerEndY = y;
+    if (party.email) {
+      norm(7);
+      pdf.text(`Email: ${party.email}`, x + 2, py);
+      py += 3.5;
+    }
+    if (party.telefon) {
+      norm(7);
+      pdf.text(`Tel: ${party.telefon}`, x + 2, py);
+      py += 3.5;
+    }
+    return py;
+  };
+
+  const sellerEndY = renderParty(inv.sprzedawca, "Sprzedawca", mg, halfW);
 
   // Nabywca (right column)
-  y = partyStartY;
   const bx = mg + halfW + 4;
-  bold(9); BLACK();
-  pdf.text("Nabywca", bx, y);
-  y += 5;
+  const buyerEndY = renderParty(inv.nabywca, "Nabywca", bx, halfW);
 
-  norm(7); DGRAY();
-  if (inv.nabywca.nip) {
-    pdf.text(`NIP: ${inv.nabywca.nip}`, bx + 2, y);
-    y += 3.5;
-  }
-  bold(8); BLACK();
-  const buyerNameLines = wrapText(inv.nabywca.nazwa, halfW - 4, 8);
-  buyerNameLines.forEach((line: string) => {
-    pdf.text(line, bx + 2, y);
-    y += 3.5;
-  });
-
-  if (inv.nabywca.adres) {
-    norm(7); DGRAY();
-    bold(7);
-    pdf.text("Adres", bx + 2, y);
-    y += 3.5;
-    norm(7);
-    const addrLines = wrapText(inv.nabywca.adres, halfW - 4, 7);
-    addrLines.forEach((line: string) => {
-      pdf.text(line, bx + 2, y);
-      y += 3.5;
-    });
-  }
-
-  if (inv.nabywca.email) {
-    norm(7);
-    pdf.text(`Email: ${inv.nabywca.email}`, bx + 2, y);
-    y += 3.5;
-  }
-  if (inv.nabywca.telefon) {
-    norm(7);
-    pdf.text(`Tel: ${inv.nabywca.telefon}`, bx + 2, y);
-    y += 3.5;
-  }
-
-  y = Math.max(sellerEndY, y) + 4;
+  y = Math.max(sellerEndY, buyerEndY) + 4;
   hline(mg, y, pw - mg);
   y += 6;
 
@@ -730,30 +709,29 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   pdf.text(t(`Forma platnosci: ${formaLabel}`), mg + 2, y);
   y += 5;
 
-  // Payment details table
-  if (inv.terminPlatnosci || inv.opisPlatnosci) {
+  // Payment details table - always show both columns like the original
+  {
     const payColW = cw / 2;
+    // Header row
     fillRect(mg, y, payColW, 6);
-    if (inv.opisPlatnosci) {
-      fillRect(mg + payColW, y, payColW, 6);
-    }
+    fillRect(mg + payColW, y, payColW, 6);
     bold(6.5); BLACK();
     pdf.text(t("Termin platnosci"), mg + 2, y + 4);
-    if (inv.opisPlatnosci) {
-      pdf.text(t("Opis platnosci"), mg + payColW + 2, y + 4);
-    }
+    pdf.text(t("Opis platnosci"), mg + payColW + 2, y + 4);
     y += 6;
 
-    drawRect(mg, y, payColW, 6);
-    if (inv.opisPlatnosci) {
-      drawRect(mg + payColW, y, payColW, 6);
-    }
+    // Values row - wrap opis platnosci text
+    const opisLines = inv.opisPlatnosci ? wrapText(inv.opisPlatnosci, payColW - 4, 7) : ["-"];
+    const valRowH = Math.max(6, opisLines.length * 3.5 + 2);
+
+    drawRect(mg, y, payColW, valRowH);
+    drawRect(mg + payColW, y, payColW, valRowH);
     norm(7); BLACK();
-    pdf.text(inv.terminPlatnosci, mg + 2, y + 4);
-    if (inv.opisPlatnosci) {
-      pdf.text(t(inv.opisPlatnosci), mg + payColW + 2, y + 4);
-    }
-    y += 8;
+    pdf.text(inv.terminPlatnosci || "-", mg + 2, y + 4);
+    opisLines.forEach((line: string, li: number) => {
+      pdf.text(line, mg + payColW + 2, y + 4 + li * 3.5);
+    });
+    y += valRowH + 2;
   }
 
   // ══════════════════════════════════════════
@@ -804,36 +782,46 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   // 11. REJESTRY (KRS, REGON, BDO)
   // ══════════════════════════════════════════
   if (inv.krs || inv.regon || inv.bdo) {
-    checkPage(18);
+    checkPage(22);
     y += 2;
     bold(9); BLACK();
     italic(9);
     pdf.text("Rejestry", mg, y);
     y += 5;
 
-    const regCols: { label: string; value: string }[] = [];
-    regCols.push({ label: t("Pelna nazwa"), value: t(inv.sprzedawca.nazwa) });
-    if (inv.krs) regCols.push({ label: "KRS", value: inv.krs });
-    if (inv.regon) regCols.push({ label: "REGON", value: inv.regon });
-    if (inv.bdo) regCols.push({ label: "BDO", value: inv.bdo });
+    // Build columns: Pełna nazwa gets more space, others fixed width
+    const smallColW = 30;
+    const smallCols: { label: string; value: string }[] = [];
+    if (inv.krs) smallCols.push({ label: "KRS", value: inv.krs });
+    if (inv.regon) smallCols.push({ label: "REGON", value: inv.regon });
+    if (inv.bdo) smallCols.push({ label: "BDO", value: inv.bdo });
+    const nameColW = cw - smallCols.length * smallColW;
 
-    const regColW = cw / regCols.length;
+    // Wrap the full name
+    const nameLines = wrapText(inv.sprzedawca.nazwa, nameColW - 4, 7);
+    const regRowH = Math.max(6, nameLines.length * 3.5 + 2);
 
-    // Header
-    regCols.forEach((col, i) => {
-      fillRect(mg + i * regColW, y, regColW, 6);
-      bold(6.5); BLACK();
-      pdf.text(col.label, mg + i * regColW + 2, y + 4);
+    // Header row
+    fillRect(mg, y, nameColW, 6);
+    bold(6.5); BLACK();
+    pdf.text(t("Pelna nazwa"), mg + 2, y + 4);
+    smallCols.forEach((col, i) => {
+      fillRect(mg + nameColW + i * smallColW, y, smallColW, 6);
+      pdf.text(col.label, mg + nameColW + i * smallColW + 2, y + 4);
     });
     y += 6;
 
-    // Values
-    regCols.forEach((col, i) => {
-      drawRect(mg + i * regColW, y, regColW, 6);
-      norm(7); BLACK();
-      pdf.text(col.value, mg + i * regColW + 2, y + 4);
+    // Values row
+    drawRect(mg, y, nameColW, regRowH);
+    norm(7); BLACK();
+    nameLines.forEach((line: string, li: number) => {
+      pdf.text(line, mg + 2, y + 4 + li * 3.5);
     });
-    y += 8;
+    smallCols.forEach((col, i) => {
+      drawRect(mg + nameColW + i * smallColW, y, smallColW, regRowH);
+      pdf.text(col.value, mg + nameColW + i * smallColW + 2, y + 4);
+    });
+    y += regRowH + 2;
   }
 
   // ══════════════════════════════════════════
