@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { parseKsefXml, generateInvoicePdf } from "@/lib/invoice-pdf";
 
 type DownloadState = { id: string; format: "xml" | "upo" | "pdf" } | null;
 
