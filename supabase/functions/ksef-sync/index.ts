@@ -656,7 +656,7 @@ Deno.serve(async (req) => {
         errors.push({
           companyId: company.id,
           companyNip: company.nip,
-          error: err instanceof Error ? err.message : String(err),
+          error: "Synchronizacja nie powiodla sie dla tej firmy.",
         });
       }
     }
