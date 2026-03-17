@@ -6,7 +6,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type DownloadState = { id: string; format: "xml" | "upo" } | null;
+type DownloadState = { id: string; format: "xml" | "upo" | "pdf" } | null;
 
 interface InvoiceTableProps {
   invoices: Invoice[];
@@ -97,41 +97,40 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
     }
   };
 
-  const handleDownloadUpo = async (invoice: Invoice) => {
+  const handleDownloadPdf = async (invoice: Invoice, pdfFormat: "pdf" | "upo") => {
     if (!invoice.ksef_number) {
       toast.error("Faktura nie ma numeru KSeF");
       return;
     }
-    setDownloading({ id: invoice.id, format: "upo" });
+    setDownloading({ id: invoice.id, format: pdfFormat });
     try {
       const { data, error } = await supabase.functions.invoke("ksef-download", {
-        body: { invoice_id: invoice.id, format: "upo" },
+        body: { invoice_id: invoice.id, format: pdfFormat },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (!data?.pdf) throw new Error("Brak danych PDF");
 
-      // Decode base64 to binary
       const binaryString = atob(data.pdf);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
       const contentType = data.content_type || "application/pdf";
-      const ext = contentType.includes("pdf") ? "pdf" : "bin";
+      const prefix = pdfFormat === "upo" ? "UPO_" : "";
       const blob = new Blob([bytes], { type: contentType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `UPO_${invoice.ksef_number}.${ext}`;
+      a.download = `${prefix}${invoice.ksef_number}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success(`Pobrano UPO dla ${invoice.ksef_number}`);
+      toast.success(`Pobrano ${prefix ? "UPO" : "PDF"} dla ${invoice.ksef_number}`);
     } catch (err) {
-      console.error("UPO download error:", err);
-      toast.error(`Błąd pobierania UPO: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
+      console.error("PDF download error:", err);
+      toast.error(`Błąd pobierania: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
     } finally {
       setDownloading(null);
     }
@@ -177,6 +176,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
         <tbody>
           {sorted.map((invoice, i) => {
             const isDownloadingXml = downloading?.id === invoice.id && downloading?.format === "xml";
+            const isDownloadingPdf = downloading?.id === invoice.id && downloading?.format === "pdf";
             const isDownloadingUpo = downloading?.id === invoice.id && downloading?.format === "upo";
             const isAnyDownloading = downloading !== null;
             return (
@@ -225,12 +225,26 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                       size="sm"
                       className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
                       disabled={isAnyDownloading || !invoice.ksef_number}
-                      onClick={() => handleDownloadUpo(invoice)}
+                      onClick={() => handleDownloadPdf(invoice, "pdf")}
+                    >
+                      {isDownloadingPdf ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FileText className="h-3.5 w-3.5" />
+                      )}
+                      PDF
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs rounded-lg gap-1 text-muted-foreground hover:text-foreground"
+                      disabled={isAnyDownloading || !invoice.ksef_number}
+                      onClick={() => handleDownloadPdf(invoice, "upo")}
                     >
                       {isDownloadingUpo ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
-                        <FileText className="h-3.5 w-3.5" />
+                        <Download className="h-3.5 w-3.5" />
                       )}
                       UPO
                     </Button>
