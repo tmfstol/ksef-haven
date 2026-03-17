@@ -317,7 +317,7 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
   const threeMonthsAgo = new Date(now);
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-  const url = `${baseUrl}/api/v2/invoices/query/metadata`;
+  const url = `${baseUrl}/api/v2/invoices/query/metadata?pageSize=100`;
   const allInvoices: any[] = [];
   let continuationToken: string | null = null;
   let pageNum = 0;
