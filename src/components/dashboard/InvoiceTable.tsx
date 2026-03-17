@@ -11,6 +11,7 @@ type DownloadState = { id: string; format: "xml" | "upo" | "pdf" } | null;
 
 interface InvoiceTableProps {
   invoices: Invoice[];
+  lastSeenTimestamp?: string | null;
 }
 
 type SortKey = "date" | "vendor" | "gross_amount";
@@ -54,7 +55,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-export function InvoiceTable({ invoices }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, lastSeenTimestamp }: InvoiceTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
   const [downloading, setDownloading] = useState<DownloadState>(null);
@@ -205,13 +206,14 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
             const isDownloadingPdf = downloading?.id === invoice.id && downloading?.format === "pdf";
             const isDownloadingUpo = downloading?.id === invoice.id && downloading?.format === "upo";
             const isAnyDownloading = downloading !== null;
+            const isNew = lastSeenTimestamp && invoice.created_at && invoice.created_at > lastSeenTimestamp;
             return (
               <motion.tr
                 key={invoice.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="border-b border-border/30 last:border-0 hover:bg-secondary/40 transition-colors"
+                className={`border-b border-border/30 last:border-0 hover:bg-secondary/40 transition-colors ${isNew ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
               >
                 <td className="px-5 py-3.5 text-sm text-foreground">
                   {formatDate(invoice.date)}

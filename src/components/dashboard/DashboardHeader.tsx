@@ -1,7 +1,8 @@
-import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap } from "lucide-react";
+import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import type { Company } from "@/types/company";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DashboardHeaderProps {
   isConnected: boolean;
@@ -25,7 +26,7 @@ export function DashboardHeader({
   activeCompany,
 }: DashboardHeaderProps) {
   const navigate = useNavigate();
-
+  const { signOut } = useAuth();
   return (
     <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
       {/* Status połączenia */}
@@ -83,8 +84,20 @@ export function DashboardHeader({
         size="icon"
         onClick={() => navigate("/settings")}
         className="rounded-xl"
+        title="Ustawienia"
       >
         <Settings className="h-4 w-4" />
+      </Button>
+
+      {/* Wyloguj */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={signOut}
+        className="rounded-xl text-muted-foreground hover:text-destructive"
+        title="Wyloguj"
+      >
+        <LogOut className="h-4 w-4" />
       </Button>
 
       {/* Sync All */}
