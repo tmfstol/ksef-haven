@@ -176,7 +176,9 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
         </thead>
         <tbody>
           {sorted.map((invoice, i) => {
-            const isDownloading = downloadingId === invoice.id;
+            const isDownloadingXml = downloading?.id === invoice.id && downloading?.format === "xml";
+            const isDownloadingUpo = downloading?.id === invoice.id && downloading?.format === "upo";
+            const isAnyDownloading = downloading !== null;
             return (
               <motion.tr
                 key={invoice.id}
@@ -208,15 +210,29 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                       variant="ghost"
                       size="sm"
                       className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
-                      disabled={isDownloading || !invoice.ksef_number}
+                      disabled={isAnyDownloading || !invoice.ksef_number}
                       onClick={() => handleDownloadXml(invoice)}
                     >
-                      {isDownloading ? (
+                      {isDownloadingXml ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <FileCode className="h-3.5 w-3.5" />
                       )}
                       XML
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
+                      disabled={isAnyDownloading || !invoice.ksef_number}
+                      onClick={() => handleDownloadUpo(invoice)}
+                    >
+                      {isDownloadingUpo ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FileText className="h-3.5 w-3.5" />
+                      )}
+                      UPO
                     </Button>
                   </div>
                 </td>
