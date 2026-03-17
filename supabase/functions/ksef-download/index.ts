@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
 
     // Fetch invoice XML
     console.log(`[ksef-download] Fetching invoice ${invoice.ksef_number}`);
-    const invoiceRes = await fetchWithRetry(`${baseUrl}/api/v2/invoices/${invoice.ksef_number}`, {
+    const invoiceRes = await fetchWithRetry(`${baseUrl}/api/v2/invoices/ksef/${invoice.ksef_number}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/octet-stream, application/json",
