@@ -784,36 +784,46 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   // 11. REJESTRY (KRS, REGON, BDO)
   // ══════════════════════════════════════════
   if (inv.krs || inv.regon || inv.bdo) {
-    checkPage(18);
+    checkPage(22);
     y += 2;
     bold(9); BLACK();
     italic(9);
     pdf.text("Rejestry", mg, y);
     y += 5;
 
-    const regCols: { label: string; value: string }[] = [];
-    regCols.push({ label: t("Pelna nazwa"), value: t(inv.sprzedawca.nazwa) });
-    if (inv.krs) regCols.push({ label: "KRS", value: inv.krs });
-    if (inv.regon) regCols.push({ label: "REGON", value: inv.regon });
-    if (inv.bdo) regCols.push({ label: "BDO", value: inv.bdo });
+    // Build columns: Pełna nazwa gets more space, others fixed width
+    const smallColW = 30;
+    const smallCols: { label: string; value: string }[] = [];
+    if (inv.krs) smallCols.push({ label: "KRS", value: inv.krs });
+    if (inv.regon) smallCols.push({ label: "REGON", value: inv.regon });
+    if (inv.bdo) smallCols.push({ label: "BDO", value: inv.bdo });
+    const nameColW = cw - smallCols.length * smallColW;
 
-    const regColW = cw / regCols.length;
+    // Wrap the full name
+    const nameLines = wrapText(inv.sprzedawca.nazwa, nameColW - 4, 7);
+    const regRowH = Math.max(6, nameLines.length * 3.5 + 2);
 
-    // Header
-    regCols.forEach((col, i) => {
-      fillRect(mg + i * regColW, y, regColW, 6);
-      bold(6.5); BLACK();
-      pdf.text(col.label, mg + i * regColW + 2, y + 4);
+    // Header row
+    fillRect(mg, y, nameColW, 6);
+    bold(6.5); BLACK();
+    pdf.text(t("Pelna nazwa"), mg + 2, y + 4);
+    smallCols.forEach((col, i) => {
+      fillRect(mg + nameColW + i * smallColW, y, smallColW, 6);
+      pdf.text(col.label, mg + nameColW + i * smallColW + 2, y + 4);
     });
     y += 6;
 
-    // Values
-    regCols.forEach((col, i) => {
-      drawRect(mg + i * regColW, y, regColW, 6);
-      norm(7); BLACK();
-      pdf.text(col.value, mg + i * regColW + 2, y + 4);
+    // Values row
+    drawRect(mg, y, nameColW, regRowH);
+    norm(7); BLACK();
+    nameLines.forEach((line: string, li: number) => {
+      pdf.text(line, mg + 2, y + 4 + li * 3.5);
     });
-    y += 8;
+    smallCols.forEach((col, i) => {
+      drawRect(mg + nameColW + i * smallColW, y, smallColW, regRowH);
+      pdf.text(col.value, mg + nameColW + i * smallColW + 2, y + 4);
+    });
+    y += regRowH + 2;
   }
 
   // ══════════════════════════════════════════
