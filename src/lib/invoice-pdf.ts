@@ -612,6 +612,23 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
     }
   }
 
+  // ── 9. QR CODE ──
+  try {
+    const qrDataUrl = await QRCode.toDataURL(inv.ksefNumber, {
+      width: 200,
+      margin: 1,
+      errorCorrectionLevel: "M",
+    });
+    const qrSize = 22;
+    const qrX = mg;
+    const qrY = 260;
+    pdf.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+    norm(5); GRAY();
+    pdf.text("Numer KSeF", qrX + qrSize / 2, qrY + qrSize + 2.5, { align: "center" });
+  } catch (e) {
+    console.error("QR generation failed:", e);
+  }
+
   // KSeF watermark
   norm(6); GRAY();
   pdf.text(
