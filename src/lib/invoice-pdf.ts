@@ -444,8 +444,6 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
 
   const sellerEndY = renderParty(inv.sprzedawca, "Sprzedawca", mg, halfW);
 
-  const sellerEndY = y;
-
   // Nabywca (right column)
   const bx = mg + halfW + 4;
   const buyerEndY = renderParty(inv.nabywca, "Nabywca", bx, halfW);
