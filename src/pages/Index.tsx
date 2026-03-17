@@ -125,6 +125,7 @@ const Index = () => {
             />
           ) : (
             <>
+              <InvoiceFilters filters={filters} onChange={setFilters} vendors={vendors} />
               <StatsBar invoices={filteredInvoices} />
               <InvoiceTable invoices={filteredInvoices} />
             </>
