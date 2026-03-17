@@ -711,30 +711,29 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   pdf.text(t(`Forma platnosci: ${formaLabel}`), mg + 2, y);
   y += 5;
 
-  // Payment details table
-  if (inv.terminPlatnosci || inv.opisPlatnosci) {
+  // Payment details table - always show both columns like the original
+  {
     const payColW = cw / 2;
+    // Header row
     fillRect(mg, y, payColW, 6);
-    if (inv.opisPlatnosci) {
-      fillRect(mg + payColW, y, payColW, 6);
-    }
+    fillRect(mg + payColW, y, payColW, 6);
     bold(6.5); BLACK();
     pdf.text(t("Termin platnosci"), mg + 2, y + 4);
-    if (inv.opisPlatnosci) {
-      pdf.text(t("Opis platnosci"), mg + payColW + 2, y + 4);
-    }
+    pdf.text(t("Opis platnosci"), mg + payColW + 2, y + 4);
     y += 6;
 
-    drawRect(mg, y, payColW, 6);
-    if (inv.opisPlatnosci) {
-      drawRect(mg + payColW, y, payColW, 6);
-    }
+    // Values row - wrap opis platnosci text
+    const opisLines = inv.opisPlatnosci ? wrapText(inv.opisPlatnosci, payColW - 4, 7) : ["-"];
+    const valRowH = Math.max(6, opisLines.length * 3.5 + 2);
+
+    drawRect(mg, y, payColW, valRowH);
+    drawRect(mg + payColW, y, payColW, valRowH);
     norm(7); BLACK();
-    pdf.text(inv.terminPlatnosci, mg + 2, y + 4);
-    if (inv.opisPlatnosci) {
-      pdf.text(t(inv.opisPlatnosci), mg + payColW + 2, y + 4);
-    }
-    y += 8;
+    pdf.text(inv.terminPlatnosci || "-", mg + 2, y + 4);
+    opisLines.forEach((line: string, li: number) => {
+      pdf.text(line, mg + payColW + 2, y + 4 + li * 3.5);
+    });
+    y += valRowH + 2;
   }
 
   // ══════════════════════════════════════════
