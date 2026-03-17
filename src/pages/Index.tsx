@@ -7,7 +7,17 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { InvoiceTable } from "@/components/dashboard/InvoiceTable";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { StatsBar } from "@/components/dashboard/StatsBar";
+import { InvoiceFilters, applyFilters, type InvoiceFiltersState } from "@/components/dashboard/InvoiceFilters";
 import { Loader2 } from "lucide-react";
+
+const EMPTY_FILTERS: InvoiceFiltersState = {
+  dateFrom: undefined,
+  dateTo: undefined,
+  vendor: null,
+  status: null,
+  amountMin: "",
+  amountMax: "",
+};
 
 const Index = () => {
   const navigate = useNavigate();
@@ -18,15 +28,14 @@ const Index = () => {
   const syncAllMutation = useSyncAllCompanies();
   const [selectedNip, setSelectedNip] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState<InvoiceFiltersState>(EMPTY_FILTERS);
 
-  // Redirect to onboarding if no companies configured
   useEffect(() => {
     if (!companiesLoading && (!companies || companies.length === 0)) {
       navigate("/onboarding", { replace: true });
     }
   }, [companies, companiesLoading, navigate]);
 
-  // Auto-select first company
   useEffect(() => {
     if (companies && companies.length > 0 && !activeCompanyId) {
       setActiveCompanyId(companies[0].id);
@@ -53,8 +62,9 @@ const Index = () => {
           i.date.includes(q)
       );
     }
+    result = applyFilters(result, filters);
     return result;
-  }, [invoices, activeCompany, selectedNip, searchQuery]);
+  }, [invoices, activeCompany, selectedNip, searchQuery, filters]);
 
   if (companiesLoading) {
     return (
