@@ -406,6 +406,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const { invoice_id, ksef_env = "prod", format = "xml" } = body;
+    console.log(`[ksef-download] Request: invoice_id=${invoice_id}, format=${format}, ksef_env=${ksef_env}`);
 
     if (!invoice_id) {
       return new Response(JSON.stringify({ error: "Brak invoice_id" }), {
