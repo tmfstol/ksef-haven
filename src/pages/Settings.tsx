@@ -88,7 +88,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     });
   };
 
-  const isValid = name.trim() && nip.trim() && ksefToken.trim() && storagePath.trim();
+  const isValid = name.trim() && nip.trim() && storagePath.trim() && (editingCompany || ksefToken.trim());
   const isSaving = addMutation.isPending || updateMutation.isPending;
 
   if (isLoading) {
