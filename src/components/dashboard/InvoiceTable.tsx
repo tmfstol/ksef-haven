@@ -1,8 +1,10 @@
-import { FileText, FileCode, ArrowUpDown } from "lucide-react";
+import { FileText, FileCode, ArrowUpDown, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface InvoiceTableProps {
   invoices: Invoice[];
@@ -37,9 +39,22 @@ function formatDate(dateStr: string) {
   });
 }
 
+function downloadFile(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export function InvoiceTable({ invoices }: InvoiceTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const sorted = [...invoices].sort((a, b) => {
     let cmp = 0;
@@ -54,6 +69,35 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
     else {
       setSortKey(key);
       setSortAsc(false);
+    }
+  };
+
+  const handleDownloadXml = async (invoice: Invoice) => {
+    if (!invoice.ksef_number) {
+      toast.error("Faktura nie ma numeru KSeF");
+      return;
+    }
+
+    setDownloadingId(invoice.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("ksef-download", {
+        body: { invoice_id: invoice.id },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.xml) throw new Error("Brak danych XML");
+
+      const filename = `${invoice.ksef_number}.xml`;
+      downloadFile(data.xml, filename, "application/xml");
+      toast.success(`Pobrano ${filename}`);
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error(
+        `Błąd pobierania: ${err instanceof Error ? err.message : "Nieznany błąd"}`
+      );
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -95,59 +139,54 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((invoice, i) => (
-            <motion.tr
-              key={invoice.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.03 }}
-              className="border-b border-border/30 last:border-0 hover:bg-secondary/40 transition-colors"
-            >
-              <td className="px-5 py-3.5 text-sm text-foreground">
-                {formatDate(invoice.date)}
-              </td>
-              <td className="px-5 py-3.5 text-sm font-medium text-foreground">
-                {invoice.vendor}
-              </td>
-              <td className="px-5 py-3.5 text-sm text-muted-foreground font-mono">
-                {invoice.nip}
-              </td>
-              <td className="px-5 py-3.5 text-sm text-foreground text-right font-semibold tabular-nums">
-                {formatCurrency(invoice.gross_amount)}
-              </td>
-              <td className="px-5 py-3.5 text-center">
-                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[invoice.status]}`}>
-                  {statusLabels[invoice.status]}
-                </span>
-              </td>
-              <td className="px-5 py-3.5 text-right">
-                <div className="flex items-center justify-end gap-1.5">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
-                    onClick={() => {
-                      if (invoice.xml_path) window.open(invoice.xml_path);
-                    }}
-                  >
-                    <FileCode className="h-3.5 w-3.5" />
-                    XML
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
-                    onClick={() => {
-                      if (invoice.pdf_path) window.open(invoice.pdf_path);
-                    }}
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    PDF
-                  </Button>
-                </div>
-              </td>
-            </motion.tr>
-          ))}
+          {sorted.map((invoice, i) => {
+            const isDownloading = downloadingId === invoice.id;
+            return (
+              <motion.tr
+                key={invoice.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.03 }}
+                className="border-b border-border/30 last:border-0 hover:bg-secondary/40 transition-colors"
+              >
+                <td className="px-5 py-3.5 text-sm text-foreground">
+                  {formatDate(invoice.date)}
+                </td>
+                <td className="px-5 py-3.5 text-sm font-medium text-foreground max-w-[250px] truncate">
+                  {invoice.vendor}
+                </td>
+                <td className="px-5 py-3.5 text-sm text-muted-foreground font-mono">
+                  {invoice.nip}
+                </td>
+                <td className="px-5 py-3.5 text-sm text-foreground text-right font-semibold tabular-nums">
+                  {formatCurrency(invoice.gross_amount)}
+                </td>
+                <td className="px-5 py-3.5 text-center">
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[invoice.status]}`}>
+                    {statusLabels[invoice.status]}
+                  </span>
+                </td>
+                <td className="px-5 py-3.5 text-right">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
+                      disabled={isDownloading || !invoice.ksef_number}
+                      onClick={() => handleDownloadXml(invoice)}
+                    >
+                      {isDownloading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FileCode className="h-3.5 w-3.5" />
+                      )}
+                      XML
+                    </Button>
+                  </div>
+                </td>
+              </motion.tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
