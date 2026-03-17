@@ -251,7 +251,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                       size="sm"
                       className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
                       disabled={isAnyDownloading || !invoice.ksef_number}
-                      onClick={() => handleDownloadPdf(invoice, "pdf")}
+                      onClick={() => handleDownloadPdf(invoice)}
                     >
                       {isDownloadingPdf ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
