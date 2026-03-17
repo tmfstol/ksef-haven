@@ -6,6 +6,8 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+type DownloadState = { id: string; format: "xml" | "upo" } | null;
+
 interface InvoiceTableProps {
   invoices: Invoice[];
 }
@@ -54,7 +56,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
 export function InvoiceTable({ invoices }: InvoiceTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<DownloadState>(null);
 
   const sorted = [...invoices].sort((a, b) => {
     let cmp = 0;
@@ -77,27 +79,61 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
       toast.error("Faktura nie ma numeru KSeF");
       return;
     }
-
-    setDownloadingId(invoice.id);
+    setDownloading({ id: invoice.id, format: "xml" });
     try {
       const { data, error } = await supabase.functions.invoke("ksef-download", {
-        body: { invoice_id: invoice.id },
+        body: { invoice_id: invoice.id, format: "xml" },
       });
-
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (!data?.xml) throw new Error("Brak danych XML");
-
-      const filename = `${invoice.ksef_number}.xml`;
-      downloadFile(data.xml, filename, "application/xml");
-      toast.success(`Pobrano ${filename}`);
+      downloadFile(data.xml, `${invoice.ksef_number}.xml`, "application/xml");
+      toast.success(`Pobrano ${invoice.ksef_number}.xml`);
     } catch (err) {
       console.error("Download error:", err);
-      toast.error(
-        `Błąd pobierania: ${err instanceof Error ? err.message : "Nieznany błąd"}`
-      );
+      toast.error(`Błąd pobierania: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
     } finally {
-      setDownloadingId(null);
+      setDownloading(null);
+    }
+  };
+
+  const handleDownloadUpo = async (invoice: Invoice) => {
+    if (!invoice.ksef_number) {
+      toast.error("Faktura nie ma numeru KSeF");
+      return;
+    }
+    setDownloading({ id: invoice.id, format: "upo" });
+    try {
+      const { data, error } = await supabase.functions.invoke("ksef-download", {
+        body: { invoice_id: invoice.id, format: "upo" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.pdf) throw new Error("Brak danych PDF");
+
+      // Decode base64 to binary
+      const binaryString = atob(data.pdf);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const contentType = data.content_type || "application/pdf";
+      const ext = contentType.includes("pdf") ? "pdf" : "bin";
+      const blob = new Blob([bytes], { type: contentType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `UPO_${invoice.ksef_number}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Pobrano UPO dla ${invoice.ksef_number}`);
+    } catch (err) {
+      console.error("UPO download error:", err);
+      toast.error(`Błąd pobierania UPO: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -140,7 +176,9 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
         </thead>
         <tbody>
           {sorted.map((invoice, i) => {
-            const isDownloading = downloadingId === invoice.id;
+            const isDownloadingXml = downloading?.id === invoice.id && downloading?.format === "xml";
+            const isDownloadingUpo = downloading?.id === invoice.id && downloading?.format === "upo";
+            const isAnyDownloading = downloading !== null;
             return (
               <motion.tr
                 key={invoice.id}
@@ -172,15 +210,29 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                       variant="ghost"
                       size="sm"
                       className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
-                      disabled={isDownloading || !invoice.ksef_number}
+                      disabled={isAnyDownloading || !invoice.ksef_number}
                       onClick={() => handleDownloadXml(invoice)}
                     >
-                      {isDownloading ? (
+                      {isDownloadingXml ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <FileCode className="h-3.5 w-3.5" />
                       )}
                       XML
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
+                      disabled={isAnyDownloading || !invoice.ksef_number}
+                      onClick={() => handleDownloadUpo(invoice)}
+                    >
+                      {isDownloadingUpo ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FileText className="h-3.5 w-3.5" />
+                      )}
+                      UPO
                     </Button>
                   </div>
                 </td>

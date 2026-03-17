@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json().catch(() => ({}));
-    const { invoice_id, ksef_env = "prod" } = body;
+    const { invoice_id, ksef_env = "prod", format = "xml" } = body;
 
     if (!invoice_id) {
       return new Response(JSON.stringify({ error: "Brak invoice_id" }), {
@@ -227,7 +227,59 @@ Deno.serve(async (req) => {
     console.log(`[ksef-download] Authenticating for NIP ${company.nip}`);
     const accessToken = await authenticate(baseUrl, company.nip, company.ksef_token.trim());
 
-    // Fetch invoice XML
+    if (format === "upo") {
+      // Fetch invoice status to get UPO URL
+      console.log(`[ksef-download] Fetching status for ${invoice.ksef_number}`);
+      const statusRes = await fetchWithRetry(`${baseUrl}/api/v2/invoices/ksef/${invoice.ksef_number}/status`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/json",
+        },
+      });
+
+      if (!statusRes.ok) {
+        const errText = await statusRes.text();
+        throw new Error(`Fetch status failed (${statusRes.status}): ${errText.substring(0, 300)}`);
+      }
+
+      const statusData = JSON.parse(await statusRes.text());
+      console.log(`[ksef-download] Status response keys: ${Object.keys(statusData).join(", ")}`);
+
+      const upoUrl = statusData.invoiceUpoUrl || statusData.upoUrl || statusData.upo?.url;
+      
+      if (!upoUrl) {
+        // Fallback: return status info so user knows UPO is not available
+        console.log(`[ksef-download] No UPO URL found. Full status:`, JSON.stringify(statusData).substring(0, 500));
+        throw new Error("UPO nie jest dostępne dla tej faktury");
+      }
+
+      // Download UPO PDF
+      console.log(`[ksef-download] Downloading UPO from: ${upoUrl}`);
+      const upoRes = await fetchWithRetry(upoUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!upoRes.ok) {
+        const errText = await upoRes.text();
+        throw new Error(`UPO download failed (${upoRes.status}): ${errText.substring(0, 300)}`);
+      }
+
+      const upoBytes = new Uint8Array(await upoRes.arrayBuffer());
+      const upoBase64 = toBase64(upoBytes);
+      const contentType = upoRes.headers.get("content-type") || "application/pdf";
+
+      return new Response(JSON.stringify({ 
+        pdf: upoBase64, 
+        content_type: contentType,
+        ksef_number: invoice.ksef_number 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Default: Fetch invoice XML
     console.log(`[ksef-download] Fetching invoice ${invoice.ksef_number}`);
     const invoiceRes = await fetchWithRetry(`${baseUrl}/api/v2/invoices/ksef/${invoice.ksef_number}`, {
       headers: {
