@@ -387,46 +387,62 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   const halfW = cw / 2 - 2;
   const partyStartY = y;
 
-  // Sprzedawca
-  bold(9); BLACK();
-  pdf.text("Sprzedawca", mg, y);
-  y += 5;
+  // Helper to render party details
+  const renderParty = (party: InvoiceParty, label: string, x: number, colW: number): number => {
+    let py = partyStartY;
+    bold(9); BLACK();
+    pdf.text(t(label), x, py);
+    py += 5;
 
-  norm(7); DGRAY();
-  if (inv.sprzedawca.nip) {
-    pdf.text(`NIP: ${inv.sprzedawca.nip}`, mg + 2, y);
-    y += 3.5;
-  }
-  bold(8); BLACK();
-  const sellerNameLines = wrapText(inv.sprzedawca.nazwa, halfW - 4, 8);
-  sellerNameLines.forEach((line: string) => {
-    pdf.text(line, mg + 2, y);
-    y += 3.5;
-  });
-
-  if (inv.sprzedawca.adres) {
     norm(7); DGRAY();
-    bold(7);
-    pdf.text("Adres", mg + 2, y);
-    y += 3.5;
-    norm(7);
-    const addrLines = wrapText(inv.sprzedawca.adres, halfW - 4, 7);
-    addrLines.forEach((line: string) => {
-      pdf.text(line, mg + 2, y);
-      y += 3.5;
+    if (party.eori) {
+      pdf.text(`Numer EORI: ${party.eori}`, x + 2, py);
+      py += 3.5;
+    }
+    if (party.prefiksVat) {
+      pdf.text(`Prefiks VAT: ${party.prefiksVat}`, x + 2, py);
+      py += 3.5;
+    }
+    if (party.nip) {
+      pdf.text(`NIP: ${party.nip}`, x + 2, py);
+      py += 3.5;
+    }
+    bold(8); BLACK();
+    pdf.text(t("Nazwa"), x + 2, py);
+    py += 3.5;
+    norm(7); BLACK();
+    const nameLines = wrapText(party.nazwa, colW - 4, 7);
+    nameLines.forEach((line: string) => {
+      pdf.text(line, x + 2, py);
+      py += 3.5;
     });
-  }
 
-  if (inv.sprzedawca.email) {
-    norm(7);
-    pdf.text(`Email: ${inv.sprzedawca.email}`, mg + 2, y);
-    y += 3.5;
-  }
-  if (inv.sprzedawca.telefon) {
-    norm(7);
-    pdf.text(`Tel: ${inv.sprzedawca.telefon}`, mg + 2, y);
-    y += 3.5;
-  }
+    if (party.adres) {
+      bold(7); DGRAY();
+      pdf.text("Adres", x + 2, py);
+      py += 3.5;
+      norm(7);
+      const addrLines = wrapText(party.adres, colW - 4, 7);
+      addrLines.forEach((line: string) => {
+        pdf.text(line, x + 2, py);
+        py += 3.5;
+      });
+    }
+
+    if (party.email) {
+      norm(7);
+      pdf.text(`Email: ${party.email}`, x + 2, py);
+      py += 3.5;
+    }
+    if (party.telefon) {
+      norm(7);
+      pdf.text(`Tel: ${party.telefon}`, x + 2, py);
+      py += 3.5;
+    }
+    return py;
+  };
+
+  const sellerEndY = renderParty(inv.sprzedawca, "Sprzedawca", mg, halfW);
 
   const sellerEndY = y;
 
