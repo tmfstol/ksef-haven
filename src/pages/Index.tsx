@@ -29,6 +29,21 @@ const Index = () => {
   const [selectedNip, setSelectedNip] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<InvoiceFiltersState>(EMPTY_FILTERS);
+  const [lastSeenTimestamp, setLastSeenTimestamp] = useState<string | null>(() => {
+    return localStorage.getItem("ksef_last_seen");
+  });
+
+  // After invoices load, mark current time as "seen" (delayed so user sees highlights)
+  useEffect(() => {
+    if (invoices && invoices.length > 0) {
+      const timer = setTimeout(() => {
+        const now = new Date().toISOString();
+        localStorage.setItem("ksef_last_seen", now);
+        setLastSeenTimestamp(now);
+      }, 30000); // Mark as seen after 30s
+      return () => clearTimeout(timer);
+    }
+  }, [invoices]);
 
   useEffect(() => {
     if (!companiesLoading && (!companies || companies.length === 0)) {
