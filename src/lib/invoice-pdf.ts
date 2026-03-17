@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import QRCode from "qrcode";
 
 // ── XML Parsing using DOMParser ──
 
@@ -309,7 +310,7 @@ function fmtNum(val: string | number): string {
   return n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function generateInvoicePdf(inv: ParsedInvoice): void {
+export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pw = 210;
   const mg = 12;
@@ -609,6 +610,23 @@ export function generateInvoicePdf(inv: ParsedInvoice): void {
       const stopkaLines = pdf.splitTextToSize(t(inv.stopka), cw);
       pdf.text(stopkaLines.slice(0, 2), pw / 2, fy + 6, { align: "center" });
     }
+  }
+
+  // ── 9. QR CODE ──
+  try {
+    const qrDataUrl = await QRCode.toDataURL(inv.ksefNumber, {
+      width: 200,
+      margin: 1,
+      errorCorrectionLevel: "M",
+    });
+    const qrSize = 22;
+    const qrX = mg;
+    const qrY = 260;
+    pdf.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+    norm(5); GRAY();
+    pdf.text("Numer KSeF", qrX + qrSize / 2, qrY + qrSize + 2.5, { align: "center" });
+  } catch (e) {
+    console.error("QR generation failed:", e);
   }
 
   // KSeF watermark

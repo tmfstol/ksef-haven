@@ -115,7 +115,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
 
       // Parse XML and generate PDF client-side
       const parsed = parseKsefXml(data.xml, invoice.ksef_number!);
-      generateInvoicePdf(parsed);
+      await generateInvoicePdf(parsed);
       toast.success(`Pobrano PDF dla ${invoice.ksef_number}`);
     } catch (err) {
       console.error("PDF download error:", err);
