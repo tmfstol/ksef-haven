@@ -98,40 +98,65 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
     }
   };
 
-  const handleDownloadPdf = async (invoice: Invoice, pdfFormat: "pdf" | "upo") => {
+  const handleDownloadPdf = async (invoice: Invoice) => {
     if (!invoice.ksef_number) {
       toast.error("Faktura nie ma numeru KSeF");
       return;
     }
-    setDownloading({ id: invoice.id, format: pdfFormat });
+    setDownloading({ id: invoice.id, format: "pdf" });
     try {
+      // Fetch XML from KSeF
       const { data, error } = await supabase.functions.invoke("ksef-download", {
-        body: { invoice_id: invoice.id, format: pdfFormat },
+        body: { invoice_id: invoice.id, format: "xml" },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      if (!data?.pdf) throw new Error("Brak danych PDF");
+      if (!data?.xml) throw new Error("Brak danych XML");
+
+      // Parse XML and generate PDF client-side
+      const parsed = parseKsefXml(data.xml, invoice.ksef_number!);
+      generateInvoicePdf(parsed);
+      toast.success(`Pobrano PDF dla ${invoice.ksef_number}`);
+    } catch (err) {
+      console.error("PDF download error:", err);
+      toast.error(`Błąd pobierania PDF: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const handleDownloadUpo = async (invoice: Invoice) => {
+    if (!invoice.ksef_number) {
+      toast.error("Faktura nie ma numeru KSeF");
+      return;
+    }
+    setDownloading({ id: invoice.id, format: "upo" });
+    try {
+      const { data, error } = await supabase.functions.invoke("ksef-download", {
+        body: { invoice_id: invoice.id, format: "upo" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.pdf) throw new Error("Brak danych UPO");
 
       const binaryString = atob(data.pdf);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
-      const contentType = data.content_type || "application/pdf";
-      const prefix = pdfFormat === "upo" ? "UPO_" : "";
-      const blob = new Blob([bytes], { type: contentType });
+      const blob = new Blob([bytes], { type: data.content_type || "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${prefix}${invoice.ksef_number}.pdf`;
+      a.download = `UPO_${invoice.ksef_number}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success(`Pobrano ${prefix ? "UPO" : "PDF"} dla ${invoice.ksef_number}`);
+      toast.success(`Pobrano UPO dla ${invoice.ksef_number}`);
     } catch (err) {
-      console.error("PDF download error:", err);
-      toast.error(`Błąd pobierania: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
+      console.error("UPO download error:", err);
+      toast.error(`Błąd pobierania UPO: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
     } finally {
       setDownloading(null);
     }
