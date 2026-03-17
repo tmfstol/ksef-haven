@@ -176,6 +176,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
         <tbody>
           {sorted.map((invoice, i) => {
             const isDownloadingXml = downloading?.id === invoice.id && downloading?.format === "xml";
+            const isDownloadingPdf = downloading?.id === invoice.id && downloading?.format === "pdf";
             const isDownloadingUpo = downloading?.id === invoice.id && downloading?.format === "upo";
             const isAnyDownloading = downloading !== null;
             return (
@@ -224,12 +225,26 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                       size="sm"
                       className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
                       disabled={isAnyDownloading || !invoice.ksef_number}
-                      onClick={() => handleDownloadUpo(invoice)}
+                      onClick={() => handleDownloadPdf(invoice, "pdf")}
+                    >
+                      {isDownloadingPdf ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FileText className="h-3.5 w-3.5" />
+                      )}
+                      PDF
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs rounded-lg gap-1 text-muted-foreground hover:text-foreground"
+                      disabled={isAnyDownloading || !invoice.ksef_number}
+                      onClick={() => handleDownloadPdf(invoice, "upo")}
                     >
                       {isDownloadingUpo ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
-                        <FileText className="h-3.5 w-3.5" />
+                        <Download className="h-3.5 w-3.5" />
                       )}
                       UPO
                     </Button>
