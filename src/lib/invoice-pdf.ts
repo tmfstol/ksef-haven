@@ -635,7 +635,145 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   y += 8;
 
   // ══════════════════════════════════════════
-  // 5. VAT SUMMARY - Podsumowanie stawek podatku
+  // 4b. ZAMOWIENIE (ordered items for advance invoices)
+  // ══════════════════════════════════════════
+  if (inv.zamowienie.length > 0) {
+    checkPage(15);
+    bold(9); BLACK();
+    italic(9);
+    pdf.text(t("Zamowienie"), mg, y);
+    y += 3;
+    norm(7); DGRAY();
+    pdf.text(t("Pozycje zamowienia dotyczace faktury zaliczkowej"), mg + 2, y);
+    y += 5;
+
+    const zamCols = [
+      { label: "Lp.", w: 10, align: "left" as const },
+      { label: "Nazwa towaru lub uslugi", w: 60, align: "left" as const },
+      { label: "Cena jedn. netto", w: 24, align: "right" as const },
+      { label: "Ilosc", w: 14, align: "right" as const },
+      { label: "Miara", w: 16, align: "left" as const },
+      { label: "Stawka podatku", w: 22, align: "right" as const },
+      { label: t("Wartosc netto"), w: cw - 146, align: "right" as const },
+    ];
+
+    fillRect(mg, y, cw, 8);
+    bold(6.5); BLACK();
+    let zcx = mg;
+    zamCols.forEach((col) => {
+      const textLines = pdf.splitTextToSize(col.label, col.w - 2);
+      if (col.align === "right") {
+        textLines.forEach((line: string, li: number) => {
+          pdf.text(line, zcx + col.w - 1.5, y + 3 + li * 2.5, { align: "right" });
+        });
+      } else {
+        textLines.forEach((line: string, li: number) => {
+          pdf.text(line, zcx + 1.5, y + 3 + li * 2.5);
+        });
+      }
+      zcx += col.w;
+    });
+    y += 8;
+
+    inv.zamowienie.forEach((z, i) => {
+      norm(7);
+      const descLines = wrapText(z.opis, zamCols[1].w - 3, 7);
+      const rowH = Math.max(6, descLines.length * 3.5 + 2);
+      checkPage(rowH);
+
+      if (i % 2 === 1) {
+        pdf.setFillColor(245, 245, 245);
+        pdf.rect(mg, y, cw, rowH, "F");
+      }
+      drawRect(mg, y, cw, rowH);
+
+      norm(7); BLACK();
+      zcx = mg;
+      const rowNr = z.nr ? z.nr.replace(/^0+/, "") || "1" : String(i + 1);
+      pdf.text(rowNr, zcx + 1.5, y + 4);
+      zcx += zamCols[0].w;
+
+      descLines.forEach((line: string, li: number) => {
+        pdf.text(line, zcx + 1.5, y + 4 + li * 3.5);
+      });
+      zcx += zamCols[1].w;
+
+      pdf.text(fmtNum(z.cenaNetto), zcx + zamCols[2].w - 1.5, y + 4, { align: "right" });
+      zcx += zamCols[2].w;
+
+      pdf.text(z.ilosc, zcx + zamCols[3].w - 1.5, y + 4, { align: "right" });
+      zcx += zamCols[3].w;
+
+      pdf.text(t(z.jm || "-"), zcx + 1.5, y + 4);
+      zcx += zamCols[4].w;
+
+      const stawkaLabel = ["zw", "oo", "np"].includes(z.stawkaVat)
+        ? z.stawkaVat.toUpperCase()
+        : `${z.stawkaVat}%`;
+      pdf.text(stawkaLabel, zcx + zamCols[5].w - 1.5, y + 4, { align: "right" });
+      zcx += zamCols[5].w;
+
+      pdf.text(fmtNum(z.wartoscNetto), zcx + zamCols[6].w - 1.5, y + 4, { align: "right" });
+
+      y += rowH;
+    });
+    y += 6;
+  }
+
+  // ══════════════════════════════════════════
+  // 4c. ZALICZKI (advance payments)
+  // ══════════════════════════════════════════
+  if (inv.zaliczki.length > 0) {
+    checkPage(15);
+    bold(9); BLACK();
+    italic(9);
+    pdf.text("Zaliczki", mg, y);
+    y += 5;
+
+    const zalCols = [
+      { label: "Lp.", w: 10 },
+      { label: "Opis", w: cw - 70 },
+      { label: "Stawka VAT", w: 25 },
+      { label: "Kwota", w: 35 },
+    ];
+
+    fillRect(mg, y, cw, 6);
+    bold(6.5); BLACK();
+    let zlx = mg;
+    zalCols.forEach((col) => {
+      pdf.text(col.label, zlx + 2, y + 4);
+      zlx += col.w;
+    });
+    y += 6;
+
+    inv.zaliczki.forEach((z, i) => {
+      norm(7);
+      const descLines = wrapText(z.opis, zalCols[1].w - 4, 7);
+      const rowH = Math.max(6, descLines.length * 3.5 + 2);
+      checkPage(rowH);
+
+      drawRect(mg, y, cw, rowH);
+      norm(7); BLACK();
+      zlx = mg;
+
+      pdf.text(z.nrZaliczki || String(i + 1), zlx + 2, y + 4);
+      zlx += zalCols[0].w;
+
+      descLines.forEach((line: string, li: number) => {
+        pdf.text(line, zlx + 2, y + 4 + li * 3.5);
+      });
+      zlx += zalCols[1].w;
+
+      pdf.text(z.stawkaVat ? `${z.stawkaVat}%` : "-", zlx + 2, y + 4);
+      zlx += zalCols[2].w;
+
+      pdf.text(fmtNum(z.kwota), zlx + zalCols[3].w - 2, y + 4, { align: "right" });
+      y += rowH;
+    });
+    y += 6;
+  }
+
+
   // ══════════════════════════════════════════
   checkPage(20 + inv.sumaNettoWgStawek.length * 7);
   bold(9); BLACK();
