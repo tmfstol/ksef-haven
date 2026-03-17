@@ -588,14 +588,41 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // ── JWT Validation ──
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Brak autoryzacji" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Nieprawidłowy token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userId = claimsData.claims.sub;
+    console.log(`[ksef-sync] Authenticated user: ${userId}`);
+
+    // Use service role for DB operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json().catch(() => ({}));
     const companyId = body.company_id || null;
     const ksefEnv = body.ksef_env || "prod";
 
-    let query = supabase.from("companies").select("id, nip, ksef_token");
+    // Only fetch companies belonging to the authenticated user
+    let query = supabase.from("companies").select("id, nip, ksef_token").eq("user_id", userId);
     if (companyId) query = query.eq("id", companyId);
 
     const { data: companies, error: companiesError } = await query;
