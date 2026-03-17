@@ -656,7 +656,7 @@ Deno.serve(async (req) => {
         errors.push({
           companyId: company.id,
           companyNip: company.nip,
-          error: err instanceof Error ? err.message : String(err),
+          error: "Synchronizacja nie powiodla sie dla tej firmy.",
         });
       }
     }
@@ -679,7 +679,7 @@ Deno.serve(async (req) => {
     console.error("[ksef-sync] Fatal error:", error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Nieznany błąd synchronizacji",
+        error: "Blad synchronizacji. Sprobuj ponownie.",
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
