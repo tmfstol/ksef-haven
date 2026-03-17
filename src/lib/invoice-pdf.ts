@@ -212,7 +212,38 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
     };
   });
 
-  // VAT summary by rate
+  // Parse Zamowienie (order items for advance invoices)
+  const zamowienieEl = getEl(faEl, "Zamowienie");
+  const zamowienieWiersze = getAllEls(zamowienieEl, "ZamowienieWiersz");
+  const zamowienie: ZamowienieLine[] = zamowienieWiersze.map((w) => ({
+    nr: getText(w, "NrWierszaZam") || "",
+    opis: getText(w, "P_7Z") || "-",
+    jm: getText(w, "P_8AZ") || "",
+    ilosc: getText(w, "P_8BZ") || "1",
+    cenaNetto: (getText(w, "P_9AZ") || getText(w, "P_9BZ") || "0").trim(),
+    wartoscNetto: getText(w, "P_11NettoZ") || "0",
+    stawkaVat: getText(w, "P_12Z") || "0",
+  }));
+
+  // Parse Zaliczka (advance payment lines)
+  const zaliczkaEl = getEl(faEl, "Zaliczka");
+  const zaliczkaWiersze = getAllEls(zaliczkaEl, "ZaliczkaWiersz");
+  const zaliczki: ZaliczkaLine[] = zaliczkaWiersze.map((w) => ({
+    nrZaliczki: getText(w, "NrWierszaZal") || "",
+    opis: getText(w, "OpisZaliczki") || getText(w, "P_7Z") || "-",
+    kwota: getText(w, "KwotaZaliczki") || "0",
+    stawkaVat: getText(w, "P_12Z") || "",
+  }));
+
+  // For advance invoices: if pozycje have empty descriptions, try to fill from zamowienie
+  if (zamowienie.length > 0) {
+    pozycje.forEach((p) => {
+      if (p.opis === "-" || !p.opis) {
+        const matching = zamowienie.find((z) => z.nr === p.nr);
+        if (matching) p.opis = matching.opis;
+      }
+    });
+  }
   const sumaNettoWgStawek: { stawka: string; netto: string; vat: string }[] = [];
 
   const p13_1 = getText(faEl, "P_13_1");
