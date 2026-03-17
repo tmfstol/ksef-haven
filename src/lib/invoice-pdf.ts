@@ -43,6 +43,8 @@ interface InvoiceParty {
   adres: string;
   email: string;
   telefon: string;
+  eori: string;
+  prefiksVat: string;
 }
 
 interface InvoiceLine {
