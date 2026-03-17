@@ -545,13 +545,13 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
 
   // Table header
   const colDefs = [
-    { label: "Lp.", w: 10, align: "left" as const },
-    { label: "Nazwa towaru lub uslugi", w: 58, align: "left" as const },
-    { label: "Cena jedn. netto", w: 24, align: "right" as const },
-    { label: "Ilosc", w: 14, align: "right" as const },
-    { label: "Miara", w: 16, align: "left" as const },
-    { label: "Stawka podatku", w: 22, align: "right" as const },
-    { label: t("Wartosc sprzedazy netto"), w: 36, align: "right" as const },
+    { label: "Lp.", w: 8, align: "left" as const },
+    { label: "Nazwa towaru lub uslugi", w: 72, align: "left" as const },
+    { label: "Cena jedn. netto", w: 22, align: "right" as const },
+    { label: "Ilosc", w: 12, align: "right" as const },
+    { label: "Miara", w: 14, align: "left" as const },
+    { label: "Stawka podatku", w: 20, align: "right" as const },
+    { label: t("Wartosc sprzedazy netto"), w: 32, align: "right" as const },
   ];
 
   const headerH = 8;
