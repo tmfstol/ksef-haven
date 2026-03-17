@@ -318,30 +318,53 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 3);
 
   const url = `${baseUrl}/api/v2/invoices/query/metadata`;
-  const queryBody = {
-    subjectType: "subject2",
-    dateRange: {
-      dateType: "issue",
-      from: sixMonthsAgo.toISOString(),
-      to: now.toISOString(),
-    },
-  };
+  const allInvoices: any[] = [];
+  let page = 0;
+  let hasMore = true;
 
-  console.log(`[ksef-sync] POST ${url} body: ${JSON.stringify(queryBody)}`);
-  const res = await fetchWithRetry(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(queryBody),
-  });
-  const rawText = await res.text();
-  const text = rawText.replace(/^\uFEFF/, "").trim();
-  console.log(`[ksef-sync] Invoice query response (${res.status}): ${text.substring(0, 500)}`);
-  if (!res.ok) throw new Error(`Invoice query failed (${res.status}): ${text.substring(0, 300)}`);
-  return JSON.parse(text);
+  while (hasMore) {
+    const queryBody: any = {
+      subjectType: "subject2",
+      dateRange: {
+        dateType: "issue",
+        from: sixMonthsAgo.toISOString(),
+        to: now.toISOString(),
+      },
+      pageSize: 100,
+      pageOffset: page,
+    };
+
+    console.log(`[ksef-sync] POST ${url} page=${page}`);
+    const res = await fetchWithRetry(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(queryBody),
+    });
+    const rawText = await res.text();
+    const text = rawText.replace(/^\uFEFF/, "").trim();
+    console.log(`[ksef-sync] Invoice query page ${page} response (${res.status}): ${text.substring(0, 300)}`);
+    if (!res.ok) throw new Error(`Invoice query failed (${res.status}): ${text.substring(0, 300)}`);
+
+    const data = JSON.parse(text);
+    const pageInvoices = data?.invoices || data?.invoiceHeaderList || [];
+    allInvoices.push(...pageInvoices);
+
+    hasMore = data.hasMore === true;
+    page++;
+
+    // Safety limit
+    if (page > 50) {
+      console.log(`[ksef-sync] Reached page limit (50), stopping pagination`);
+      break;
+    }
+  }
+
+  console.log(`[ksef-sync] Total invoices fetched across ${page} pages: ${allInvoices.length}`);
+  return { invoices: allInvoices };
 }
 
 // Get single invoice
