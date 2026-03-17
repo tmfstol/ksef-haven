@@ -127,7 +127,7 @@ function parseAddr(adresEl: Element | null): string {
 }
 
 function parseParty(el: Element | null): InvoiceParty {
-  if (!el) return { nip: "", nazwa: "", adres: "", email: "", telefon: "" };
+  if (!el) return { nip: "", nazwa: "", adres: "", email: "", telefon: "", eori: "", prefiksVat: "" };
   const ident = getEl(el, "DaneIdentyfikacyjne");
   const adresEl = getEl(el, "Adres");
   const kontakt = getEl(el, "DaneKontaktowe");
@@ -137,6 +137,8 @@ function parseParty(el: Element | null): InvoiceParty {
     adres: parseAddr(adresEl),
     email: getText(kontakt, "Email") || "",
     telefon: getText(kontakt, "Telefon") || "",
+    eori: getText(ident, "NrEORI") || getText(el, "NrEORI") || "",
+    prefiksVat: getText(ident, "PrefiksVAT") || getText(el, "PrefiksVAT") || getText(ident, "PrefVAT") || "",
   };
 }
 
