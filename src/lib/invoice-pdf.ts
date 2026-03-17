@@ -328,6 +328,8 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
     sprzedawca: parseParty(podmiot1),
     nabywca: parseParty(podmiot2),
     pozycje,
+    zamowienie,
+    zaliczki,
     sumaNettoWgStawek,
     sumaNetto,
     sumaVat,
