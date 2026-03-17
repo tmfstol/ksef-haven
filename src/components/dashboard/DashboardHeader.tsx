@@ -84,8 +84,20 @@ export function DashboardHeader({
         size="icon"
         onClick={() => navigate("/settings")}
         className="rounded-xl"
+        title="Ustawienia"
       >
         <Settings className="h-4 w-4" />
+      </Button>
+
+      {/* Wyloguj */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={signOut}
+        className="rounded-xl text-muted-foreground hover:text-destructive"
+        title="Wyloguj"
+      >
+        <LogOut className="h-4 w-4" />
       </Button>
 
       {/* Sync All */}

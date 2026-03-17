@@ -24,6 +24,8 @@ export function useAddCompany() {
 
   return useMutation({
     mutationFn: async (company: { name: string; nip: string; ksefToken: string; storagePath: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Nie zalogowano");
       const { data, error } = await supabase
         .from("companies")
         .insert({
@@ -31,6 +33,7 @@ export function useAddCompany() {
           nip: company.nip,
           ksef_token: company.ksefToken,
           storage_path: company.storagePath,
+          user_id: user.id,
         })
         .select()
         .single();
