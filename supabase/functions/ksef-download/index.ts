@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("[ksef-download] Error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Nieznany błąd" }),
+      JSON.stringify({ error: "Blad pobierania faktury. Sprobuj ponownie." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
