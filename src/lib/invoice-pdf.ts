@@ -1,22 +1,39 @@
 import { jsPDF } from "jspdf";
 
-// ── XML Parsing ──
+// ── XML Parsing using DOMParser ──
 
-function getTag(xml: string, tag: string): string {
-  const patterns = [
-    new RegExp(`<[^:]*:?${tag}[^>]*>([\\s\\S]*?)<\\/[^:]*:?${tag}>`, "i"),
-    new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"),
-  ];
-  for (const re of patterns) {
-    const m = xml.match(re);
-    if (m) return m[1].trim();
+function getText(el: Element | null, tag: string): string {
+  if (!el) return "";
+  // Try without namespace first, then with wildcard namespace
+  const found = el.getElementsByTagName(tag)[0] 
+    || el.getElementsByTagNameNS("*", tag)[0];
+  return found?.textContent?.trim() || "";
+}
+
+function getDirectText(el: Element | null, tag: string): string {
+  if (!el) return "";
+  // Only match direct children to avoid picking up nested elements
+  const children = el.children;
+  for (let i = 0; i < children.length; i++) {
+    if (children[i].localName === tag) {
+      return children[i].textContent?.trim() || "";
+    }
   }
   return "";
 }
 
-function getAllBlocks(xml: string, tag: string): string[] {
-  const re = new RegExp(`<[^:]*:?${tag}[^>]*>[\\s\\S]*?<\\/[^:]*:?${tag}>`, "gi");
-  return [...xml.matchAll(re)].map((m) => m[0]);
+function getEl(el: Element | null, tag: string): Element | null {
+  if (!el) return null;
+  const found = el.getElementsByTagName(tag)[0]
+    || el.getElementsByTagNameNS("*", tag)[0];
+  return found || null;
+}
+
+function getAllEls(el: Element | null, tag: string): Element[] {
+  if (!el) return [];
+  const list = el.getElementsByTagName(tag);
+  if (list.length > 0) return Array.from(list);
+  return Array.from(el.getElementsByTagNameNS("*", tag));
 }
 
 // ── Data types ──
@@ -25,6 +42,8 @@ interface InvoiceParty {
   nip: string;
   nazwa: string;
   adres: string;
+  email: string;
+  telefon: string;
 }
 
 interface InvoiceLine {
@@ -46,6 +65,7 @@ interface ParsedInvoice {
   nrFaktury: string;
   dataWystawienia: string;
   dataSprzedazy: string;
+  miejsceWystawienia: string;
   okresOd: string;
   okresDo: string;
   sprzedawca: InvoiceParty;
@@ -58,8 +78,11 @@ interface ParsedInvoice {
   terminPlatnosci: string;
   formaPlatnosci: string;
   nrRachunku: string;
+  nazwaBanku: string;
   doZaplaty: string;
   uwagi: { klucz: string; wartosc: string }[];
+  nrWZ: string;
+  nrZamowienia: string;
   stopka: string;
   krs: string;
   regon: string;
@@ -67,7 +90,7 @@ interface ParsedInvoice {
 }
 
 const FORMA_PLATNOSCI: Record<string, string> = {
-  "1": "Gotówka",
+  "1": "Gotowka",
   "2": "Karta",
   "3": "Bon",
   "4": "Czek",
@@ -77,7 +100,7 @@ const FORMA_PLATNOSCI: Record<string, string> = {
 
 const RODZAJ_FAKTURY: Record<string, string> = {
   VAT: "Faktura VAT",
-  KOR: "Faktura korygująca",
+  KOR: "Faktura korygujaca",
   ZAL: "Faktura zaliczkowa",
   ROZ: "Faktura rozliczeniowa",
   UPR: "Faktura uproszczona",
@@ -85,50 +108,78 @@ const RODZAJ_FAKTURY: Record<string, string> = {
   KOR_ROZ: "Korekta faktury rozliczeniowej",
 };
 
-function parseAddr(block: string): string {
-  const addrL1 = getTag(block, "AdresL1");
-  const addrL2 = getTag(block, "AdresL2");
+function parseAddr(adresEl: Element | null): string {
+  if (!adresEl) return "";
+  const addrL1 = getText(adresEl, "AdresL1");
+  const addrL2 = getText(adresEl, "AdresL2");
   if (addrL1 || addrL2) return [addrL1, addrL2].filter(Boolean).join(", ");
-  const street = getTag(block, "Ulica");
-  const nr = getTag(block, "NrDomu");
-  const nrLok = getTag(block, "NrLokalu");
-  const code = getTag(block, "KodPocztowy");
-  const city = getTag(block, "Miejscowosc");
+  const street = getText(adresEl, "Ulica");
+  const nr = getText(adresEl, "NrDomu");
+  const nrLok = getText(adresEl, "NrLokalu");
+  const code = getText(adresEl, "KodPocztowy");
+  const city = getText(adresEl, "Miejscowosc");
   return [street, [nr, nrLok].filter(Boolean).join("/"), [code, city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 }
 
-function parseParty(block: string): InvoiceParty {
-  const ident = getTag(block, "DaneIdentyfikacyjne");
-  const addr = getTag(block, "Adres");
+function parseParty(el: Element | null): InvoiceParty {
+  if (!el) return { nip: "", nazwa: "", adres: "", email: "", telefon: "" };
+  const ident = getEl(el, "DaneIdentyfikacyjne");
+  const adresEl = getEl(el, "Adres");
+  const kontakt = getEl(el, "DaneKontaktowe");
   return {
-    nip: getTag(ident, "NIP") || getTag(block, "NIP") || "",
-    nazwa: getTag(ident, "Nazwa") || getTag(ident, "PelnaNazwa") || "",
-    adres: parseAddr(addr),
+    nip: getText(ident, "NIP") || getText(el, "NIP") || "",
+    nazwa: getText(ident, "Nazwa") || getText(ident, "PelnaNazwa") || "",
+    adres: parseAddr(adresEl),
+    email: getText(kontakt, "Email") || "",
+    telefon: getText(kontakt, "Telefon") || "",
   };
 }
 
+// Strip Polish diacritics for jsPDF (helvetica font doesn't support them)
+function stripPl(s: string): string {
+  const map: Record<string, string> = {
+    'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n',
+    'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z',
+    'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N',
+    'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z',
+  };
+  return s.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, (c) => map[c] || c);
+}
+
 export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
-  const fa = getTag(xml, "Fa") || xml;
-  const podmiot1 = getTag(xml, "Podmiot1");
-  const podmiot2 = getTag(xml, "Podmiot2");
-  const platnosc = getTag(fa, "Platnosc");
-  const rozliczenie = getTag(fa, "Rozliczenie");
-  const stopkaBlock = getTag(xml, "Stopka");
-  const rejestry = getTag(stopkaBlock, "Rejestry");
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, "application/xml");
+  
+  // Check for parsing errors
+  const parseError = doc.querySelector("parsererror");
+  if (parseError) {
+    console.error("XML parse error:", parseError.textContent);
+  }
+
+  const root = doc.documentElement;
+  const podmiot1 = getEl(root, "Podmiot1");
+  const podmiot2 = getEl(root, "Podmiot2");
+  const faEl = getEl(root, "Fa");
+  const platnoscEl = getEl(faEl, "Platnosc");
+  const rozliczenieEl = getEl(faEl, "Rozliczenie");
+  const stopkaEl = getEl(root, "Stopka");
+  const rejestrEl = getEl(stopkaEl, "Rejestry");
+  const warunkiEl = getEl(faEl, "WarunkiTransakcji");
+  const okresEl = getEl(faEl, "OkresFa");
 
   // Parse line items
-  const wiersze = getAllBlocks(fa, "FaWiersz");
+  const wiersze = getAllEls(faEl, "FaWiersz");
   const pozycje: InvoiceLine[] = wiersze.map((w) => {
-    const net = getTag(w, "P_11") || "0";
-    const vatRate = getTag(w, "P_12") || "0";
+    const net = getText(w, "P_11") || "0";
+    const vatRate = getText(w, "P_12") || "0";
     const netNum = parseFloat(net) || 0;
-    const vatNum = netNum * (parseFloat(vatRate) / 100);
+    const vatNum = parseFloat(getText(w, "P_11Vat") || "") || netNum * (parseFloat(vatRate) / 100);
     return {
-      nr: getTag(w, "NrWierszaFa") || "",
-      opis: getTag(w, "P_7") || "-",
-      jm: getTag(w, "P_8A") || "",
-      ilosc: getTag(w, "P_8B") || "1",
-      cenaNetto: getTag(w, "P_9A") || getTag(w, "P_9B") || "0",
+      nr: getText(w, "NrWierszaFa") || "",
+      opis: getText(w, "P_7") || "-",
+      jm: getText(w, "P_8A") || "",
+      ilosc: getText(w, "P_8B") || "1",
+      cenaNetto: (getText(w, "P_9A") || getText(w, "P_9B") || "0").trim(),
       wartoscNetto: net,
       stawkaVat: vatRate,
       kwotaVat: vatNum.toFixed(2),
@@ -153,26 +204,30 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
 
   // Additional descriptions
   const uwagi: { klucz: string; wartosc: string }[] = [];
-  const opisBlocks = getAllBlocks(fa, "DodatkowyOpis");
-  opisBlocks.forEach((b) => {
-    const k = getTag(b, "Klucz");
-    const v = getTag(b, "Wartosc");
+  const opisEls = getAllEls(faEl, "DodatkowyOpis");
+  opisEls.forEach((b) => {
+    const k = getText(b, "Klucz");
+    const v = getText(b, "Wartosc");
     if (k || v) uwagi.push({ klucz: k, wartosc: v });
   });
 
-  const sumaNetto = getTag(fa, "P_13_1") || getTag(fa, "P_13_2") || "0";
-  const sumaVat = getTag(fa, "P_14_1") || getTag(fa, "P_14_2") || "0";
-  const sumaBrutto = getTag(fa, "P_15") || "0";
+  const sumaNetto = getText(faEl, "P_13_1") || getText(faEl, "P_13_2") || "0";
+  const sumaVat = getText(faEl, "P_14_1") || getText(faEl, "P_14_2") || "0";
+  const sumaBrutto = getText(faEl, "P_15") || "0";
+
+  const rachunekEl = getEl(platnoscEl, "RachunekBankowy");
+  const terminEl = getEl(platnoscEl, "TerminPlatnosci");
 
   return {
     ksefNumber,
-    rodzajFaktury: getTag(fa, "RodzajFaktury") || "VAT",
-    kodWaluty: getTag(fa, "KodWaluty") || "PLN",
-    nrFaktury: getTag(fa, "P_2") || getTag(xml, "NrFaWewnetrzny") || ksefNumber,
-    dataWystawienia: getTag(fa, "P_1") || getTag(xml, "DataWytworzeniaFa") || "",
-    dataSprzedazy: getTag(fa, "P_6") || "",
-    okresOd: getTag(getTag(fa, "OkresFa"), "P_6_Od") || "",
-    okresDo: getTag(getTag(fa, "OkresFa"), "P_6_Do") || "",
+    rodzajFaktury: getText(faEl, "RodzajFaktury") || "VAT",
+    kodWaluty: getText(faEl, "KodWaluty") || "PLN",
+    nrFaktury: getText(faEl, "P_2") || getText(root, "NrFaWewnetrzny") || ksefNumber,
+    dataWystawienia: getText(faEl, "P_1") || getText(root, "DataWytworzeniaFa") || "",
+    dataSprzedazy: getDirectText(faEl, "P_6") || "",
+    miejsceWystawienia: getText(faEl, "P_1M") || "",
+    okresOd: getText(okresEl, "P_6_Od") || "",
+    okresDo: getText(okresEl, "P_6_Do") || "",
     sprzedawca: parseParty(podmiot1),
     nabywca: parseParty(podmiot2),
     pozycje,
@@ -180,133 +235,170 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
     sumaNetto,
     sumaVat,
     sumaBrutto,
-    terminPlatnosci: getTag(getTag(platnosc, "TerminPlatnosci"), "Termin") || "",
-    formaPlatnosci: getTag(platnosc, "FormaPlatnosci") || "",
-    nrRachunku: getTag(getTag(platnosc, "RachunekBankowy"), "NrRB") || "",
-    doZaplaty: getTag(rozliczenie, "DoZaplaty") || sumaBrutto,
+    terminPlatnosci: getText(terminEl, "Termin") || "",
+    formaPlatnosci: getText(platnoscEl, "FormaPlatnosci") || "",
+    nrRachunku: getText(rachunekEl, "NrRB") || "",
+    nazwaBanku: getText(rachunekEl, "NazwaBanku") || "",
+    doZaplaty: getText(rozliczenieEl, "DoZaplaty") || sumaBrutto,
     uwagi,
-    stopka: getTag(getTag(stopkaBlock, "Informacje"), "StopkaFaktury") || "",
-    krs: getTag(rejestry, "KRS") || "",
-    regon: getTag(rejestry, "REGON") || "",
-    bdo: getTag(rejestry, "BDO") || "",
+    nrWZ: getText(faEl, "WZ") || "",
+    nrZamowienia: getText(getEl(warunkiEl, "Zamowienia"), "NrZamowienia") || "",
+    stopka: getText(getEl(stopkaEl, "Informacje"), "StopkaFaktury") || "",
+    krs: getText(rejestrEl, "KRS") || "",
+    regon: getText(rejestrEl, "REGON") || "",
+    bdo: getText(rejestrEl, "BDO") || "",
   };
 }
 
-// ── PDF Generation (KSeF-compliant layout) ──
+// ── PDF Generation (KSeF FA(3) compliant layout) ──
 
-function fmtNum(val: string | number, currency = ""): string {
+function fmtNum(val: string | number): string {
   const n = typeof val === "string" ? parseFloat(val) : val;
   if (isNaN(n)) return String(val);
-  const formatted = n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return currency ? `${formatted} ${currency}` : formatted;
+  return n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function generateInvoicePdf(inv: ParsedInvoice): void {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pw = 210;
-  const m = 12; // margin
-  const cw = pw - 2 * m;
+  const mg = 12;
+  const cw = pw - 2 * mg;
   let y = 12;
 
-  // Style helpers
-  const bold = (s = 9) => { doc.setFont("helvetica", "bold"); doc.setFontSize(s); };
-  const norm = (s = 8) => { doc.setFont("helvetica", "normal"); doc.setFontSize(s); };
-  const clr = (r: number, g: number, b: number) => doc.setTextColor(r, g, b);
-  const BLACK = () => clr(0, 0, 0);
-  const GRAY = () => clr(90, 90, 90);
-  const BLUE = () => clr(25, 65, 148);
-  const line = (x1: number, y1: number, x2: number, y2: number, c = [200, 200, 200]) => {
-    doc.setDrawColor(c[0], c[1], c[2]);
-    doc.setLineWidth(0.3);
-    doc.line(x1, y1, x2, y2);
+  // All text goes through stripPl to handle Polish diacritics
+  const t = (s: string) => stripPl(s);
+
+  const bold = (s = 9) => { pdf.setFont("helvetica", "bold"); pdf.setFontSize(s); };
+  const norm = (s = 8) => { pdf.setFont("helvetica", "normal"); pdf.setFontSize(s); };
+  const setClr = (r: number, g: number, b: number) => pdf.setTextColor(r, g, b);
+  const BLACK = () => setClr(0, 0, 0);
+  const GRAY = () => setClr(100, 100, 100);
+  const BLUE = () => setClr(25, 65, 148);
+  const WHITE = () => setClr(255, 255, 255);
+  const hline = (x1: number, y1: number, x2: number, c = [200, 200, 200]) => {
+    pdf.setDrawColor(c[0], c[1], c[2]);
+    pdf.setLineWidth(0.3);
+    pdf.line(x1, y1, x2, y1);
   };
-  const checkPage = (need: number) => { if (y + need > 282) { doc.addPage(); y = 12; } };
+  const checkPage = (need: number) => {
+    if (y + need > 275) { pdf.addPage(); y = 12; }
+  };
+
+  // Helper: label + value pair
+  const labelVal = (lx: number, ly: number, label: string, value: string, labelW = 35) => {
+    norm(7); GRAY();
+    pdf.text(t(label), lx, ly);
+    bold(8); BLACK();
+    pdf.text(t(value), lx + labelW, ly);
+  };
 
   // ── 1. HEADER ──
   const rodzaj = RODZAJ_FAKTURY[inv.rodzajFaktury] || `Faktura ${inv.rodzajFaktury}`;
   bold(14); BLUE();
-  doc.text(rodzaj.toUpperCase(), m, y);
-  y += 1;
-  line(m, y, pw - m, y, [25, 65, 148]);
-  y += 5;
+  pdf.text(t(rodzaj.toUpperCase()), mg, y);
+  hline(mg, y + 1.5, pw - mg, [25, 65, 148]);
+  y += 6;
 
   // KSeF number
   norm(7); GRAY();
-  doc.text(`Numer KSeF: ${inv.ksefNumber}`, m, y);
+  pdf.text(`Numer KSeF: ${inv.ksefNumber}`, mg, y);
   y += 7;
 
-  // ── 2. INVOICE INFO ──
-  const infoLeft = [
-    { label: "Numer faktury", value: inv.nrFaktury },
-    { label: "Data wystawienia", value: inv.dataWystawienia },
-  ];
-  if (inv.dataSprzedazy) infoLeft.push({ label: "Data sprzedazy", value: inv.dataSprzedazy });
-  if (inv.okresOd && inv.okresDo) infoLeft.push({ label: "Okres", value: `${inv.okresOd} - ${inv.okresDo}` });
-  infoLeft.push({ label: "Waluta", value: inv.kodWaluty });
-
-  const infoRight = [
-    { label: "Forma platnosci", value: FORMA_PLATNOSCI[inv.formaPlatnosci] || inv.formaPlatnosci || "-" },
-  ];
-  if (inv.terminPlatnosci) infoRight.push({ label: "Termin platnosci", value: inv.terminPlatnosci });
-  if (inv.nrRachunku) infoRight.push({ label: "Nr rachunku", value: inv.nrRachunku });
-
+  // ── 2. INVOICE DETAILS ──
   const infoStartY = y;
+
   // Left column
-  infoLeft.forEach((item) => {
-    norm(7); GRAY();
-    doc.text(item.label + ":", m, y);
-    bold(8); BLACK();
-    doc.text(item.value, m + 35, y);
+  labelVal(mg, y, "Numer faktury:", inv.nrFaktury);
+  y += 4.5;
+  labelVal(mg, y, "Data wystawienia:", inv.dataWystawienia);
+  y += 4.5;
+  if (inv.dataSprzedazy) {
+    labelVal(mg, y, "Data sprzedazy:", inv.dataSprzedazy);
     y += 4.5;
-  });
+  }
+  if (inv.okresOd && inv.okresDo) {
+    labelVal(mg, y, "Okres:", `${inv.okresOd} - ${inv.okresDo}`);
+    y += 4.5;
+  }
+  if (inv.miejsceWystawienia) {
+    labelVal(mg, y, "Miejsce wystawienia:", inv.miejsceWystawienia);
+    y += 4.5;
+  }
+  labelVal(mg, y, "Waluta:", inv.kodWaluty);
+  y += 4.5;
 
   // Right column
   let yr = infoStartY;
   const rx = pw / 2 + 10;
-  infoRight.forEach((item) => {
-    norm(7); GRAY();
-    doc.text(item.label + ":", rx, yr);
-    bold(8); BLACK();
-    doc.text(item.value, rx + 35, yr);
+  labelVal(rx, yr, "Forma platnosci:", FORMA_PLATNOSCI[inv.formaPlatnosci] || inv.formaPlatnosci || "-");
+  yr += 4.5;
+  if (inv.terminPlatnosci) {
+    labelVal(rx, yr, "Termin platnosci:", inv.terminPlatnosci);
     yr += 4.5;
-  });
+  }
+  if (inv.nrRachunku) {
+    labelVal(rx, yr, "Nr rachunku:", inv.nrRachunku);
+    yr += 4.5;
+  }
+  if (inv.nazwaBanku) {
+    labelVal(rx, yr, "Bank:", inv.nazwaBanku);
+    yr += 4.5;
+  }
+  if (inv.nrWZ) {
+    labelVal(rx, yr, "Nr WZ:", inv.nrWZ);
+    yr += 4.5;
+  }
+  if (inv.nrZamowienia) {
+    labelVal(rx, yr, "Nr zamowienia:", inv.nrZamowienia, 30);
+    yr += 4.5;
+  }
 
   y = Math.max(y, yr) + 4;
 
   // ── 3. PARTIES ──
   const colW = cw / 2 - 3;
-  const partyH = 26;
+  const partyH = 30;
 
-  // Seller
-  doc.setFillColor(240, 243, 248);
-  doc.rect(m, y, colW, partyH, "F");
-  line(m, y, m + colW, y, [25, 65, 148]);
-
-  bold(7); BLUE();
-  doc.text("SPRZEDAWCA", m + 3, y + 4.5);
-  bold(9); BLACK();
-  const sellerLines = doc.splitTextToSize(inv.sprzedawca.nazwa, colW - 6);
-  doc.text(sellerLines.slice(0, 2), m + 3, y + 9);
-  norm(8); GRAY();
-  doc.text(`NIP: ${inv.sprzedawca.nip}`, m + 3, y + 16);
-  const sellerAddr = doc.splitTextToSize(inv.sprzedawca.adres, colW - 6);
-  doc.text(sellerAddr.slice(0, 2), m + 3, y + 20);
-
-  // Buyer
-  const bx = m + colW + 6;
-  doc.setFillColor(240, 243, 248);
-  doc.rect(bx, y, colW, partyH, "F");
-  line(bx, y, bx + colW, y, [25, 65, 148]);
+  // Seller box
+  pdf.setFillColor(240, 243, 248);
+  pdf.rect(mg, y, colW, partyH, "F");
+  hline(mg, y, mg + colW, [25, 65, 148]);
 
   bold(7); BLUE();
-  doc.text("NABYWCA", bx + 3, y + 4.5);
+  pdf.text("SPRZEDAWCA", mg + 3, y + 5);
   bold(9); BLACK();
-  const buyerLines = doc.splitTextToSize(inv.nabywca.nazwa, colW - 6);
-  doc.text(buyerLines.slice(0, 2), bx + 3, y + 9);
+  const sellerLines = pdf.splitTextToSize(t(inv.sprzedawca.nazwa), colW - 6);
+  pdf.text(sellerLines.slice(0, 2), mg + 3, y + 10);
+  const sellerNameH = Math.min(sellerLines.length, 2) * 4;
   norm(8); GRAY();
-  doc.text(`NIP: ${inv.nabywca.nip}`, bx + 3, y + 16);
-  const buyerAddr = doc.splitTextToSize(inv.nabywca.adres, colW - 6);
-  doc.text(buyerAddr.slice(0, 2), bx + 3, y + 20);
+  pdf.text(`NIP: ${inv.sprzedawca.nip}`, mg + 3, y + 10 + sellerNameH);
+  const sellerAddrLines = pdf.splitTextToSize(t(inv.sprzedawca.adres), colW - 6);
+  pdf.text(sellerAddrLines.slice(0, 2), mg + 3, y + 14 + sellerNameH);
+  if (inv.sprzedawca.email) {
+    norm(7);
+    pdf.text(t(inv.sprzedawca.email), mg + 3, y + 22 + sellerNameH);
+  }
+
+  // Buyer box
+  const bx = mg + colW + 6;
+  pdf.setFillColor(240, 243, 248);
+  pdf.rect(bx, y, colW, partyH, "F");
+  hline(bx, y, bx + colW, [25, 65, 148]);
+
+  bold(7); BLUE();
+  pdf.text("NABYWCA", bx + 3, y + 5);
+  bold(9); BLACK();
+  const buyerLines = pdf.splitTextToSize(t(inv.nabywca.nazwa), colW - 6);
+  pdf.text(buyerLines.slice(0, 2), bx + 3, y + 10);
+  const buyerNameH = Math.min(buyerLines.length, 2) * 4;
+  norm(8); GRAY();
+  pdf.text(`NIP: ${inv.nabywca.nip}`, bx + 3, y + 10 + buyerNameH);
+  const buyerAddrLines = pdf.splitTextToSize(t(inv.nabywca.adres), colW - 6);
+  pdf.text(buyerAddrLines.slice(0, 2), bx + 3, y + 14 + buyerNameH);
+  if (inv.nabywca.email) {
+    norm(7);
+    pdf.text(t(inv.nabywca.email), bx + 3, y + 22 + buyerNameH);
+  }
 
   y += partyH + 6;
 
@@ -326,16 +418,15 @@ export function generateInvoicePdf(inv: ParsedInvoice): void {
   checkPage(10 + inv.pozycje.length * 5);
 
   // Table header
-  doc.setFillColor(25, 65, 148);
-  doc.rect(m, y, cw, 6, "F");
-  bold(6.5);
-  doc.setTextColor(255, 255, 255);
-  let cx = m + 1;
+  pdf.setFillColor(25, 65, 148);
+  pdf.rect(mg, y, cw, 6, "F");
+  bold(6.5); WHITE();
+  let cx = mg + 1;
   cols.forEach((col) => {
     if (col.align === "right") {
-      doc.text(col.label, cx + col.w - 2, y + 4, { align: "right" });
+      pdf.text(col.label, cx + col.w - 2, y + 4, { align: "right" });
     } else {
-      doc.text(col.label, cx + 1, y + 4);
+      pdf.text(col.label, cx + 1, y + 4);
     }
     cx += col.w;
   });
@@ -345,14 +436,16 @@ export function generateInvoicePdf(inv: ParsedInvoice): void {
   inv.pozycje.forEach((p, i) => {
     checkPage(5.5);
     if (i % 2 === 0) {
-      doc.setFillColor(248, 249, 252);
-      doc.rect(m, y - 0.5, cw, 5, "F");
+      pdf.setFillColor(248, 249, 252);
+      pdf.rect(mg, y - 0.5, cw, 5, "F");
     }
     norm(7); BLACK();
-    cx = m + 1;
+    cx = mg + 1;
+
+    const rowNr = p.nr ? p.nr.replace(/^0+/, "") || "1" : String(i + 1);
     const vals = [
-      { v: p.nr || String(i + 1), a: "left" },
-      { v: p.opis, a: "left", maxW: 50 },
+      { v: rowNr, a: "left" },
+      { v: t(p.opis), a: "left", maxW: 50 },
       { v: p.jm, a: "left" },
       { v: p.ilosc, a: "right" },
       { v: fmtNum(p.cenaNetto), a: "right" },
@@ -368,110 +461,110 @@ export function generateInvoicePdf(inv: ParsedInvoice): void {
         if (text.length > maxChars) text = text.substring(0, maxChars - 1) + "...";
       }
       if (item.a === "right") {
-        doc.text(text, cx + cols[j].w - 2, y + 3, { align: "right" });
+        pdf.text(text, cx + cols[j].w - 2, y + 3, { align: "right" });
       } else {
-        doc.text(text, cx + 1, y + 3);
+        pdf.text(text, cx + 1, y + 3);
       }
       cx += cols[j].w;
     });
     y += 5;
   });
 
-  // Table bottom line
-  line(m, y, m + cw, y);
-  y += 3;
-
-  // ── 5. VAT SUMMARY ──
-  checkPage(20);
-  const sumX = m + cw - 90;
-
-  bold(7); BLUE();
-  doc.text("PODSUMOWANIE VAT", sumX, y);
+  hline(mg, y, mg + cw);
   y += 4;
 
-  // VAT summary header
-  doc.setFillColor(240, 243, 248);
-  doc.rect(sumX, y - 1, 90, 5, "F");
+  // ── 5. VAT SUMMARY ──
+  checkPage(25);
+  const sumX = mg + cw - 90;
+
+  bold(7); BLUE();
+  pdf.text("PODSUMOWANIE VAT", sumX, y);
+  y += 4;
+
+  pdf.setFillColor(240, 243, 248);
+  pdf.rect(sumX, y - 1, 90, 5, "F");
   bold(6.5); GRAY();
-  doc.text("Stawka VAT", sumX + 2, y + 2.5);
-  doc.text("Netto", sumX + 30, y + 2.5, { align: "right" });
-  doc.text("VAT", sumX + 55, y + 2.5, { align: "right" });
-  doc.text("Brutto", sumX + 88, y + 2.5, { align: "right" });
+  pdf.text("Stawka VAT", sumX + 2, y + 2.5);
+  pdf.text("Netto", sumX + 30, y + 2.5, { align: "right" });
+  pdf.text("VAT", sumX + 55, y + 2.5, { align: "right" });
+  pdf.text("Brutto", sumX + 88, y + 2.5, { align: "right" });
   y += 5;
 
   inv.sumaNettoWgStawek.forEach((s) => {
     norm(7); BLACK();
-    doc.text(`${s.stawka}%`, sumX + 2, y + 2.5);
-    doc.text(fmtNum(s.netto), sumX + 30, y + 2.5, { align: "right" });
-    doc.text(fmtNum(s.vat), sumX + 55, y + 2.5, { align: "right" });
+    pdf.text(`${s.stawka}%`, sumX + 2, y + 2.5);
+    pdf.text(fmtNum(s.netto), sumX + 30, y + 2.5, { align: "right" });
+    pdf.text(fmtNum(s.vat), sumX + 55, y + 2.5, { align: "right" });
     const brutto = (parseFloat(s.netto) + parseFloat(s.vat)).toFixed(2);
-    doc.text(fmtNum(brutto), sumX + 88, y + 2.5, { align: "right" });
+    pdf.text(fmtNum(brutto), sumX + 88, y + 2.5, { align: "right" });
     y += 4.5;
   });
 
-  // Totals line
-  line(sumX, y, sumX + 90, y, [25, 65, 148]);
+  hline(sumX, y, sumX + 90, [25, 65, 148]);
   y += 1;
   bold(8); BLACK();
-  doc.text("RAZEM:", sumX + 2, y + 3);
-  doc.text(fmtNum(inv.sumaNetto), sumX + 30, y + 3, { align: "right" });
-  doc.text(fmtNum(inv.sumaVat), sumX + 55, y + 3, { align: "right" });
+  pdf.text("RAZEM:", sumX + 2, y + 3);
+  pdf.text(fmtNum(inv.sumaNetto), sumX + 30, y + 3, { align: "right" });
+  pdf.text(fmtNum(inv.sumaVat), sumX + 55, y + 3, { align: "right" });
   bold(9);
-  doc.text(fmtNum(inv.sumaBrutto, inv.kodWaluty), sumX + 88, y + 3, { align: "right" });
+  pdf.text(fmtNum(inv.sumaBrutto) + " " + inv.kodWaluty, sumX + 88, y + 3, { align: "right" });
   y += 8;
 
   // ── 6. AMOUNT DUE ──
   checkPage(14);
-  doc.setFillColor(25, 65, 148);
-  doc.rect(sumX, y, 90, 9, "F");
-  bold(8);
-  doc.setTextColor(255, 255, 255);
-  doc.text("DO ZAPLATY:", sumX + 4, y + 6);
+  pdf.setFillColor(25, 65, 148);
+  pdf.rect(sumX, y, 90, 9, "F");
+  bold(8); WHITE();
+  pdf.text("DO ZAPLATY:", sumX + 4, y + 6);
   bold(11);
-  doc.text(fmtNum(inv.doZaplaty, inv.kodWaluty), sumX + 86, y + 6, { align: "right" });
+  pdf.text(fmtNum(inv.doZaplaty) + " " + inv.kodWaluty, sumX + 86, y + 6, { align: "right" });
   y += 14;
 
-  // ── 7. ADDITIONAL DESCRIPTIONS ──
+  // ── 7. ADDITIONAL INFO ──
   if (inv.uwagi.length > 0) {
-    checkPage(8 + inv.uwagi.length * 5);
+    checkPage(8 + inv.uwagi.length * 8);
     bold(7); BLUE();
-    doc.text("INFORMACJE DODATKOWE", m, y);
+    pdf.text("INFORMACJE DODATKOWE", mg, y);
     y += 4;
     inv.uwagi.forEach((u) => {
       norm(7); GRAY();
-      doc.text(`${u.klucz}:`, m, y);
+      pdf.text(t(u.klucz) + ":", mg, y);
       y += 3.5;
       norm(7); BLACK();
-      const lines = doc.splitTextToSize(u.wartosc, cw - 4);
-      doc.text(lines.slice(0, 3), m + 2, y);
+      const lines = pdf.splitTextToSize(t(u.wartosc), cw - 4);
+      pdf.text(lines.slice(0, 3), mg + 2, y);
       y += lines.slice(0, 3).length * 3.5 + 2;
     });
     y += 2;
   }
 
   // ── 8. FOOTER ──
-  // Registry info
   const footerParts: string[] = [];
   if (inv.krs) footerParts.push(`KRS: ${inv.krs}`);
   if (inv.regon) footerParts.push(`REGON: ${inv.regon}`);
   if (inv.bdo) footerParts.push(`BDO: ${inv.bdo}`);
-  if (inv.stopka) footerParts.push(inv.stopka);
 
-  if (footerParts.length > 0) {
-    const fy = 278;
-    line(m, fy, pw - m, fy);
+  if (footerParts.length > 0 || inv.stopka) {
+    const fy = 273;
+    hline(mg, fy, pw - mg);
     norm(6); GRAY();
-    doc.text(footerParts.join("  |  "), pw / 2, fy + 3, { align: "center" });
+    if (footerParts.length > 0) {
+      pdf.text(footerParts.join("  |  "), pw / 2, fy + 3, { align: "center" });
+    }
+    if (inv.stopka) {
+      const stopkaLines = pdf.splitTextToSize(t(inv.stopka), cw);
+      pdf.text(stopkaLines.slice(0, 2), pw / 2, fy + 6, { align: "center" });
+    }
   }
 
   // KSeF watermark
   norm(6); GRAY();
-  doc.text(
+  pdf.text(
     `Wizualizacja faktury ustrukturyzowanej KSeF  |  ${inv.ksefNumber}`,
     pw / 2,
-    285,
+    288,
     { align: "center" }
   );
 
-  doc.save(`${inv.ksefNumber}.pdf`);
+  pdf.save(`${inv.ksefNumber}.pdf`);
 }
