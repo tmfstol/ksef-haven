@@ -447,49 +447,10 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   const sellerEndY = y;
 
   // Nabywca (right column)
-  y = partyStartY;
   const bx = mg + halfW + 4;
-  bold(9); BLACK();
-  pdf.text("Nabywca", bx, y);
-  y += 5;
+  const buyerEndY = renderParty(inv.nabywca, "Nabywca", bx, halfW);
 
-  norm(7); DGRAY();
-  if (inv.nabywca.nip) {
-    pdf.text(`NIP: ${inv.nabywca.nip}`, bx + 2, y);
-    y += 3.5;
-  }
-  bold(8); BLACK();
-  const buyerNameLines = wrapText(inv.nabywca.nazwa, halfW - 4, 8);
-  buyerNameLines.forEach((line: string) => {
-    pdf.text(line, bx + 2, y);
-    y += 3.5;
-  });
-
-  if (inv.nabywca.adres) {
-    norm(7); DGRAY();
-    bold(7);
-    pdf.text("Adres", bx + 2, y);
-    y += 3.5;
-    norm(7);
-    const addrLines = wrapText(inv.nabywca.adres, halfW - 4, 7);
-    addrLines.forEach((line: string) => {
-      pdf.text(line, bx + 2, y);
-      y += 3.5;
-    });
-  }
-
-  if (inv.nabywca.email) {
-    norm(7);
-    pdf.text(`Email: ${inv.nabywca.email}`, bx + 2, y);
-    y += 3.5;
-  }
-  if (inv.nabywca.telefon) {
-    norm(7);
-    pdf.text(`Tel: ${inv.nabywca.telefon}`, bx + 2, y);
-    y += 3.5;
-  }
-
-  y = Math.max(sellerEndY, y) + 4;
+  y = Math.max(sellerEndY, buyerEndY) + 4;
   hline(mg, y, pw - mg);
   y += 6;
 
