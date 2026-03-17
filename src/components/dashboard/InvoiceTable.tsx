@@ -6,7 +6,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type DownloadState = { id: string; format: "xml" | "upo" } | null;
+type DownloadState = { id: string; format: "xml" | "upo" | "pdf" } | null;
 
 interface InvoiceTableProps {
   invoices: Invoice[];
