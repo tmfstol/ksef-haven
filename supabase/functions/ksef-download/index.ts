@@ -81,7 +81,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
   throw new Error("Unreachable");
 }
 
-// ── KSeF Auth ──
+async function authenticate(baseUrl: string, nip: string, ksefToken: string): Promise<string> {
   // Challenge
   const challengeRes = await fetchWithRetry(`${baseUrl}/api/v2/auth/challenge`, {
     method: "POST",
