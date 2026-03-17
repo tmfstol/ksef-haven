@@ -56,7 +56,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
 export function InvoiceTable({ invoices }: InvoiceTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<DownloadState>(null);
 
   const sorted = [...invoices].sort((a, b) => {
     let cmp = 0;
