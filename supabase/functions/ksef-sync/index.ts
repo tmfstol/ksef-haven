@@ -404,7 +404,7 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
 
 // Get single invoice
 async function getInvoice(baseUrl: string, accessToken: string, ksefNumber: string) {
-  const res = await fetchWithRetry(`${baseUrl}/api/v2/invoices/${ksefNumber}`, {
+  const res = await fetchWithRetry(`${baseUrl}/api/v2/invoices/ksef/${ksefNumber}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/octet-stream, application/json",
