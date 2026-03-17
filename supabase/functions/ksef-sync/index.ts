@@ -370,14 +370,21 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
     if (!res!.ok) throw new Error(`Invoice query failed (${res!.status}): ${text.substring(0, 300)}`);
 
     const data = JSON.parse(text);
+    
+    // Debug: log all response keys and headers
+    console.log(`[ksef-sync] Response keys: ${Object.keys(data).join(', ')}`);
+    const allHeaders: string[] = [];
+    res!.headers.forEach((v, k) => allHeaders.push(`${k}: ${v.substring(0, 50)}`));
+    console.log(`[ksef-sync] Response headers: ${allHeaders.join(' | ')}`);
+    
     const pageInvoices = data?.invoices || data?.invoiceHeaderList || [];
     allInvoices.push(...pageInvoices);
 
     // Get continuation token from response headers or body
-    const resContinuationToken = res!.headers.get("x-continuation-token") || data?.continuationToken || null;
+    const resContinuationToken = res!.headers.get("x-continuation-token") || data?.continuationToken || data?.nextPageToken || null;
 
     if (!data.hasMore || !resContinuationToken) {
-      console.log(`[ksef-sync] No more pages. hasMore=${data.hasMore}, token=${!!resContinuationToken}`);
+      console.log(`[ksef-sync] No more pages. hasMore=${data.hasMore}, token=${!!resContinuationToken}, invoiceCount=${pageInvoices.length}`);
       break;
     }
 
