@@ -335,19 +335,34 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
     };
 
     console.log(`[ksef-sync] POST ${url} page=${page}`);
-    const res = await fetchWithRetry(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(queryBody),
-    });
-    const rawText = await res.text();
+    // Rate limit: wait between pages
+    if (page > 0) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    let res: Response;
+    for (let retry = 0; retry < 3; retry++) {
+      res = await fetchWithRetry(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(queryBody),
+      });
+      if (res.status === 429) {
+        const wait = Math.pow(2, retry + 1) * 1000;
+        console.log(`[ksef-sync] Rate limited on page ${page}, waiting ${wait}ms`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      break;
+    }
+    const rawText = await res!.text();
     const text = rawText.replace(/^\uFEFF/, "").trim();
-    console.log(`[ksef-sync] Invoice query page ${page} response (${res.status}): ${text.substring(0, 300)}`);
-    if (!res.ok) throw new Error(`Invoice query failed (${res.status}): ${text.substring(0, 300)}`);
+    console.log(`[ksef-sync] Invoice query page ${page} response (${res!.status}): ${text.substring(0, 300)}`);
+    if (!res!.ok) throw new Error(`Invoice query failed (${res!.status}): ${text.substring(0, 300)}`);
 
     const data = JSON.parse(text);
     const pageInvoices = data?.invoices || data?.invoiceHeaderList || [];
