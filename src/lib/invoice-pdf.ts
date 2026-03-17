@@ -187,20 +187,71 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
     };
   });
 
-  // VAT summary by rate
-  const vatMap = new Map<string, { netto: number; vat: number }>();
-  pozycje.forEach((p) => {
-    const key = p.stawkaVat;
-    const prev = vatMap.get(key) || { netto: 0, vat: 0 };
-    prev.netto += parseFloat(p.wartoscNetto) || 0;
-    prev.vat += parseFloat(p.kwotaVat) || 0;
-    vatMap.set(key, prev);
-  });
-  const sumaNettoWgStawek = [...vatMap.entries()].map(([stawka, v]) => ({
-    stawka,
-    netto: v.netto.toFixed(2),
-    vat: v.vat.toFixed(2),
-  }));
+  // VAT summary by rate - read from official P_13_x/P_14_x FA(3) fields
+  const sumaNettoWgStawek: { stawka: string; netto: string; vat: string }[] = [];
+  
+  // P_13_1/P_14_1 = 23% (or 22%)
+  const p13_1 = getText(faEl, "P_13_1");
+  const p14_1 = getText(faEl, "P_14_1");
+  if (p13_1) sumaNettoWgStawek.push({ stawka: "23", netto: p13_1, vat: p14_1 || "0" });
+  
+  // P_13_2/P_14_2 = 8% (or 7%)
+  const p13_2 = getText(faEl, "P_13_2");
+  const p14_2 = getText(faEl, "P_14_2");
+  if (p13_2) sumaNettoWgStawek.push({ stawka: "8", netto: p13_2, vat: p14_2 || "0" });
+  
+  // P_13_3/P_14_3 = 5%
+  const p13_3 = getText(faEl, "P_13_3");
+  const p14_3 = getText(faEl, "P_14_3");
+  if (p13_3) sumaNettoWgStawek.push({ stawka: "5", netto: p13_3, vat: p14_3 || "0" });
+  
+  // P_13_4/P_14_4 = ryczalt taksowki
+  const p13_4 = getText(faEl, "P_13_4");
+  const p14_4 = getText(faEl, "P_14_4");
+  if (p13_4) sumaNettoWgStawek.push({ stawka: "ryczalt", netto: p13_4, vat: p14_4 || "0" });
+  
+  // P_13_6_1 = 0%
+  const p13_6_1 = getText(faEl, "P_13_6_1");
+  if (p13_6_1) sumaNettoWgStawek.push({ stawka: "0", netto: p13_6_1, vat: "0" });
+  
+  // P_13_7 = zwolnione (ZW)
+  const p13_7 = getText(faEl, "P_13_7");
+  if (p13_7) sumaNettoWgStawek.push({ stawka: "zw", netto: p13_7, vat: "0" });
+  
+  // P_13_8 = odwrotne obciazenie (OO) 
+  const p13_8 = getText(faEl, "P_13_8");
+  if (p13_8) sumaNettoWgStawek.push({ stawka: "oo", netto: p13_8, vat: "0" });
+  
+  // P_13_9 = np (nie podlega)
+  const p13_9 = getText(faEl, "P_13_9");
+  if (p13_9) sumaNettoWgStawek.push({ stawka: "np", netto: p13_9, vat: "0" });
+  
+  // P_13_10 = np-ue
+  const p13_10 = getText(faEl, "P_13_10");
+  if (p13_10) sumaNettoWgStawek.push({ stawka: "np-ue", netto: p13_10, vat: "0" });
+  
+  // P_13_11 = np-kraj
+  const p13_11 = getText(faEl, "P_13_11");
+  if (p13_11) sumaNettoWgStawek.push({ stawka: "np-kraj", netto: p13_11, vat: "0" });
+  
+  // Fallback: if no P_13 fields found, compute from line items
+  if (sumaNettoWgStawek.length === 0) {
+    const vatMap = new Map<string, { netto: number; vat: number }>();
+    pozycje.forEach((p) => {
+      const key = p.stawkaVat;
+      const prev = vatMap.get(key) || { netto: 0, vat: 0 };
+      prev.netto += parseFloat(p.wartoscNetto) || 0;
+      prev.vat += parseFloat(p.kwotaVat) || 0;
+      vatMap.set(key, prev);
+    });
+    [...vatMap.entries()].forEach(([stawka, v]) => {
+      sumaNettoWgStawek.push({
+        stawka,
+        netto: v.netto.toFixed(2),
+        vat: v.vat.toFixed(2),
+      });
+    });
+  }
 
   // Additional descriptions
   const uwagi: { klucz: string; wartosc: string }[] = [];
@@ -492,7 +543,10 @@ export function generateInvoicePdf(inv: ParsedInvoice): void {
 
   inv.sumaNettoWgStawek.forEach((s) => {
     norm(7); BLACK();
-    pdf.text(`${s.stawka}%`, sumX + 2, y + 2.5);
+    const stawkaLabel = ["zw", "oo", "np", "np-ue", "np-kraj", "ryczalt"].includes(s.stawka) 
+      ? s.stawka.toUpperCase() 
+      : `${s.stawka}%`;
+    pdf.text(stawkaLabel, sumX + 2, y + 2.5);
     pdf.text(fmtNum(s.netto), sumX + 30, y + 2.5, { align: "right" });
     pdf.text(fmtNum(s.vat), sumX + 55, y + 2.5, { align: "right" });
     const brutto = (parseFloat(s.netto) + parseFloat(s.vat)).toFixed(2);
