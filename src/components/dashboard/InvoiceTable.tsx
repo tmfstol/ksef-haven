@@ -265,7 +265,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                       size="sm"
                       className="h-8 px-2 text-xs rounded-lg gap-1 text-muted-foreground hover:text-foreground"
                       disabled={isAnyDownloading || !invoice.ksef_number}
-                      onClick={() => handleDownloadPdf(invoice, "upo")}
+                      onClick={() => handleDownloadUpo(invoice)}
                     >
                       {isDownloadingUpo ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
