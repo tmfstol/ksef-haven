@@ -26,7 +26,7 @@ export function DashboardHeader({
   activeCompany,
 }: DashboardHeaderProps) {
   const navigate = useNavigate();
-
+  const { signOut } = useAuth();
   return (
     <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
       {/* Status połączenia */}
