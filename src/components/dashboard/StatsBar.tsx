@@ -3,12 +3,15 @@ import type { Invoice } from "@/types/invoice";
 
 interface StatsBarProps {
   invoices: Invoice[];
+  lastSeenTimestamp?: string | null;
 }
 
-export function StatsBar({ invoices }: StatsBarProps) {
+export function StatsBar({ invoices, lastSeenTimestamp }: StatsBarProps) {
   const total = invoices.length;
   const processed = invoices.filter((i) => i.status === "processed").length;
-  const newCount = invoices.filter((i) => i.status === "new").length;
+  const newCount = lastSeenTimestamp
+    ? invoices.filter((i) => i.created_at && i.created_at > lastSeenTimestamp).length
+    : 0;
   const errors = invoices.filter((i) => i.status === "error").length;
 
   const stats = [
