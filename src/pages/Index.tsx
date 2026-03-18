@@ -29,21 +29,12 @@ const Index = () => {
   const [selectedNip, setSelectedNip] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<InvoiceFiltersState>(EMPTY_FILTERS);
-  const [lastSeenTimestamp, setLastSeenTimestamp] = useState<string | null>(() => {
-    return localStorage.getItem("ksef_last_seen");
+  const [lastSeenTimestamp] = useState<string | null>(() => {
+    const prev = localStorage.getItem("ksef_last_seen");
+    // Immediately save current time so next visit won't re-highlight these invoices
+    localStorage.setItem("ksef_last_seen", new Date().toISOString());
+    return prev;
   });
-
-  // After invoices load, mark current time as "seen" (delayed so user sees highlights)
-  useEffect(() => {
-    if (invoices && invoices.length > 0) {
-      const timer = setTimeout(() => {
-        const now = new Date().toISOString();
-        localStorage.setItem("ksef_last_seen", now);
-        setLastSeenTimestamp(now);
-      }, 30000); // Mark as seen after 30s
-      return () => clearTimeout(timer);
-    }
-  }, [invoices]);
 
   useEffect(() => {
     if (!companiesLoading && (!companies || companies.length === 0)) {
