@@ -26,6 +26,15 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
   const [nip, setNip] = useState("");
   const [ksefToken, setKsefToken] = useState("");
   const [storagePath, setStoragePath] = useState("\\\\TB-AFS\\Archive");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [countryCode, setCountryCode] = useState("PL");
+  const [bankName, setBankName] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [invoicePattern, setInvoicePattern] = useState("FV/{NNN}/{MM}/{RRRR}");
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
   // Load company data for editing
