@@ -78,6 +78,17 @@ export function DashboardHeader({
 
       <div className="flex-1" />
 
+      {/* Nowa faktura */}
+      <Button
+        variant="outline"
+        onClick={() => navigate("/invoices/new")}
+        className="rounded-xl px-4 gap-2"
+        title="Utwórz nową fakturę"
+      >
+        <FilePlus className="h-4 w-4" />
+        Nowa faktura
+      </Button>
+
       {/* Ustawienia */}
       <Button
         variant="ghost"
