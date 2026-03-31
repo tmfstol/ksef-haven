@@ -7,4 +7,13 @@ export interface Company {
   created_at?: string;
   updated_at?: string;
   user_id?: string;
+  street?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  country_code?: string;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  invoice_pattern?: string;
 }
