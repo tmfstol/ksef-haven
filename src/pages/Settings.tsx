@@ -328,6 +328,73 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
             />
           </motion.div>
 
+          {/* Adres firmy */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18 }}
+            className="glass-panel-elevated rounded-2xl p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <MapPin className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Adres firmy</h2>
+                <p className="text-xs text-muted-foreground">Adres używany na wystawianych fakturach</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input type="text" placeholder="ul. Przykładowa 1" value={street} onChange={(e) => setStreet(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+              <input type="text" placeholder="Warszawa" value={city} onChange={(e) => setCity(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+              <input type="text" placeholder="00-001" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" maxLength={6} />
+              <input type="text" placeholder="PL" value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" maxLength={2} />
+            </div>
+          </motion.div>
+
+          {/* Dane bankowe */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22 }}
+            className="glass-panel-elevated rounded-2xl p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <CreditCard className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Dane bankowe</h2>
+                <p className="text-xs text-muted-foreground">Rachunek bankowy wyświetlany na fakturach</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input type="text" placeholder="Nazwa banku" value={bankName} onChange={(e) => setBankName(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+              <input type="text" placeholder="PL 00 0000 0000 0000 0000 0000 0000" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono text-xs" />
+              <input type="email" placeholder="email@firma.pl" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+              <input type="tel" placeholder="+48 000 000 000" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+            </div>
+          </motion.div>
+
+          {/* Wzorzec numeracji */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="glass-panel-elevated rounded-2xl p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Hash className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Wzorzec numeracji faktur</h2>
+                <p className="text-xs text-muted-foreground">Zmienne: {"{NNN}"} numer, {"{MM}"} miesiąc, {"{RRRR}"} rok, {"{RR}"} rok skrócony</p>
+              </div>
+            </div>
+            <input type="text" value={invoicePattern} onChange={(e) => setInvoicePattern(e.target.value)} placeholder="FV/{NNN}/{MM}/{RRRR}" className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono" />
+          </motion.div>
+
           {/* Przyciski */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
