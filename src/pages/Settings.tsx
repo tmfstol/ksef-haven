@@ -47,6 +47,15 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
         setNip(company.nip);
         setKsefToken("••••••••");
         setStoragePath(company.storage_path);
+        setStreet(company.street || "");
+        setCity(company.city || "");
+        setPostalCode(company.postal_code || "");
+        setCountryCode(company.country_code || "PL");
+        setBankName(company.bank_name || "");
+        setBankAccount(company.bank_account || "");
+        setEmail(company.email || "");
+        setPhone(company.phone || "");
+        setInvoicePattern(company.invoice_pattern || "FV/{NNN}/{MM}/{RRRR}");
       }
     }
   }, [editId, companies]);
