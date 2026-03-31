@@ -72,11 +72,25 @@ export function useUpdateCompany() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (company: { id: string; name: string; nip: string; ksefToken?: string; storagePath: string }) => {
-      const updatePayload: Record<string, string> = {
+    mutationFn: async (company: {
+      id: string; name: string; nip: string; ksefToken?: string; storagePath: string;
+      street?: string | null; city?: string | null; postalCode?: string | null; countryCode?: string;
+      bankName?: string | null; bankAccount?: string | null; email?: string | null; phone?: string | null;
+      invoicePattern?: string;
+    }) => {
+      const updatePayload: Record<string, any> = {
         name: company.name,
         nip: company.nip,
         storage_path: company.storagePath,
+        street: company.street,
+        city: company.city,
+        postal_code: company.postalCode,
+        country_code: company.countryCode || "PL",
+        bank_name: company.bankName,
+        bank_account: company.bankAccount,
+        email: company.email,
+        phone: company.phone,
+        invoice_pattern: company.invoicePattern || "FV/{NNN}/{MM}/{RRRR}",
       };
       // Only update ksef_token if user provided a new value
       if (company.ksefToken && company.ksefToken.trim() && company.ksefToken !== "••••••••") {
