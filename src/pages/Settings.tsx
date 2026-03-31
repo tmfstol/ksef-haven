@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCompanies, useAddCompany, useUpdateCompany, useDeleteCompany } from "@/hooks/useCompanies";
 import { useTestConnection } from "@/hooks/useSettings";
-import { ArrowLeft, Save, Loader2, Wifi, Shield, FolderOpen, Building2, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Wifi, Shield, FolderOpen, Building2, Trash2, Plus, MapPin, CreditCard, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import type { Company } from "@/types/company";
