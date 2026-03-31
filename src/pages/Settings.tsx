@@ -101,6 +101,15 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
       nip: nip.trim(),
       ksefToken: ksefToken.trim(),
       storagePath: storagePath.trim(),
+      street: street.trim() || null,
+      city: city.trim() || null,
+      postalCode: postalCode.trim() || null,
+      countryCode: countryCode.trim() || "PL",
+      bankName: bankName.trim() || null,
+      bankAccount: bankAccount.trim() || null,
+      email: email.trim() || null,
+      phone: phone.trim() || null,
+      invoicePattern: invoicePattern.trim() || "FV/{NNN}/{MM}/{RRRR}",
     };
 
     if (editingCompany) {
