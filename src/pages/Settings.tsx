@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCompanies, useAddCompany, useUpdateCompany, useDeleteCompany } from "@/hooks/useCompanies";
 import { useTestConnection } from "@/hooks/useSettings";
-import { ArrowLeft, Save, Loader2, Wifi, Shield, FolderOpen, Building2, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Wifi, Shield, FolderOpen, Building2, Trash2, Plus, MapPin, CreditCard, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import type { Company } from "@/types/company";
@@ -26,6 +26,15 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
   const [nip, setNip] = useState("");
   const [ksefToken, setKsefToken] = useState("");
   const [storagePath, setStoragePath] = useState("\\\\TB-AFS\\Archive");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [countryCode, setCountryCode] = useState("PL");
+  const [bankName, setBankName] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [invoicePattern, setInvoicePattern] = useState("FV/{NNN}/{MM}/{RRRR}");
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
   // Load company data for editing
@@ -38,6 +47,15 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
         setNip(company.nip);
         setKsefToken("••••••••");
         setStoragePath(company.storage_path);
+        setStreet(company.street || "");
+        setCity(company.city || "");
+        setPostalCode(company.postal_code || "");
+        setCountryCode(company.country_code || "PL");
+        setBankName(company.bank_name || "");
+        setBankAccount(company.bank_account || "");
+        setEmail(company.email || "");
+        setPhone(company.phone || "");
+        setInvoicePattern(company.invoice_pattern || "FV/{NNN}/{MM}/{RRRR}");
       }
     }
   }, [editId, companies]);
@@ -48,6 +66,15 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     setNip(company.nip);
     setKsefToken("••••••••");
     setStoragePath(company.storage_path);
+    setStreet(company.street || "");
+    setCity(company.city || "");
+    setPostalCode(company.postal_code || "");
+    setCountryCode(company.country_code || "PL");
+    setBankName(company.bank_name || "");
+    setBankAccount(company.bank_account || "");
+    setEmail(company.email || "");
+    setPhone(company.phone || "");
+    setInvoicePattern(company.invoice_pattern || "FV/{NNN}/{MM}/{RRRR}");
   };
 
   const handleNewCompany = () => {
@@ -56,6 +83,15 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     setNip("");
     setKsefToken("");
     setStoragePath("\\\\TB-AFS\\Archive");
+    setStreet("");
+    setCity("");
+    setPostalCode("");
+    setCountryCode("PL");
+    setBankName("");
+    setBankAccount("");
+    setEmail("");
+    setPhone("");
+    setInvoicePattern("FV/{NNN}/{MM}/{RRRR}");
   };
 
   const handleSave = () => {
@@ -65,6 +101,15 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
       nip: nip.trim(),
       ksefToken: ksefToken.trim(),
       storagePath: storagePath.trim(),
+      street: street.trim() || null,
+      city: city.trim() || null,
+      postalCode: postalCode.trim() || null,
+      countryCode: countryCode.trim() || "PL",
+      bankName: bankName.trim() || null,
+      bankAccount: bankAccount.trim() || null,
+      email: email.trim() || null,
+      phone: phone.trim() || null,
+      invoicePattern: invoicePattern.trim() || "FV/{NNN}/{MM}/{RRRR}",
     };
 
     if (editingCompany) {
@@ -281,6 +326,73 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
               onChange={(e) => setStoragePath(e.target.value)}
               className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono text-xs"
             />
+          </motion.div>
+
+          {/* Adres firmy */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18 }}
+            className="glass-panel-elevated rounded-2xl p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <MapPin className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Adres firmy</h2>
+                <p className="text-xs text-muted-foreground">Adres używany na wystawianych fakturach</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input type="text" placeholder="ul. Przykładowa 1" value={street} onChange={(e) => setStreet(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+              <input type="text" placeholder="Warszawa" value={city} onChange={(e) => setCity(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+              <input type="text" placeholder="00-001" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" maxLength={6} />
+              <input type="text" placeholder="PL" value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" maxLength={2} />
+            </div>
+          </motion.div>
+
+          {/* Dane bankowe */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22 }}
+            className="glass-panel-elevated rounded-2xl p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <CreditCard className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Dane bankowe</h2>
+                <p className="text-xs text-muted-foreground">Rachunek bankowy wyświetlany na fakturach</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input type="text" placeholder="Nazwa banku" value={bankName} onChange={(e) => setBankName(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+              <input type="text" placeholder="PL 00 0000 0000 0000 0000 0000 0000" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono text-xs" />
+              <input type="email" placeholder="email@firma.pl" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+              <input type="tel" placeholder="+48 000 000 000" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+            </div>
+          </motion.div>
+
+          {/* Wzorzec numeracji */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="glass-panel-elevated rounded-2xl p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Hash className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Wzorzec numeracji faktur</h2>
+                <p className="text-xs text-muted-foreground">Zmienne: {"{NNN}"} numer, {"{MM}"} miesiąc, {"{RRRR}"} rok, {"{RR}"} rok skrócony</p>
+              </div>
+            </div>
+            <input type="text" value={invoicePattern} onChange={(e) => setInvoicePattern(e.target.value)} placeholder="FV/{NNN}/{MM}/{RRRR}" className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono" />
           </motion.div>
 
           {/* Przyciski */}
