@@ -72,7 +72,7 @@ export function useUpdateCompany() {
         .from("companies")
         .update(updatePayload)
         .eq("id", company.id)
-        .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id")
+        .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id, street, city, postal_code, country_code, bank_name, bank_account, email, phone, invoice_pattern")
         .single();
       if (error) throw error;
       return data;
