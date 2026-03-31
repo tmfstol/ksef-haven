@@ -9,7 +9,7 @@ export function useCompanies() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("companies")
-        .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id")
+        .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id, street, city, postal_code, country_code, bank_name, bank_account, email, phone, invoice_pattern")
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data as Company[];
