@@ -16,39 +16,101 @@ export type Database = {
     Tables: {
       companies: {
         Row: {
+          bank_account: string | null
+          bank_name: string | null
+          city: string | null
+          country_code: string
           created_at: string
+          email: string | null
           id: string
+          invoice_pattern: string
           is_active: boolean
           ksef_token: string
           name: string
           nip: string
+          phone: string | null
+          postal_code: string | null
           storage_path: string
+          street: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          bank_account?: string | null
+          bank_name?: string | null
+          city?: string | null
+          country_code?: string
           created_at?: string
+          email?: string | null
           id?: string
+          invoice_pattern?: string
           is_active?: boolean
           ksef_token: string
           name: string
           nip: string
+          phone?: string | null
+          postal_code?: string | null
           storage_path?: string
+          street?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          bank_account?: string | null
+          bank_name?: string | null
+          city?: string | null
+          country_code?: string
           created_at?: string
+          email?: string | null
           id?: string
+          invoice_pattern?: string
           is_active?: boolean
           ksef_token?: string
           name?: string
           nip?: string
+          phone?: string | null
+          postal_code?: string | null
           storage_path?: string
+          street?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Relationships: []
+      }
+      invoice_sequences: {
+        Row: {
+          company_id: string
+          id: string
+          last_number: number
+          month: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          company_id: string
+          id?: string
+          last_number?: number
+          month: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          last_number?: number
+          month?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_sequences_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoices: {
         Row: {
