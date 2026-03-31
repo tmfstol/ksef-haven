@@ -83,6 +83,15 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     setNip("");
     setKsefToken("");
     setStoragePath("\\\\TB-AFS\\Archive");
+    setStreet("");
+    setCity("");
+    setPostalCode("");
+    setCountryCode("PL");
+    setBankName("");
+    setBankAccount("");
+    setEmail("");
+    setPhone("");
+    setInvoicePattern("FV/{NNN}/{MM}/{RRRR}");
   };
 
   const handleSave = () => {
