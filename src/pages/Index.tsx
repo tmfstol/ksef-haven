@@ -133,7 +133,7 @@ const Index = () => {
             <>
               <InvoiceFilters filters={filters} onChange={setFilters} vendors={vendors} />
               <StatsBar invoices={filteredInvoices} lastSeenTimestamp={lastSeenTimestamp} />
-              <InvoiceTable invoices={filteredInvoices} lastSeenTimestamp={lastSeenTimestamp} clientPortalEmail={activeCompany?.client_portal_email} />
+              <InvoiceTable invoices={filteredInvoices} lastSeenTimestamp={lastSeenTimestamp} clientPortalEmail={activeCompany?.client_portal_email} companyName={activeCompany?.name} />
             </>
           )}
         </main>
