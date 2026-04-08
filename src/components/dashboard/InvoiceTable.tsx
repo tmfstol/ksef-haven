@@ -13,7 +13,6 @@ interface InvoiceTableProps {
   invoices: Invoice[];
   lastSeenTimestamp?: string | null;
   clientPortalEmail?: string | null;
-  companyName?: string;
 }
 
 type SortKey = "date" | "vendor" | "gross_amount";
@@ -57,7 +56,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail, companyName }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }: InvoiceTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
   const [downloading, setDownloading] = useState<DownloadState>(null);
@@ -108,7 +107,6 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail, c
     }
     setDownloading({ id: invoice.id, format: "pdf" });
     try {
-      // Fetch XML from KSeF
       const { data, error } = await supabase.functions.invoke("ksef-download", {
         body: { invoice_id: invoice.id, format: "xml" },
       });
@@ -116,8 +114,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail, c
       if (data?.error) throw new Error(data.error);
       if (!data?.xml) throw new Error("Brak danych XML");
 
-      // Parse XML and generate PDF client-side
-      const parsed = parseKsefXml(data.xml, invoice.ksef_number!);
+      const parsed = parseKsefXml(data.xml, invoice.ksef_number);
       await generateInvoicePdf(parsed);
       toast.success(`Pobrano PDF dla ${invoice.ksef_number}`);
     } catch (err) {
@@ -165,15 +162,40 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail, c
     }
   };
 
-  const SortHeader = ({ label, sortKeyName }: { label: string; sortKeyName: SortKey }) => (
+  const handleSendToPortal = async (invoice: Invoice) => {
+    if (!clientPortalEmail) {
+      toast.error("Brak e-maila portalu klienta");
+      return;
+    }
+
+    setDownloading({ id: invoice.id, format: "email" });
+    try {
+      const { data, error } = await supabase.functions.invoke("send-invoice-email", {
+        body: { invoiceId: invoice.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Faktura wysłana na ${clientPortalEmail}`);
+    } catch (err) {
+      console.error("Email send error:", err);
+      toast.error(`Błąd wysyłki: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const renderSortHeader = (label: string, sortKeyName: SortKey) => (
     <button
+      type="button"
       onClick={() => toggleSort(sortKeyName)}
       className="flex items-center gap-1.5 hover:text-foreground transition-colors group"
     >
       {label}
-      <ArrowUpDown className={`h-3 w-3 transition-colors ${
-        sortKey === sortKeyName ? "text-primary" : "text-muted-foreground/40 group-hover:text-muted-foreground"
-      }`} />
+      <ArrowUpDown
+        className={`h-3 w-3 transition-colors ${
+          sortKey === sortKeyName ? "text-primary" : "text-muted-foreground/40 group-hover:text-muted-foreground"
+        }`}
+      />
     </button>
   );
 
@@ -183,16 +205,16 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail, c
         <thead>
           <tr className="border-b border-border/50">
             <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
-              <SortHeader label="Data" sortKeyName="date" />
+              {renderSortHeader("Data", "date")}
             </th>
             <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
-              <SortHeader label="Kontrahent" sortKeyName="vendor" />
+              {renderSortHeader("Kontrahent", "vendor")}
             </th>
             <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
               NIP
             </th>
             <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
-              <SortHeader label="Kwota brutto" sortKeyName="gross_amount" />
+              {renderSortHeader("Kwota brutto", "gross_amount")}
             </th>
             <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
               Status
@@ -207,8 +229,10 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail, c
             const isDownloadingXml = downloading?.id === invoice.id && downloading?.format === "xml";
             const isDownloadingPdf = downloading?.id === invoice.id && downloading?.format === "pdf";
             const isDownloadingUpo = downloading?.id === invoice.id && downloading?.format === "upo";
+            const isSendingEmail = downloading?.id === invoice.id && downloading?.format === "email";
             const isAnyDownloading = downloading !== null;
             const isNew = lastSeenTimestamp && invoice.created_at && invoice.created_at > lastSeenTimestamp;
+
             return (
               <motion.tr
                 key={invoice.id}
@@ -217,15 +241,11 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail, c
                 transition={{ delay: i * 0.03 }}
                 className={`border-b border-border/30 last:border-0 hover:bg-secondary/40 transition-colors ${isNew ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
               >
-                <td className="px-5 py-3.5 text-sm text-foreground">
-                  {formatDate(invoice.date)}
-                </td>
+                <td className="px-5 py-3.5 text-sm text-foreground">{formatDate(invoice.date)}</td>
                 <td className="px-5 py-3.5 text-sm font-medium text-foreground max-w-[250px] truncate">
                   {invoice.vendor}
                 </td>
-                <td className="px-5 py-3.5 text-sm text-muted-foreground font-mono">
-                  {invoice.nip}
-                </td>
+                <td className="px-5 py-3.5 text-sm text-muted-foreground font-mono">{invoice.nip}</td>
                 <td className="px-5 py-3.5 text-sm text-foreground text-right font-semibold tabular-nums">
                   {formatCurrency(invoice.gross_amount)}
                 </td>
@@ -284,35 +304,9 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail, c
                         size="sm"
                         className="h-8 px-3 text-xs rounded-lg gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
                         disabled={isAnyDownloading}
-                        onClick={async () => {
-                          setDownloading({ id: invoice.id, format: "email" });
-                          try {
-                            const { data, error } = await supabase.functions.invoke("send-invoice-email", {
-                              body: {
-                                recipientEmail: clientPortalEmail,
-                                subject: `Faktura ${invoice.ksef_number || invoice.vendor} z dnia ${formatDate(invoice.date)}`,
-                                companyName: companyName || "",
-                                invoiceData: {
-                                  vendor: invoice.vendor,
-                                  nip: invoice.nip,
-                                  date: formatDate(invoice.date),
-                                  grossAmount: formatCurrency(invoice.gross_amount),
-                                  ksefNumber: invoice.ksef_number || null,
-                                },
-                              },
-                            });
-                            if (error) throw error;
-                            if (data?.error) throw new Error(data.error);
-                            toast.success(`Faktura wysłana na ${clientPortalEmail}`);
-                          } catch (err) {
-                            console.error("Email send error:", err);
-                            toast.error(`Błąd wysyłki: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
-                          } finally {
-                            setDownloading(null);
-                          }
-                        }}
+                        onClick={() => handleSendToPortal(invoice)}
                       >
-                        {downloading?.id === invoice.id && downloading?.format === "email" ? (
+                        {isSendingEmail ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <Send className="h-3.5 w-3.5" />
