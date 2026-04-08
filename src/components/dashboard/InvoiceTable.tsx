@@ -7,12 +7,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseKsefXml, generateInvoicePdf } from "@/lib/invoice-pdf";
 
-type DownloadState = { id: string; format: "xml" | "upo" | "pdf" } | null;
+type DownloadState = { id: string; format: "xml" | "upo" | "pdf" | "email" } | null;
 
 interface InvoiceTableProps {
   invoices: Invoice[];
   lastSeenTimestamp?: string | null;
   clientPortalEmail?: string | null;
+  companyName?: string;
 }
 
 type SortKey = "date" | "vendor" | "gross_amount";
@@ -56,7 +57,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail, companyName }: InvoiceTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
   const [downloading, setDownloading] = useState<DownloadState>(null);
@@ -282,13 +283,40 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                         variant="ghost"
                         size="sm"
                         className="h-8 px-3 text-xs rounded-lg gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
-                        onClick={() => {
-                          const subject = encodeURIComponent(`Faktura ${invoice.ksef_number || invoice.vendor} z dnia ${formatDate(invoice.date)}`);
-                          const body = encodeURIComponent(`Dzień dobry,\n\nW załączeniu przesyłam fakturę:\n\nKontrahent: ${invoice.vendor}\nNIP: ${invoice.nip}\nKwota brutto: ${formatCurrency(invoice.gross_amount)}\nData: ${formatDate(invoice.date)}\nNumer KSeF: ${invoice.ksef_number || "—"}\n\nZ poważaniem`);
-                          window.open(`mailto:${clientPortalEmail}?subject=${subject}&body=${body}`, "_blank");
+                        disabled={isAnyDownloading}
+                        onClick={async () => {
+                          setDownloading({ id: invoice.id, format: "email" });
+                          try {
+                            const { data, error } = await supabase.functions.invoke("send-invoice-email", {
+                              body: {
+                                recipientEmail: clientPortalEmail,
+                                subject: `Faktura ${invoice.ksef_number || invoice.vendor} z dnia ${formatDate(invoice.date)}`,
+                                companyName: companyName || "",
+                                invoiceData: {
+                                  vendor: invoice.vendor,
+                                  nip: invoice.nip,
+                                  date: formatDate(invoice.date),
+                                  grossAmount: formatCurrency(invoice.gross_amount),
+                                  ksefNumber: invoice.ksef_number || null,
+                                },
+                              },
+                            });
+                            if (error) throw error;
+                            if (data?.error) throw new Error(data.error);
+                            toast.success(`Faktura wysłana na ${clientPortalEmail}`);
+                          } catch (err) {
+                            console.error("Email send error:", err);
+                            toast.error(`Błąd wysyłki: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
+                          } finally {
+                            setDownloading(null);
+                          }
                         }}
                       >
-                        <Send className="h-3.5 w-3.5" />
+                        {downloading?.id === invoice.id && downloading?.format === "email" ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
                         Portal
                       </Button>
                     )}
