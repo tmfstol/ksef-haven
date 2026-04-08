@@ -1,4 +1,4 @@
-import { FileText, FileCode, ArrowUpDown, Download, Loader2 } from "lucide-react";
+import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { motion } from "framer-motion";
@@ -12,6 +12,7 @@ type DownloadState = { id: string; format: "xml" | "upo" | "pdf" } | null;
 interface InvoiceTableProps {
   invoices: Invoice[];
   lastSeenTimestamp?: string | null;
+  clientPortalEmail?: string | null;
 }
 
 type SortKey = "date" | "vendor" | "gross_amount";
@@ -55,7 +56,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-export function InvoiceTable({ invoices, lastSeenTimestamp }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }: InvoiceTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
   const [downloading, setDownloading] = useState<DownloadState>(null);
@@ -276,6 +277,21 @@ export function InvoiceTable({ invoices, lastSeenTimestamp }: InvoiceTableProps)
                       )}
                       UPO
                     </Button>
+                    {clientPortalEmail && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-3 text-xs rounded-lg gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
+                        onClick={() => {
+                          const subject = encodeURIComponent(`Faktura ${invoice.ksef_number || invoice.vendor} z dnia ${formatDate(invoice.date)}`);
+                          const body = encodeURIComponent(`Dzień dobry,\n\nW załączeniu przesyłam fakturę:\n\nKontrahent: ${invoice.vendor}\nNIP: ${invoice.nip}\nKwota brutto: ${formatCurrency(invoice.gross_amount)}\nData: ${formatDate(invoice.date)}\nNumer KSeF: ${invoice.ksef_number || "—"}\n\nZ poważaniem`);
+                          window.open(`mailto:${clientPortalEmail}?subject=${subject}&body=${body}`, "_blank");
+                        }}
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        Portal
+                      </Button>
+                    )}
                   </div>
                 </td>
               </motion.tr>
