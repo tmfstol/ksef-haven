@@ -19,6 +19,7 @@ export type Database = {
           bank_account: string | null
           bank_name: string | null
           city: string | null
+          client_portal_email: string | null
           country_code: string
           created_at: string
           email: string | null
@@ -39,6 +40,7 @@ export type Database = {
           bank_account?: string | null
           bank_name?: string | null
           city?: string | null
+          client_portal_email?: string | null
           country_code?: string
           created_at?: string
           email?: string | null
@@ -59,6 +61,7 @@ export type Database = {
           bank_account?: string | null
           bank_name?: string | null
           city?: string | null
+          client_portal_email?: string | null
           country_code?: string
           created_at?: string
           email?: string | null

@@ -1,0 +1,1 @@
+ALTER TABLE public.companies ADD COLUMN client_portal_email text DEFAULT NULL;
