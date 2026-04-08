@@ -16,4 +16,5 @@ export interface Company {
   email?: string | null;
   phone?: string | null;
   invoice_pattern?: string;
+  client_portal_email?: string | null;
 }
