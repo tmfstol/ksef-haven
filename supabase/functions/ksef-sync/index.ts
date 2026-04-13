@@ -317,9 +317,7 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
   const threeMonthsAgo = new Date(now);
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-  const url = `${baseUrl}/api/v2/invoices/query/metadata?pageSize=100`;
   const allInvoices: any[] = [];
-  let continuationToken: string | null = null;
   let pageNum = 0;
 
   while (true) {
@@ -332,22 +330,19 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
       },
     };
 
-    // Build headers - add continuation token for subsequent pages
     const headers: Record<string, string> = {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       Accept: "application/json",
     };
-    if (continuationToken) {
-      headers["x-continuation-token"] = continuationToken;
-    }
 
     // Rate limit: wait between pages
     if (pageNum > 0) {
       await new Promise(r => setTimeout(r, 500));
     }
 
-    console.log(`[ksef-sync] POST ${url} page=${pageNum}, continuationToken=${continuationToken ? continuationToken.substring(0, 30) + '...' : 'none'}`);
+    const url = `${baseUrl}/api/v2/invoices/query/metadata?pageSize=100&pageOffset=${pageNum}`;
+    console.log(`[ksef-sync] POST ${url} page=${pageNum}`);
 
     let res: Response;
     for (let retry = 0; retry < 3; retry++) {
@@ -370,25 +365,17 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
     if (!res!.ok) throw new Error(`Invoice query failed (${res!.status}): ${text.substring(0, 300)}`);
 
     const data = JSON.parse(text);
-    
-    // Debug: log all response keys and headers
     console.log(`[ksef-sync] Response keys: ${Object.keys(data).join(', ')}`);
-    const allHeaders: string[] = [];
-    res!.headers.forEach((v, k) => allHeaders.push(`${k}: ${v.substring(0, 50)}`));
-    console.log(`[ksef-sync] Response headers: ${allHeaders.join(' | ')}`);
-    
+
     const pageInvoices = data?.invoices || data?.invoiceHeaderList || [];
     allInvoices.push(...pageInvoices);
 
-    // Get continuation token from response headers or body
-    const resContinuationToken = res!.headers.get("x-continuation-token") || data?.continuationToken || data?.nextPageToken || null;
-
-    if (!data.hasMore || !resContinuationToken) {
-      console.log(`[ksef-sync] No more pages. hasMore=${data.hasMore}, token=${!!resContinuationToken}, invoiceCount=${pageInvoices.length}`);
+    // Stop if no more pages or empty page
+    if (!data.hasMore || pageInvoices.length === 0) {
+      console.log(`[ksef-sync] No more pages. hasMore=${data.hasMore}, invoiceCount=${pageInvoices.length}`);
       break;
     }
 
-    continuationToken = resContinuationToken;
     pageNum++;
 
     // Safety limit
