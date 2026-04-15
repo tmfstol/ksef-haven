@@ -1,0 +1,1 @@
+ALTER TABLE public.companies ADD COLUMN make_webhook_url text DEFAULT NULL;

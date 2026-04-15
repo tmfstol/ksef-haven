@@ -107,6 +107,7 @@ export type Database = {
           invoice_pattern: string
           is_active: boolean
           ksef_token: string
+          make_webhook_url: string | null
           name: string
           nip: string
           phone: string | null
@@ -128,6 +129,7 @@ export type Database = {
           invoice_pattern?: string
           is_active?: boolean
           ksef_token: string
+          make_webhook_url?: string | null
           name: string
           nip: string
           phone?: string | null
@@ -149,6 +151,7 @@ export type Database = {
           invoice_pattern?: string
           is_active?: boolean
           ksef_token?: string
+          make_webhook_url?: string | null
           name?: string
           nip?: string
           phone?: string | null
