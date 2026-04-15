@@ -1,7 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
+import { Button } from "@/components/ui/button";
+import { parseKsefXml } from "@/lib/invoice-pdf";
+import { Loader2, RefreshCcw } from "lucide-react";
 import { motion } from "framer-motion";
+
+type InvoiceItemRow = Tables<"invoice_items">;
 
 interface InvoiceItem {
   id: string;
@@ -23,7 +29,32 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+function toNumber(value: string | number) {
+  const normalized = typeof value === "number" ? value : Number(String(value).replace(",", "."));
+  return Number.isFinite(normalized) ? normalized : 0;
+}
+
+function mapXmlItems(xml: string, invoiceId: string, ksefNumber: string): InvoiceItem[] {
+  const parsed = parseKsefXml(xml, ksefNumber);
+
+  return parsed.pozycje.map((item, index) => ({
+    id: `${invoiceId}-${index + 1}`,
+    ordinal: Number(item.nr) || index + 1,
+    name: item.opis || "—",
+    quantity: toNumber(item.ilosc),
+    unit: item.jm || "szt.",
+    unit_price_net: toNumber(item.cenaNetto),
+    net_amount: toNumber(item.wartoscNetto),
+    vat_rate: item.stawkaVat || "—",
+    vat_amount: toNumber(item.kwotaVat),
+    gross_amount: toNumber(item.brutto),
+  }));
+}
+
 export function InvoiceItemsRow({ invoiceId, colSpan }: { invoiceId: string; colSpan: number }) {
+  const queryClient = useQueryClient();
+  const [fallbackItems, setFallbackItems] = useState<InvoiceItem[] | null>(null);
+
   const { data: items, isLoading } = useQuery<InvoiceItem[]>({
     queryKey: ["invoice-items", invoiceId],
     queryFn: async () => {
@@ -33,7 +64,7 @@ export function InvoiceItemsRow({ invoiceId, colSpan }: { invoiceId: string; col
         .eq("invoice_id", invoiceId)
         .order("ordinal", { ascending: true });
       if (error) throw error;
-      return (data as any[]).map((r) => ({
+      return (data as InvoiceItemRow[]).map((r) => ({
         ...r,
         quantity: Number(r.quantity),
         unit_price_net: Number(r.unit_price_net),
@@ -44,6 +75,61 @@ export function InvoiceItemsRow({ invoiceId, colSpan }: { invoiceId: string; col
     },
   });
 
+  const {
+    mutate: hydrateItems,
+    isPending: isHydrating,
+    isError: isHydrateError,
+    isSuccess: hasHydrated,
+    error: hydrateError,
+  } = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("ksef-download", {
+        body: { invoice_id: invoiceId, format: "xml" },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.xml) throw new Error("Brak XML faktury.");
+
+      const downloadedItems = mapXmlItems(data.xml, invoiceId, data.ksef_number || invoiceId);
+
+      if (downloadedItems.length > 0) {
+        const { error: insertError } = await supabase.from("invoice_items").insert(
+          downloadedItems.map(({ id, ...item }) => ({
+            invoice_id: invoiceId,
+            ordinal: item.ordinal,
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price_net: item.unit_price_net,
+            net_amount: item.net_amount,
+            vat_rate: item.vat_rate,
+            vat_amount: item.vat_amount,
+            gross_amount: item.gross_amount,
+          }))
+        );
+
+        if (!insertError) {
+          queryClient.invalidateQueries({ queryKey: ["invoice-items", invoiceId] });
+        }
+      }
+
+      return downloadedItems;
+    },
+    onSuccess: (downloadedItems) => {
+      setFallbackItems(downloadedItems);
+    },
+  });
+
+  useEffect(() => {
+    if (!isLoading && items && items.length === 0 && !isHydrating && !hasHydrated && !isHydrateError) {
+      hydrateItems();
+    }
+  }, [hasHydrated, hydrateItems, invoiceId, isHydrateError, isHydrating, isLoading, items]);
+
+  const displayItems = items && items.length > 0 ? items : fallbackItems ?? [];
+  const showHydrationLoader = !isLoading && (items?.length ?? 0) === 0 && isHydrating;
+
   return (
     <motion.tr
       initial={{ opacity: 0, height: 0 }}
@@ -52,15 +138,35 @@ export function InvoiceItemsRow({ invoiceId, colSpan }: { invoiceId: string; col
       className="bg-muted/20"
     >
       <td colSpan={colSpan} className="px-5 py-3">
-        {isLoading ? (
+        {isLoading || showHydrationLoader ? (
           <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Ładowanie pozycji...
+            {isLoading ? "Ładowanie pozycji..." : "Pobieranie treści faktury z KSeF..."}
           </div>
-        ) : !items || items.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-1">
-            Brak pozycji — uruchom ponowną synchronizację, aby pobrać treść faktury.
-          </p>
+        ) : displayItems.length === 0 ? (
+          <div className="flex flex-col gap-3 py-1 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">
+                {isHydrateError
+                  ? "Nie udało się pobrać treści faktury z KSeF."
+                  : "Ta faktura nie zawiera pozycji do wyświetlenia."}
+              </p>
+              {isHydrateError && hydrateError instanceof Error && (
+                <p className="text-xs text-muted-foreground/80">{hydrateError.message}</p>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-fit gap-2"
+              onClick={() => hydrateItems()}
+              disabled={isHydrating}
+            >
+              {isHydrating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+              Pobierz treść
+            </Button>
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -76,7 +182,7 @@ export function InvoiceItemsRow({ invoiceId, colSpan }: { invoiceId: string; col
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {displayItems.map((item) => (
                 <tr key={item.id} className="border-t border-border/20">
                   <td className="py-1.5 pr-3 text-muted-foreground tabular-nums">{item.ordinal}</td>
                   <td className="py-1.5 pr-3 font-medium">{item.name || "—"}</td>
