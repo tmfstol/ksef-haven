@@ -370,7 +370,7 @@ function base64ToPdfBytes(base64: string): Uint8Array {
 export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   const pdfBase64 = await generateInvoicePdfBase64(inv);
   const bytes = base64ToPdfBytes(pdfBase64);
-  const blob = new Blob([bytes], { type: "application/pdf" });
+  const blob = new Blob([bytes.buffer], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
