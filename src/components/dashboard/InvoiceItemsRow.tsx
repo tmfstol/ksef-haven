@@ -4,10 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { parseKsefXml } from "@/lib/invoice-pdf";
-import { Loader2, RefreshCcw, FolderOpen, Check, X } from "lucide-react";
+import { Loader2, RefreshCcw, FolderOpen, StickyNote, Check, X, Pencil } from "lucide-react";
 import { motion } from "framer-motion";
 import { useProjects, useAssignInvoiceToProject } from "@/hooks/useProjects";
 import type { Invoice } from "@/types/invoice";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -70,9 +72,29 @@ interface InvoiceItemsRowProps {
 export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: InvoiceItemsRowProps) {
   const queryClient = useQueryClient();
   const [fallbackItems, setFallbackItems] = useState<InvoiceItem[] | null>(null);
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [noteText, setNoteText] = useState(invoice?.bookkeeper_note ?? "");
 
   const { data: projects } = useProjects(companyId);
   const assignMutation = useAssignInvoiceToProject();
+
+  const saveNoteMutation = useMutation({
+    mutationFn: async (note: string) => {
+      const trimmed = note.trim() || null;
+      const { error } = await supabase
+        .from("invoices")
+        .update({ bookkeeper_note: trimmed } as any)
+        .eq("id", invoiceId);
+      if (error) throw error;
+      return trimmed;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setIsEditingNote(false);
+      toast.success("Notatka zapisana");
+    },
+    onError: () => toast.error("Nie udało się zapisać notatki"),
+  });
 
   const { data: items, isLoading } = useQuery<InvoiceItem[]>({
     queryKey: ["invoice-items", invoiceId],
@@ -224,6 +246,64 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
                 {assignMutation.isPending && (
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 )}
+              </div>
+            </caption>
+            {/* Bookkeeper note */}
+            <caption className="caption-top text-left pb-3">
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                <StickyNote className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Notatka dla księgowego</span>
+                    {!isEditingNote && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setIsEditingNote(true); setNoteText(invoice?.bookkeeper_note ?? ""); }}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                  {isEditingNote ? (
+                    <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Textarea
+                        value={noteText}
+                        onChange={(e) => setNoteText(e.target.value)}
+                        placeholder="Np. materiały budowlane — inwestycja ul. Kwiatowa 12"
+                        className="text-sm min-h-[60px] bg-background/60 resize-none"
+                        maxLength={500}
+                        autoFocus
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-7 gap-1.5 text-xs"
+                          onClick={() => saveNoteMutation.mutate(noteText)}
+                          disabled={saveNoteMutation.isPending}
+                        >
+                          {saveNoteMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                          Zapisz
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setIsEditingNote(false)}
+                        >
+                          Anuluj
+                        </Button>
+                        <span className="text-xs text-muted-foreground ml-auto">{noteText.length}/500</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {invoice?.bookkeeper_note || <span className="italic text-muted-foreground/60">Kliknij ołówek, aby dodać opis</span>}
+                    </p>
+                  )}
+                </div>
               </div>
             </caption>
             <thead>
