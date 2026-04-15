@@ -9,6 +9,7 @@ import Landing from "./pages/Landing";
 import Settings from "./pages/Settings";
 import CreateInvoice from "./pages/CreateInvoice";
 import Expenses from "./pages/Expenses";
+import Projects from "./pages/Projects";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -51,6 +52,7 @@ const AppRoutes = () => {
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/invoices/new" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
       <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+      <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
       <Route path="/onboarding" element={<ProtectedRoute><Settings isOnboarding /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
