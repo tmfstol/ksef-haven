@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseKsefXml, generateInvoicePdf } from "@/lib/invoice-pdf";
 import { InvoiceItemsRow } from "./InvoiceItemsRow";
-import { AdBannerPlaceholder } from "./AdBanner";
+import { AdBanner, AdBannerPlaceholder } from "./AdBanner";
 
 type DownloadState = { id: string; format: "xml" | "upo" | "pdf" | "email" } | null;
 
@@ -337,7 +337,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                 {i > 0 && i % 10 === 9 && (
                   <tr key={`ad-${i}`}>
                     <td colSpan={7} className="px-5 py-2">
-                      <AdBannerPlaceholder />
+                      <AdBanner slot="1234567890" format="horizontal" />
                     </td>
                   </tr>
                 )}
