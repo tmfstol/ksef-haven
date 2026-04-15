@@ -568,6 +568,8 @@ async function syncCompany(
           let date = ref.issueDate || ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
           let grossAmount = ref.grossAmount || ref.grossValue || ref.grossAmount || 0;
 
+          let parsedItems: any[] = [];
+
           try {
             const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
             const parsed = parseInvoiceXml(xml);
@@ -575,11 +577,12 @@ async function syncCompany(
             if (parsed.nip) nip = parsed.nip;
             if (parsed.date) date = parsed.date;
             if (parsed.grossAmount) grossAmount = parsed.grossAmount;
+            parsedItems = parsed.items || [];
           } catch (xmlErr) {
             console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
           }
 
-          const { error: insertError } = await supabase.from("invoices").insert({
+          const { data: inserted, error: insertError } = await supabase.from("invoices").insert({
             company_id: company.id,
             date,
             vendor,
@@ -587,12 +590,33 @@ async function syncCompany(
             gross_amount: grossAmount,
             ksef_number: ksefNumber,
             status: "new",
-          });
+          }).select("id").single();
 
           if (insertError) {
             console.error(`[ksef-sync] Insert error for ${ksefNumber}:`, insertError);
           } else {
             upsertedCount++;
+            // Insert line items
+            if (parsedItems.length > 0 && inserted?.id) {
+              const itemRows = parsedItems.map(item => ({
+                invoice_id: inserted.id,
+                ordinal: item.ordinal,
+                name: item.name,
+                quantity: item.quantity,
+                unit: item.unit,
+                unit_price_net: item.unit_price_net,
+                net_amount: item.net_amount,
+                vat_rate: item.vat_rate,
+                vat_amount: item.vat_amount,
+                gross_amount: item.gross_amount,
+              }));
+              const { error: itemsError } = await supabase.from("invoice_items").insert(itemRows);
+              if (itemsError) {
+                console.error(`[ksef-sync] Items insert error for ${ksefNumber}:`, itemsError);
+              } else {
+                console.log(`[ksef-sync] Inserted ${itemRows.length} items for ${ksefNumber}`);
+              }
+            }
           }
         } catch (invErr) {
           console.error(`[ksef-sync] Error processing ${ksefNumber}:`, invErr);
