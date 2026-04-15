@@ -14,6 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      clients: {
+        Row: {
+          city: string | null
+          company_id: string
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          nip: string | null
+          notes: string | null
+          phone: string | null
+          postal_code: string | null
+          street: string | null
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          company_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          nip?: string | null
+          notes?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          street?: string | null
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          nip?: string | null
+          notes?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          street?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           bank_account: string | null
@@ -79,6 +159,96 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      expense_categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category_id: string | null
+          company_id: string
+          created_at: string
+          currency: string
+          date: string
+          description: string | null
+          document_path: string | null
+          id: string
+          ocr_data: Json | null
+          ocr_status: string
+          updated_at: string
+          vendor_name: string | null
+        }
+        Insert: {
+          amount?: number
+          category_id?: string | null
+          company_id: string
+          created_at?: string
+          currency?: string
+          date?: string
+          description?: string | null
+          document_path?: string | null
+          id?: string
+          ocr_data?: Json | null
+          ocr_status?: string
+          updated_at?: string
+          vendor_name?: string | null
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          company_id?: string
+          created_at?: string
+          currency?: string
+          date?: string
+          description?: string | null
+          document_path?: string | null
+          id?: string
+          ocr_data?: Json | null
+          ocr_status?: string
+          updated_at?: string
+          vendor_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "expense_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoice_items: {
         Row: {
@@ -214,6 +384,117 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_alerts: {
+        Row: {
+          amount: number | null
+          client_id: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          invoice_id: string | null
+          is_read: boolean
+          title: string
+          type: string
+        }
+        Insert: {
+          amount?: number | null
+          client_id?: string | null
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_id?: string | null
+          is_read?: boolean
+          title: string
+          type?: string
+        }
+        Update: {
+          amount?: number | null
+          client_id?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_id?: string | null
+          is_read?: boolean
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_alerts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_alerts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_alerts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_declarations: {
+        Row: {
+          company_id: string
+          created_at: string
+          file_path: string | null
+          id: string
+          metadata: Json | null
+          period_from: string
+          period_to: string
+          status: string
+          type: string
+          updated_at: string
+          xml_content: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          file_path?: string | null
+          id?: string
+          metadata?: Json | null
+          period_from: string
+          period_to: string
+          status?: string
+          type: string
+          updated_at?: string
+          xml_content?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          file_path?: string | null
+          id?: string
+          metadata?: Json | null
+          period_from?: string
+          period_to?: string
+          status?: string
+          type?: string
+          updated_at?: string
+          xml_content?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_declarations_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
