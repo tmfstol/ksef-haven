@@ -62,6 +62,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
   const [downloading, setDownloading] = useState<DownloadState>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const sorted = [...invoices].sort((a, b) => {
     let cmp = 0;
