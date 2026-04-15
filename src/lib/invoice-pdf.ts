@@ -1,7 +1,6 @@
-import { jsPDF } from "jspdf";
-import QRCode from "qrcode";
+import { xml2js } from "xml-js";
 
-// ── XML Parsing using DOMParser ──
+// ── XML Parsing using DOMParser (kept for line-item extraction) ──
 
 function getText(el: Element | null, tag: string): string {
   if (!el) return "";
@@ -76,7 +75,7 @@ interface ZaliczkaLine {
   stawkaVat: string;
 }
 
-interface ParsedInvoice {
+export interface ParsedInvoice {
   ksefNumber: string;
   rodzajFaktury: string;
   kodWaluty: string;
@@ -110,25 +109,6 @@ interface ParsedInvoice {
   bdo: string;
 }
 
-const FORMA_PLATNOSCI: Record<string, string> = {
-  "1": "Gotowka",
-  "2": "Karta",
-  "3": "Bon",
-  "4": "Czek",
-  "5": "Kredyt",
-  "6": "Przelew",
-};
-
-const RODZAJ_FAKTURY: Record<string, string> = {
-  VAT: "Faktura podstawowa",
-  KOR: "Faktura korygujaca",
-  ZAL: "Faktura zaliczkowa",
-  ROZ: "Faktura rozliczeniowa",
-  UPR: "Faktura uproszczona",
-  KOR_ZAL: "Korekta faktury zaliczkowej",
-  KOR_ROZ: "Korekta faktury rozliczeniowej",
-};
-
 function parseAddr(adresEl: Element | null): string {
   if (!adresEl) return "";
   const addrL1 = getText(adresEl, "AdresL1");
@@ -161,17 +141,6 @@ function parseParty(el: Element | null): InvoiceParty {
   };
 }
 
-// Strip Polish diacritics for jsPDF (helvetica font doesn't support them)
-function stripPl(s: string): string {
-  const map: Record<string, string> = {
-    'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n',
-    'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z',
-    'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N',
-    'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z',
-  };
-  return s.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, (c) => map[c] || c);
-}
-
 export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, "application/xml");
@@ -192,7 +161,6 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
   const warunkiEl = getEl(faEl, "WarunkiTransakcji");
   const okresEl = getEl(faEl, "OkresFa");
 
-  // Parse line items
   const wiersze = getAllEls(faEl, "FaWiersz");
   const pozycje: InvoiceLine[] = wiersze.map((w) => {
     const net = getText(w, "P_11") || "0";
@@ -212,7 +180,6 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
     };
   });
 
-  // Parse Zamowienie (order items for advance invoices)
   const zamowienieEl = getEl(faEl, "Zamowienie");
   const zamowienieWiersze = getAllEls(zamowienieEl, "ZamowienieWiersz");
   const zamowienie: ZamowienieLine[] = zamowienieWiersze.map((w) => ({
@@ -225,7 +192,6 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
     stawkaVat: getText(w, "P_12Z") || "0",
   }));
 
-  // Parse Zaliczka (advance payment lines)
   const zaliczkaEl = getEl(faEl, "Zaliczka");
   const zaliczkaWiersze = getAllEls(zaliczkaEl, "ZaliczkaWiersz");
   const zaliczki: ZaliczkaLine[] = zaliczkaWiersze.map((w) => ({
@@ -235,7 +201,6 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
     stawkaVat: getText(w, "P_12Z") || "",
   }));
 
-  // For advance invoices: if pozycje have empty descriptions, try to fill from zamowienie
   if (zamowienie.length > 0) {
     pozycje.forEach((p) => {
       if (p.opis === "-" || !p.opis) {
@@ -244,43 +209,33 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
       }
     });
   }
-  const sumaNettoWgStawek: { stawka: string; netto: string; vat: string }[] = [];
 
+  const sumaNettoWgStawek: { stawka: string; netto: string; vat: string }[] = [];
   const p13_1 = getText(faEl, "P_13_1");
   const p14_1 = getText(faEl, "P_14_1");
   if (p13_1) sumaNettoWgStawek.push({ stawka: "23", netto: p13_1, vat: p14_1 || "0" });
-
   const p13_2 = getText(faEl, "P_13_2");
   const p14_2 = getText(faEl, "P_14_2");
   if (p13_2) sumaNettoWgStawek.push({ stawka: "8", netto: p13_2, vat: p14_2 || "0" });
-
   const p13_3 = getText(faEl, "P_13_3");
   const p14_3 = getText(faEl, "P_14_3");
   if (p13_3) sumaNettoWgStawek.push({ stawka: "5", netto: p13_3, vat: p14_3 || "0" });
-
   const p13_4 = getText(faEl, "P_13_4");
   const p14_4 = getText(faEl, "P_14_4");
   if (p13_4) sumaNettoWgStawek.push({ stawka: "ryczalt", netto: p13_4, vat: p14_4 || "0" });
-
   const p13_6_1 = getText(faEl, "P_13_6_1");
   if (p13_6_1) sumaNettoWgStawek.push({ stawka: "0", netto: p13_6_1, vat: "0" });
-
   const p13_7 = getText(faEl, "P_13_7");
   if (p13_7) sumaNettoWgStawek.push({ stawka: "zw", netto: p13_7, vat: "0" });
-
   const p13_8 = getText(faEl, "P_13_8");
   if (p13_8) sumaNettoWgStawek.push({ stawka: "oo", netto: p13_8, vat: "0" });
-
   const p13_9 = getText(faEl, "P_13_9");
   if (p13_9) sumaNettoWgStawek.push({ stawka: "np", netto: p13_9, vat: "0" });
-
   const p13_10 = getText(faEl, "P_13_10");
   if (p13_10) sumaNettoWgStawek.push({ stawka: "np-ue", netto: p13_10, vat: "0" });
-
   const p13_11 = getText(faEl, "P_13_11");
   if (p13_11) sumaNettoWgStawek.push({ stawka: "np-kraj", netto: p13_11, vat: "0" });
 
-  // Fallback: compute from line items
   if (sumaNettoWgStawek.length === 0) {
     const vatMap = new Map<string, { netto: number; vat: number }>();
     pozycje.forEach((p) => {
@@ -299,7 +254,6 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
     });
   }
 
-  // Additional descriptions
   const uwagi: { klucz: string; wartosc: string }[] = [];
   const opisEls = getAllEls(faEl, "DodatkowyOpis");
   opisEls.forEach((b) => {
@@ -311,7 +265,6 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
   const sumaNetto = getText(faEl, "P_13_1") || getText(faEl, "P_13_2") || "0";
   const sumaVat = getText(faEl, "P_14_1") || getText(faEl, "P_14_2") || "0";
   const sumaBrutto = getText(faEl, "P_15") || "0";
-
   const rachunekEl = getEl(platnoscEl, "RachunekBankowy");
   const terminEl = getEl(platnoscEl, "TerminPlatnosci");
 
@@ -350,16 +303,75 @@ export function parseKsefXml(xml: string, ksefNumber: string): ParsedInvoice {
   };
 }
 
-// ── PDF Generation – official KSeF visualization style ──
+// ── PDF Generation using official CIRFMF/ksef-pdf-generator ──
 
-function fmtNum(val: string | number): string {
-  const n = typeof val === "string" ? parseFloat(val) : val;
-  if (isNaN(n)) return String(val);
-  return n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function stripPrefix(key: string): string {
+  return key.includes(":") ? key.split(":")[1] : key;
 }
 
-export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
-  const pdfBase64 = await generateInvoicePdfBase64(inv);
+/**
+ * Generate QR code URL for KSeF verification
+ * Format: https://ksef.mf.gov.pl/web/verify/{ksefNumber}/{checksum}
+ */
+function generateKsefQrUrl(ksefNumber: string): string {
+  return `https://ksef.mf.gov.pl/web/verify/${ksefNumber}`;
+}
+
+async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Promise<string> {
+  // Dynamically import the CIRFMF library
+  const { generateFA3, generateFA1, generateFA2 } = await import("@/lib/ksef-pdf/index.js");
+
+  // Parse XML with xml-js (same way CIRFMF does it)
+  const jsonDoc = xml2js(xmlString, {
+    compact: true,
+    cdataKey: "_text",
+    trim: true,
+    elementNameFn: stripPrefix,
+    attributeNameFn: stripPrefix,
+  }) as any;
+
+  const invoice = jsonDoc.Faktura;
+  const wersja = invoice?.Naglowek?.KodFormularza?._attributes?.kodSystemowy;
+  const qrUrl = generateKsefQrUrl(ksefNumber);
+
+  const additionalData = {
+    nrKSeF: ksefNumber,
+    qrCode: qrUrl,
+  };
+
+  let pdf: any;
+  switch (wersja) {
+    case "FA (1)":
+      pdf = generateFA1(invoice, additionalData);
+      break;
+    case "FA (2)":
+      pdf = generateFA2(invoice, additionalData);
+      break;
+    case "FA (3)":
+    default:
+      pdf = generateFA3(invoice, additionalData);
+      break;
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    try {
+      pdf.getBase64((base64: string) => {
+        resolve(base64);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+/**
+ * Download invoice PDF using official CIRFMF KSeF visualization
+ */
+export async function generateInvoicePdf(inv: ParsedInvoice, xmlString?: string): Promise<void> {
+  if (!xmlString) {
+    throw new Error("XML string is required for official KSeF PDF generation");
+  }
+  const pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
   const anchor = document.createElement("a");
   anchor.href = `data:application/pdf;base64,${pdfBase64}`;
   anchor.download = `${inv.ksefNumber}.pdf`;
@@ -368,85 +380,12 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   document.body.removeChild(anchor);
 }
 
-export async function generateInvoicePdfBase64(inv: ParsedInvoice): Promise<string> {
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pw = 210;
-  const mg = 15;
-  const cw = pw - 2 * mg;
-  let y = 15;
-
-  const t = (s: string) => stripPl(s);
-  const bold = (s = 9) => { pdf.setFont("helvetica", "bold"); pdf.setFontSize(s); };
-  const norm = (s = 8) => { pdf.setFont("helvetica", "normal"); pdf.setFontSize(s); };
-  const BLACK = () => pdf.setTextColor(0, 0, 0);
-  const GRAY = () => pdf.setTextColor(80, 80, 80);
-
-  // Simplified PDF for portal - header
-  bold(14); BLACK();
-  pdf.text(t("FAKTURA"), mg, y); y += 6;
-  norm(9); GRAY();
-  pdf.text(t(`Nr KSeF: ${inv.ksefNumber}`), mg, y); y += 5;
-  pdf.text(t(`Nr faktury: ${inv.nrFaktury}`), mg, y); y += 5;
-  pdf.text(t(`Data wystawienia: ${inv.dataWystawienia}`), mg, y); y += 8;
-
-  // Seller / Buyer
-  bold(9); BLACK();
-  pdf.text(t("Sprzedawca:"), mg, y);
-  pdf.text(t("Nabywca:"), mg + cw / 2, y); y += 5;
-  norm(8); GRAY();
-  pdf.text(t(inv.sprzedawca.nazwa), mg, y);
-  pdf.text(t(inv.nabywca.nazwa), mg + cw / 2, y); y += 4;
-  pdf.text(t(`NIP: ${inv.sprzedawca.nip}`), mg, y);
-  pdf.text(t(`NIP: ${inv.nabywca.nip}`), mg + cw / 2, y); y += 4;
-  pdf.text(t(inv.sprzedawca.adres), mg, y, { maxWidth: cw / 2 - 5 });
-  pdf.text(t(inv.nabywca.adres), mg + cw / 2, y, { maxWidth: cw / 2 - 5 }); y += 10;
-
-  // Items table
-  bold(8); BLACK();
-  const cols = [mg, mg+8, mg+68, mg+83, mg+93, mg+113, mg+133, mg+148, mg+168];
-  const headers = ["#", "Nazwa", "Jm.", "Ilosc", "Cena netto", "Netto", "VAT%", "VAT", "Brutto"];
-  headers.forEach((h, i) => pdf.text(t(h), cols[i], y));
-  y += 2;
-  pdf.setDrawColor(180); pdf.setLineWidth(0.3); pdf.line(mg, y, pw - mg, y); y += 4;
-
-  norm(7); GRAY();
-  for (const p of inv.pozycje) {
-    if (y > 270) { pdf.addPage(); y = 15; }
-    pdf.text(p.nr, cols[0], y);
-    pdf.text(t(p.opis).substring(0, 35), cols[1], y);
-    pdf.text(t(p.jm), cols[2], y);
-    pdf.text(p.ilosc, cols[3], y);
-    pdf.text(p.cenaNetto, cols[4], y);
-    pdf.text(p.wartoscNetto, cols[5], y);
-    pdf.text(p.stawkaVat, cols[6], y);
-    pdf.text(p.kwotaVat, cols[7], y);
-    pdf.text(p.brutto, cols[8], y);
-    y += 4;
+/**
+ * Generate invoice PDF as base64 using official CIRFMF KSeF visualization
+ */
+export async function generateInvoicePdfBase64(inv: ParsedInvoice, xmlString?: string): Promise<string> {
+  if (!xmlString) {
+    throw new Error("XML string is required for official KSeF PDF generation");
   }
-
-  y += 4;
-  pdf.setDrawColor(180); pdf.line(mg, y, pw - mg, y); y += 5;
-  bold(9); BLACK();
-  pdf.text(t(`Netto: ${inv.sumaNetto}  VAT: ${inv.sumaVat}  Brutto: ${inv.sumaBrutto}`), mg, y); y += 6;
-  if (inv.doZaplaty) {
-    pdf.text(t(`Do zaplaty: ${inv.doZaplaty} ${inv.kodWaluty}`), mg, y); y += 5;
-  }
-  if (inv.formaPlatnosci) {
-    norm(8); GRAY();
-    pdf.text(t(`Forma platnosci: ${inv.formaPlatnosci}`), mg, y); y += 4;
-  }
-  if (inv.terminPlatnosci) {
-    pdf.text(t(`Termin platnosci: ${inv.terminPlatnosci}`), mg, y); y += 4;
-  }
-
-  norm(6); GRAY();
-  pdf.text("Krajowy System e-Faktur", pw / 2, 290, { align: "center" });
-
-  const arrayBuf = pdf.output("arraybuffer");
-  const bytes = new Uint8Array(arrayBuf);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+  return generatePdfWithCirfmf(xmlString, inv.ksefNumber);
 }
