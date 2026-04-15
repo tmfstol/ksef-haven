@@ -9,7 +9,7 @@ export function useCompanies() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("companies")
-        .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id, street, city, postal_code, country_code, bank_name, bank_account, email, phone, invoice_pattern, client_portal_email")
+        .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id, street, city, postal_code, country_code, bank_name, bank_account, email, phone, invoice_pattern, client_portal_email, make_webhook_url")
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data as Company[];
@@ -27,7 +27,7 @@ export function useAddCompany() {
       name: string; nip: string; ksefToken: string; storagePath: string;
       street?: string | null; city?: string | null; postalCode?: string | null; countryCode?: string;
       bankName?: string | null; bankAccount?: string | null; email?: string | null; phone?: string | null;
-      invoicePattern?: string; clientPortalEmail?: string | null;
+      invoicePattern?: string; clientPortalEmail?: string | null; makeWebhookUrl?: string | null;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Nie zalogowano");
@@ -49,6 +49,7 @@ export function useAddCompany() {
           phone: company.phone,
           invoice_pattern: company.invoicePattern || "FV/{NNN}/{MM}/{RRRR}",
           client_portal_email: company.clientPortalEmail || null,
+          make_webhook_url: company.makeWebhookUrl || null,
         } as any)
         .select()
         .single();
@@ -77,7 +78,7 @@ export function useUpdateCompany() {
       id: string; name: string; nip: string; ksefToken?: string; storagePath: string;
       street?: string | null; city?: string | null; postalCode?: string | null; countryCode?: string;
       bankName?: string | null; bankAccount?: string | null; email?: string | null; phone?: string | null;
-      invoicePattern?: string; clientPortalEmail?: string | null;
+      invoicePattern?: string; clientPortalEmail?: string | null; makeWebhookUrl?: string | null;
     }) => {
       const updatePayload: any = {
         name: company.name,
@@ -93,6 +94,7 @@ export function useUpdateCompany() {
         phone: company.phone,
         invoice_pattern: company.invoicePattern || "FV/{NNN}/{MM}/{RRRR}",
         client_portal_email: company.clientPortalEmail || null,
+        make_webhook_url: company.makeWebhookUrl || null,
       };
       // Only update ksef_token if user provided a new value
       if (company.ksefToken && company.ksefToken.trim() && company.ksefToken !== "••••••••") {
@@ -102,7 +104,7 @@ export function useUpdateCompany() {
         .from("companies")
         .update(updatePayload)
         .eq("id", company.id)
-        .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id, street, city, postal_code, country_code, bank_name, bank_account, email, phone, invoice_pattern, client_portal_email")
+        .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id, street, city, postal_code, country_code, bank_name, bank_account, email, phone, invoice_pattern, client_portal_email, make_webhook_url")
         .single();
       if (error) throw error;
       return data;

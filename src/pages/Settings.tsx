@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCompanies, useAddCompany, useUpdateCompany, useDeleteCompany } from "@/hooks/useCompanies";
 import { useTestConnection } from "@/hooks/useSettings";
-import { ArrowLeft, Save, Loader2, Wifi, Shield, FolderOpen, Building2, Trash2, Plus, MapPin, CreditCard, Hash, Mail } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Wifi, Shield, FolderOpen, Building2, Trash2, Plus, MapPin, CreditCard, Hash, Mail, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import type { Company } from "@/types/company";
@@ -36,6 +36,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
   const [phone, setPhone] = useState("");
   const [invoicePattern, setInvoicePattern] = useState("FV/{NNN}/{MM}/{RRRR}");
   const [clientPortalEmail, setClientPortalEmail] = useState("");
+  const [makeWebhookUrl, setMakeWebhookUrl] = useState("");
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
   // Load company data for editing
@@ -58,6 +59,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
         setPhone(company.phone || "");
         setInvoicePattern(company.invoice_pattern || "FV/{NNN}/{MM}/{RRRR}");
         setClientPortalEmail(company.client_portal_email || "");
+        setMakeWebhookUrl(company.make_webhook_url || "");
       }
     }
   }, [editId, companies]);
@@ -78,6 +80,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     setPhone(company.phone || "");
     setInvoicePattern(company.invoice_pattern || "FV/{NNN}/{MM}/{RRRR}");
     setClientPortalEmail(company.client_portal_email || "");
+    setMakeWebhookUrl(company.make_webhook_url || "");
   };
 
   const handleNewCompany = () => {
@@ -96,6 +99,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     setPhone("");
     setInvoicePattern("FV/{NNN}/{MM}/{RRRR}");
     setClientPortalEmail("");
+    setMakeWebhookUrl("");
   };
 
   const handleSave = () => {
@@ -115,6 +119,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
       phone: phone.trim() || null,
       invoicePattern: invoicePattern.trim() || "FV/{NNN}/{MM}/{RRRR}",
       clientPortalEmail: clientPortalEmail.trim() || null,
+      makeWebhookUrl: makeWebhookUrl.trim() || null,
     };
 
     if (editingCompany) {
@@ -398,6 +403,25 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
               </div>
             </div>
             <input type="email" placeholder="portal@klient.pl" value={clientPortalEmail} onChange={(e) => setClientPortalEmail(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+          </motion.div>
+
+          {/* URL Webhooka Make */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="glass-panel-elevated rounded-2xl p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Webhook className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Webhook Make (automatyzacja)</h2>
+                <p className="text-xs text-muted-foreground">URL webhooka Make do automatycznej wysyłki faktur z PDF</p>
+              </div>
+            </div>
+            <input type="url" placeholder="https://hook.eu2.make.com/..." value={makeWebhookUrl} onChange={(e) => setMakeWebhookUrl(e.target.value)} className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono text-xs" />
           </motion.div>
 
           {/* Wzorzec numeracji */}

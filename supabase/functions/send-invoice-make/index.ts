@@ -31,11 +31,6 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Brak identyfikatora faktury" }, 400);
     }
 
-    const webhookUrl = Deno.env.get("MAKE_WEBHOOK_URL");
-    if (!webhookUrl) {
-      return jsonResponse({ error: "Brak konfiguracji webhooka Make" }, 500);
-    }
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -59,9 +54,15 @@ Deno.serve(async (req) => {
 
     const { data: company } = await supabase
       .from("companies")
-      .select("name, nip, client_portal_email")
+      .select("name, nip, client_portal_email, make_webhook_url")
       .eq("id", invoice.company_id)
       .single();
+
+    // Read webhook URL from company record, fallback to env var
+    const webhookUrl = company?.make_webhook_url || Deno.env.get("MAKE_WEBHOOK_URL");
+    if (!webhookUrl) {
+      return jsonResponse({ error: "Brak URL webhooka Make — ustaw go w ustawieniach firmy" }, 400);
+    }
 
     const { data: items } = await supabase
       .from("invoice_items")
