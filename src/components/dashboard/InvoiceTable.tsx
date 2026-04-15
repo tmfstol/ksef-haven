@@ -332,7 +332,13 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                   </td>
                 </motion.tr>
                 {isExpanded && (
-                  <InvoiceItemsRow key={`${invoice.id}-items`} invoiceId={invoice.id} colSpan={7} />
+                  <InvoiceItemsRow
+                    key={`${invoice.id}-items`}
+                    invoiceId={invoice.id}
+                    colSpan={7}
+                    invoice={invoice}
+                    companyId={invoice.company_id}
+                  />
                 )}
                 {/* Ad banner every 10 rows */}
                 {i > 0 && i % 10 === 9 && (

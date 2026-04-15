@@ -4,8 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { parseKsefXml } from "@/lib/invoice-pdf";
-import { Loader2, RefreshCcw } from "lucide-react";
+import { Loader2, RefreshCcw, FolderOpen, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
+import { useProjects, useAssignInvoiceToProject } from "@/hooks/useProjects";
+import type { Invoice } from "@/types/invoice";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type InvoiceItemRow = Tables<"invoice_items">;
 
@@ -51,9 +60,19 @@ function mapXmlItems(xml: string, invoiceId: string, ksefNumber: string): Invoic
   }));
 }
 
-export function InvoiceItemsRow({ invoiceId, colSpan }: { invoiceId: string; colSpan: number }) {
+interface InvoiceItemsRowProps {
+  invoiceId: string;
+  colSpan: number;
+  invoice?: Invoice;
+  companyId?: string | null;
+}
+
+export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: InvoiceItemsRowProps) {
   const queryClient = useQueryClient();
   const [fallbackItems, setFallbackItems] = useState<InvoiceItem[] | null>(null);
+
+  const { data: projects } = useProjects(companyId);
+  const assignMutation = useAssignInvoiceToProject();
 
   const { data: items, isLoading } = useQuery<InvoiceItem[]>({
     queryKey: ["invoice-items", invoiceId],
@@ -169,6 +188,44 @@ export function InvoiceItemsRow({ invoiceId, colSpan }: { invoiceId: string; col
           </div>
         ) : (
           <table className="w-full text-sm">
+            {/* Project assignment bar */}
+            <caption className="caption-top text-left pb-2">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <FolderOpen className="h-4 w-4" />
+                  <span>Projekt:</span>
+                </div>
+                <Select
+                  value={invoice?.project_id ?? "__none__"}
+                  onValueChange={(value) => {
+                    const projectId = value === "__none__" ? null : value;
+                    assignMutation.mutate({ invoiceId, projectId });
+                  }}
+                  disabled={assignMutation.isPending}
+                >
+                  <SelectTrigger className="h-8 w-[260px] text-sm">
+                    <SelectValue placeholder="Brak przypisania" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Brak przypisania —</SelectItem>
+                    {projects?.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: p.color }}
+                          />
+                          {p.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {assignMutation.isPending && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+            </caption>
             <thead>
               <tr className="text-xs text-muted-foreground uppercase tracking-wider">
                 <th className="text-left py-1.5 pr-3 w-8">#</th>
