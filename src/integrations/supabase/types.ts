@@ -80,6 +80,59 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_items: {
+        Row: {
+          created_at: string
+          gross_amount: number
+          id: string
+          invoice_id: string
+          name: string
+          net_amount: number
+          ordinal: number
+          quantity: number
+          unit: string | null
+          unit_price_net: number
+          vat_amount: number
+          vat_rate: string | null
+        }
+        Insert: {
+          created_at?: string
+          gross_amount?: number
+          id?: string
+          invoice_id: string
+          name?: string
+          net_amount?: number
+          ordinal?: number
+          quantity?: number
+          unit?: string | null
+          unit_price_net?: number
+          vat_amount?: number
+          vat_rate?: string | null
+        }
+        Update: {
+          created_at?: string
+          gross_amount?: number
+          id?: string
+          invoice_id?: string
+          name?: string
+          net_amount?: number
+          ordinal?: number
+          quantity?: number
+          unit?: string | null
+          unit_price_net?: number
+          vat_amount?: number
+          vat_rate?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_sequences: {
         Row: {
           company_id: string
