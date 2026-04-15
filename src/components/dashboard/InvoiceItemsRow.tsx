@@ -78,7 +78,6 @@ export function InvoiceItemsRow({ invoiceId, colSpan }: { invoiceId: string; col
     isError: isHydrateError,
     isSuccess: hasHydrated,
     error: hydrateError,
-    reset: resetHydration,
   } = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("ksef-download", {
@@ -118,11 +117,6 @@ export function InvoiceItemsRow({ invoiceId, colSpan }: { invoiceId: string; col
       setFallbackItems(downloadedItems);
     },
   });
-
-  useEffect(() => {
-    setFallbackItems(null);
-    resetHydration();
-  }, [invoiceId, resetHydration]);
 
   useEffect(() => {
     if (!isLoading && items && items.length === 0 && !isHydrating && !hasHydrated && !isHydrateError) {
