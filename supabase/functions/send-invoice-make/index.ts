@@ -12,6 +12,15 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   });
 }
 
+class HttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 function decodePdfBase64(pdfBase64: string): Uint8Array {
   const cleanedBase64 = pdfBase64
     .replace(/^data:application\/pdf;base64,/i, "")
@@ -31,7 +40,7 @@ function resolveWebhookUrl(rawUrl?: string | null): string {
   const trimmedUrl = rawUrl?.trim();
 
   if (!trimmedUrl) {
-    throw new Error("Brak URL webhooka Make — ustaw go w ustawieniach firmy");
+    throw new HttpError(400, "Brak URL webhooka Make — ustaw go w ustawieniach firmy");
   }
 
   const candidateUrl = /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmedUrl)
@@ -42,15 +51,15 @@ function resolveWebhookUrl(rawUrl?: string | null): string {
   try {
     parsedUrl = new URL(candidateUrl);
   } catch {
-    throw new Error("Nieprawidłowy URL webhooka Make — wklej pełny adres zaczynający się od https://");
+    throw new HttpError(400, "Nieprawidłowy URL webhooka Make — wklej pełny adres zaczynający się od https://");
   }
 
   if ((parsedUrl.username || parsedUrl.password) && parsedUrl.hostname.includes("hook.")) {
-    throw new Error("Nieprawidłowy URL webhooka Make — wygląda na niepełny adres webhooka");
+    throw new HttpError(400, "Nieprawidłowy URL webhooka Make — wygląda na niepełny adres webhooka");
   }
 
   if (parsedUrl.hostname.includes("hook.") && (parsedUrl.pathname === "/" || parsedUrl.pathname.length <= 1)) {
-    throw new Error("Nieprawidłowy URL webhooka Make — wklej pełny adres webhooka, np. https://hook.eu2.make.com/xxxxx");
+    throw new HttpError(400, "Nieprawidłowy URL webhooka Make — wklej pełny adres webhooka, np. https://hook.eu2.make.com/xxxxx");
   }
 
   return parsedUrl.toString();
@@ -163,7 +172,7 @@ Deno.serve(async (req) => {
 
     if (!makeResponse.ok) {
       const text = await makeResponse.text();
-      throw new Error(`Make webhook error [${makeResponse.status}]: ${text}`);
+      throw new HttpError(502, `Make webhook error [${makeResponse.status}]: ${text}`);
     }
 
     // consume body
@@ -173,6 +182,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Make webhook error:", error);
     const message = error instanceof Error ? error.message : "Błąd wysyłki do Make";
-    return jsonResponse({ error: message }, 500);
+    const status = error instanceof HttpError ? error.status : 500;
+    return jsonResponse({ error: message }, status);
   }
 });
