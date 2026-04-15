@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { parseKsefXml } from "@/lib/invoice-pdf";
 import { Loader2, RefreshCcw } from "lucide-react";
 import { motion } from "framer-motion";
+
+type InvoiceItemRow = Tables<"invoice_items">;
 
 interface InvoiceItem {
   id: string;
@@ -61,7 +64,7 @@ export function InvoiceItemsRow({ invoiceId, colSpan }: { invoiceId: string; col
         .eq("invoice_id", invoiceId)
         .order("ordinal", { ascending: true });
       if (error) throw error;
-      return (data as any[]).map((r) => ({
+      return (data as InvoiceItemRow[]).map((r) => ({
         ...r,
         quantity: Number(r.quantity),
         unit_price_net: Number(r.unit_price_net),
