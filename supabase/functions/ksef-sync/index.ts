@@ -420,7 +420,57 @@ function parseInvoiceXml(xml: string) {
   const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
   const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
 
-  return { vendor, nip, date, grossAmount };
+  // Parse line items (FA(3) format: <FaWiersz> elements)
+  const items: Array<{
+    ordinal: number;
+    name: string;
+    quantity: number;
+    unit: string;
+    unit_price_net: number;
+    net_amount: number;
+    vat_rate: string;
+    vat_amount: number;
+    gross_amount: number;
+  }> = [];
+
+  const lineRegex = /<[^>]*FaWiersz[^>]*>([\s\S]*?)<\/[^>]*FaWiersz[^>]*>/gi;
+  let lineMatch;
+  let ordinal = 1;
+  while ((lineMatch = lineRegex.exec(xml)) !== null) {
+    const block = lineMatch[1];
+    const getField = (tag: string) => {
+      const m = block.match(new RegExp(`<[^>]*${tag}[^>]*>([^<]+)<`, "i"));
+      return m ? m[1].trim() : null;
+    };
+    const getNum = (tag: string) => {
+      const v = getField(tag);
+      return v ? parseFloat(v) : 0;
+    };
+
+    const name = getField("P_7") || getField("NazwaTowaru") || getField("Opis") || "";
+    const quantity = getNum("P_8B") || getNum("Ilosc") || 1;
+    const unit = getField("P_8A") || getField("JednostkaMiary") || "szt.";
+    const unitPriceNet = getNum("P_9A") || getNum("CenaJednostkowa") || 0;
+    const netAmount = getNum("P_11") || getNum("WartoscNetto") || 0;
+    const vatRateNum = getNum("P_12") || 23;
+    const vatRate = vatRateNum === -1 ? "zw." : `${vatRateNum}%`;
+    const vatAmount = getNum("P_11A") || (netAmount * (vatRateNum > 0 ? vatRateNum / 100 : 0));
+    const itemGross = netAmount + vatAmount;
+
+    items.push({
+      ordinal: ordinal++,
+      name,
+      quantity,
+      unit,
+      unit_price_net: unitPriceNet,
+      net_amount: netAmount,
+      vat_rate: vatRate,
+      vat_amount: vatAmount,
+      gross_amount: itemGross,
+    });
+  }
+
+  return { vendor, nip, date, grossAmount, items };
 }
 
 // Main sync for single company
@@ -518,6 +568,8 @@ async function syncCompany(
           let date = ref.issueDate || ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
           let grossAmount = ref.grossAmount || ref.grossValue || ref.grossAmount || 0;
 
+          let parsedItems: any[] = [];
+
           try {
             const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
             const parsed = parseInvoiceXml(xml);
@@ -525,11 +577,12 @@ async function syncCompany(
             if (parsed.nip) nip = parsed.nip;
             if (parsed.date) date = parsed.date;
             if (parsed.grossAmount) grossAmount = parsed.grossAmount;
+            parsedItems = parsed.items || [];
           } catch (xmlErr) {
             console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
           }
 
-          const { error: insertError } = await supabase.from("invoices").insert({
+          const { data: inserted, error: insertError } = await supabase.from("invoices").insert({
             company_id: company.id,
             date,
             vendor,
@@ -537,12 +590,33 @@ async function syncCompany(
             gross_amount: grossAmount,
             ksef_number: ksefNumber,
             status: "new",
-          });
+          }).select("id").single();
 
           if (insertError) {
             console.error(`[ksef-sync] Insert error for ${ksefNumber}:`, insertError);
           } else {
             upsertedCount++;
+            // Insert line items
+            if (parsedItems.length > 0 && inserted?.id) {
+              const itemRows = parsedItems.map(item => ({
+                invoice_id: inserted.id,
+                ordinal: item.ordinal,
+                name: item.name,
+                quantity: item.quantity,
+                unit: item.unit,
+                unit_price_net: item.unit_price_net,
+                net_amount: item.net_amount,
+                vat_rate: item.vat_rate,
+                vat_amount: item.vat_amount,
+                gross_amount: item.gross_amount,
+              }));
+              const { error: itemsError } = await supabase.from("invoice_items").insert(itemRows);
+              if (itemsError) {
+                console.error(`[ksef-sync] Items insert error for ${ksefNumber}:`, itemsError);
+              } else {
+                console.log(`[ksef-sync] Inserted ${itemRows.length} items for ${ksefNumber}`);
+              }
+            }
           }
         } catch (invErr) {
           console.error(`[ksef-sync] Error processing ${ksefNumber}:`, invErr);
