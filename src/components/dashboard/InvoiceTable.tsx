@@ -118,7 +118,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
       if (!data?.xml) throw new Error("Brak danych XML");
 
       const parsed = parseKsefXml(data.xml, invoice.ksef_number);
-      await generateInvoicePdf(parsed);
+      await generateInvoicePdf(parsed, data.xml);
       toast.success(`Pobrano PDF dla ${invoice.ksef_number}`);
     } catch (err) {
       console.error("PDF download error:", err);
@@ -178,7 +178,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
 
       // 2. Generate PDF as base64
       const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number || "");
-      const pdfBase64 = await generateInvoicePdfBase64(parsed);
+      const pdfBase64 = await generateInvoicePdfBase64(parsed, xmlData.xml);
 
       // 3. Send to Make with PDF
       const { data, error } = await supabase.functions.invoke("send-invoice-make", {
