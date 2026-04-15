@@ -561,7 +561,45 @@ async function syncCompany(
             .eq("company_id", company.id)
             .maybeSingle();
 
-          if (existing) continue;
+          // If invoice exists, check if it has items — if not, fetch XML and add them
+          if (existing) {
+            const { count } = await supabase
+              .from("invoice_items")
+              .select("id", { count: "exact", head: true })
+              .eq("invoice_id", existing.id);
+
+            if (count && count > 0) continue; // Already has items, skip
+
+            // Fetch XML and parse items for existing invoice without items
+            try {
+              const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
+              const parsed = parseInvoiceXml(xml);
+              if (parsed.items.length > 0) {
+                const itemRows = parsed.items.map(item => ({
+                  invoice_id: existing.id,
+                  ordinal: item.ordinal,
+                  name: item.name,
+                  quantity: item.quantity,
+                  unit: item.unit,
+                  unit_price_net: item.unit_price_net,
+                  net_amount: item.net_amount,
+                  vat_rate: item.vat_rate,
+                  vat_amount: item.vat_amount,
+                  gross_amount: item.gross_amount,
+                }));
+                const { error: itemsError } = await supabase.from("invoice_items").insert(itemRows);
+                if (itemsError) {
+                  console.error(`[ksef-sync] Backfill items error for ${ksefNumber}:`, itemsError);
+                } else {
+                  console.log(`[ksef-sync] Backfilled ${itemRows.length} items for existing ${ksefNumber}`);
+                  upsertedCount++;
+                }
+              }
+            } catch (xmlErr) {
+              console.log(`[ksef-sync] Could not backfill XML for ${ksefNumber}: ${xmlErr}`);
+            }
+            continue;
+          }
 
           let vendor = ref.seller?.name || ref.subjectName || ref.vendorName || "Nieznany";
           let nip = ref.seller?.nip || ref.subjectNip || ref.nip || company.nip;
