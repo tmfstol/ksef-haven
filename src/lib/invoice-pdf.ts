@@ -1153,5 +1153,11 @@ export async function generateInvoicePdfBase64(inv: ParsedInvoice): Promise<stri
   norm(6); GRAY();
   pdf.text("Krajowy System e-Faktur", pw / 2, 290, { align: "center" });
 
-  return pdf.output("datauristring").split(",")[1];
+  const arrayBuf = pdf.output("arraybuffer");
+  const bytes = new Uint8Array(arrayBuf);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
