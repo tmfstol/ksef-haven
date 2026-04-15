@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { parseKsefXml, generateInvoicePdf } from "@/lib/invoice-pdf";
+import { parseKsefXml, generateInvoicePdf, generateInvoicePdfBase64 } from "@/lib/invoice-pdf";
 import { InvoiceItemsRow } from "./InvoiceItemsRow";
 import { AdBanner, AdBannerPlaceholder } from "./AdBanner";
 
@@ -168,8 +168,25 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
   const handleSendToPortal = async (invoice: Invoice) => {
     setDownloading({ id: invoice.id, format: "email" });
     try {
+      // 1. Fetch XML from KSeF
+      const { data: xmlData, error: xmlError } = await supabase.functions.invoke("ksef-download", {
+        body: { invoice_id: invoice.id, format: "xml" },
+      });
+      if (xmlError) throw xmlError;
+      if (xmlData?.error) throw new Error(xmlData.error);
+      if (!xmlData?.xml) throw new Error("Brak XML faktury");
+
+      // 2. Generate PDF as base64
+      const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number || "");
+      const pdfBase64 = await generateInvoicePdfBase64(parsed);
+
+      // 3. Send to Make with PDF
       const { data, error } = await supabase.functions.invoke("send-invoice-make", {
-        body: { invoiceId: invoice.id },
+        body: {
+          invoiceId: invoice.id,
+          pdfBase64,
+          pdfFilename: `${invoice.ksef_number || invoice.vendor}.pdf`,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
