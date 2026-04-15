@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
 
     const { data: invoice, error: invoiceError } = await supabase
       .from("invoices")
-      .select("id, company_id, date, vendor, nip, gross_amount, ksef_number")
+      .select("id, company_id, date, vendor, nip, gross_amount, ksef_number, bookkeeper_note")
       .eq("id", invoiceId)
       .single();
 
@@ -117,6 +117,7 @@ Deno.serve(async (req) => {
     const ksefNumber = escapeHtml(invoice.ksef_number || "—");
     const formattedDate = formatDate(invoice.date);
     const formattedAmount = formatCurrency(Number(invoice.gross_amount || 0));
+    const bookNote = invoice.bookkeeper_note ? escapeHtml(invoice.bookkeeper_note) : null;
     const subject = `Faktura ${invoice.ksef_number || invoice.vendor} z dnia ${formattedDate}`;
 
     const htmlBody = `
@@ -147,6 +148,12 @@ Deno.serve(async (req) => {
             <td style="padding: 10px; font-family: monospace;">${ksefNumber}</td>
           </tr>
         </table>
+        ${bookNote ? `
+        <div style="margin: 20px 0; padding: 14px 16px; background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 4px;">
+          <p style="margin: 0 0 4px; font-weight: bold; color: #92400e; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Notatka dla księgowego</p>
+          <p style="margin: 0; color: #78350f;">${bookNote}</p>
+        </div>
+        ` : ''}
         <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 12px;">
           Wiadomość wygenerowana automatycznie z systemu KSeF Archiwum.
         </p>
