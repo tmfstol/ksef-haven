@@ -17,4 +17,5 @@ export interface Company {
   phone?: string | null;
   invoice_pattern?: string;
   client_portal_email?: string | null;
+  make_webhook_url?: string | null;
 }
