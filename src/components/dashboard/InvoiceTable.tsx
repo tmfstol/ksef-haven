@@ -1,11 +1,13 @@
-import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send } from "lucide-react";
+import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseKsefXml, generateInvoicePdf } from "@/lib/invoice-pdf";
+import { InvoiceItemsRow } from "./InvoiceItemsRow";
+import { AdBannerPlaceholder } from "./AdBanner";
 
 type DownloadState = { id: string; format: "xml" | "upo" | "pdf" | "email" } | null;
 
