@@ -207,6 +207,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
       <table className="w-full">
         <thead>
           <tr className="border-b border-border/50">
+            <th className="w-10 px-2 py-3.5"></th>
             <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5">
               {renderSortHeader("Data", "date")}
             </th>
@@ -235,91 +236,112 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
             const isSendingEmail = downloading?.id === invoice.id && downloading?.format === "email";
             const isAnyDownloading = downloading !== null;
             const isNew = lastSeenTimestamp && invoice.created_at && invoice.created_at > lastSeenTimestamp;
+            const isExpanded = expandedId === invoice.id;
 
             return (
-              <motion.tr
-                key={invoice.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03 }}
-                className={`border-b border-border/30 last:border-0 hover:bg-secondary/40 transition-colors ${isNew ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
-              >
-                <td className="px-5 py-3.5 text-sm text-foreground">{formatDate(invoice.date)}</td>
-                <td className="px-5 py-3.5 text-sm font-medium text-foreground max-w-[250px] truncate">
-                  {invoice.vendor}
-                </td>
-                <td className="px-5 py-3.5 text-sm text-muted-foreground font-mono">{invoice.nip}</td>
-                <td className="px-5 py-3.5 text-sm text-foreground text-right font-semibold tabular-nums">
-                  {formatCurrency(invoice.gross_amount)}
-                </td>
-                <td className="px-5 py-3.5 text-center">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[invoice.status]}`}>
-                    {statusLabels[invoice.status]}
-                  </span>
-                </td>
-                <td className="px-5 py-3.5 text-right">
-                  <div className="flex items-center justify-end gap-1.5">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
-                      disabled={isAnyDownloading || !invoice.ksef_number}
-                      onClick={() => handleDownloadXml(invoice)}
-                    >
-                      {isDownloadingXml ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <FileCode className="h-3.5 w-3.5" />
-                      )}
-                      XML
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
-                      disabled={isAnyDownloading || !invoice.ksef_number}
-                      onClick={() => handleDownloadPdf(invoice)}
-                    >
-                      {isDownloadingPdf ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <FileText className="h-3.5 w-3.5" />
-                      )}
-                      PDF
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs rounded-lg gap-1 text-muted-foreground hover:text-foreground"
-                      disabled={isAnyDownloading || !invoice.ksef_number}
-                      onClick={() => handleDownloadUpo(invoice)}
-                    >
-                      {isDownloadingUpo ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Download className="h-3.5 w-3.5" />
-                      )}
-                      UPO
-                    </Button>
-                    {clientPortalEmail && (
+              <AnimatePresence key={invoice.id}>
+                <motion.tr
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                  className={`border-b border-border/30 last:border-0 hover:bg-secondary/40 transition-colors cursor-pointer ${isNew ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
+                  onClick={() => setExpandedId(isExpanded ? null : invoice.id)}
+                >
+                  <td className="px-2 py-3.5 text-center">
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-foreground">{formatDate(invoice.date)}</td>
+                  <td className="px-5 py-3.5 text-sm font-medium text-foreground max-w-[250px] truncate">
+                    {invoice.vendor}
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-muted-foreground font-mono">{invoice.nip}</td>
+                  <td className="px-5 py-3.5 text-sm text-foreground text-right font-semibold tabular-nums">
+                    {formatCurrency(invoice.gross_amount)}
+                  </td>
+                  <td className="px-5 py-3.5 text-center">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[invoice.status]}`}>
+                      {statusLabels[invoice.status]}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1.5">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-3 text-xs rounded-lg gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
-                        disabled={isAnyDownloading}
-                        onClick={() => handleSendToPortal(invoice)}
+                        className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
+                        disabled={isAnyDownloading || !invoice.ksef_number}
+                        onClick={() => handleDownloadXml(invoice)}
                       >
-                        {isSendingEmail ? (
+                        {isDownloadingXml ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <Send className="h-3.5 w-3.5" />
+                          <FileCode className="h-3.5 w-3.5" />
                         )}
-                        Portal
+                        XML
                       </Button>
-                    )}
-                  </div>
-                </td>
-              </motion.tr>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
+                        disabled={isAnyDownloading || !invoice.ksef_number}
+                        onClick={() => handleDownloadPdf(invoice)}
+                      >
+                        {isDownloadingPdf ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <FileText className="h-3.5 w-3.5" />
+                        )}
+                        PDF
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs rounded-lg gap-1 text-muted-foreground hover:text-foreground"
+                        disabled={isAnyDownloading || !invoice.ksef_number}
+                        onClick={() => handleDownloadUpo(invoice)}
+                      >
+                        {isDownloadingUpo ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Download className="h-3.5 w-3.5" />
+                        )}
+                        UPO
+                      </Button>
+                      {clientPortalEmail && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-3 text-xs rounded-lg gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
+                          disabled={isAnyDownloading}
+                          onClick={() => handleSendToPortal(invoice)}
+                        >
+                          {isSendingEmail ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5" />
+                          )}
+                          Portal
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </motion.tr>
+                {isExpanded && (
+                  <InvoiceItemsRow invoiceId={invoice.id} colSpan={7} />
+                )}
+                {/* Ad banner every 10 rows */}
+                {i > 0 && i % 10 === 9 && (
+                  <tr key={`ad-${i}`}>
+                    <td colSpan={7} className="px-5 py-2">
+                      <AdBannerPlaceholder />
+                    </td>
+                  </tr>
+                )}
+              </AnimatePresence>
             );
           })}
         </tbody>
