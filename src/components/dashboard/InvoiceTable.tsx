@@ -118,7 +118,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
       if (!data?.xml) throw new Error("Brak danych XML");
 
       const parsed = parseKsefXml(data.xml, invoice.ksef_number);
-      await generateInvoicePdf(parsed);
+      await generateInvoicePdf(parsed, data.xml);
       toast.success(`Pobrano PDF dla ${invoice.ksef_number}`);
     } catch (err) {
       console.error("PDF download error:", err);
