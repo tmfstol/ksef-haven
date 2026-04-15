@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { StatsBar } from "@/components/dashboard/StatsBar";
 import { InvoiceFilters, applyFilters, type InvoiceFiltersState } from "@/components/dashboard/InvoiceFilters";
 import { Loader2 } from "lucide-react";
+import { AiAssistantChat } from "@/components/dashboard/AiAssistantChat";
 
 const EMPTY_FILTERS: InvoiceFiltersState = {
   dateFrom: undefined,
@@ -138,6 +139,7 @@ const Index = () => {
           )}
         </main>
       </div>
+      <AiAssistantChat />
     </div>
   );
 };
