@@ -12,6 +12,63 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   });
 }
 
+function decodePdfBase64(pdfBase64: string): Uint8Array {
+  const cleanedBase64 = pdfBase64
+    .replace(/^data:application\/pdf;base64,/i, "")
+    .replace(/\s+/g, "");
+
+  const binary = atob(cleanedBase64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+}
+
+function resolveWebhookUrl(rawUrl?: string | null): string {
+  const trimmedUrl = rawUrl?.trim();
+
+  if (!trimmedUrl) {
+    throw new Error("Brak URL webhooka Make — ustaw go w ustawieniach firmy");
+  }
+
+  const candidateUrl = /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmedUrl)
+    ? trimmedUrl
+    : `https://${trimmedUrl}`;
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(candidateUrl);
+  } catch {
+    throw new Error("Nieprawidłowy URL webhooka Make — wklej pełny adres zaczynający się od https://");
+  }
+
+  if ((parsedUrl.username || parsedUrl.password) && parsedUrl.hostname.includes("hook.")) {
+    throw new Error("Nieprawidłowy URL webhooka Make — wygląda na niepełny adres webhooka");
+  }
+
+  if (parsedUrl.hostname.includes("hook.") && (parsedUrl.pathname === "/" || parsedUrl.pathname.length <= 1)) {
+    throw new Error("Nieprawidłowy URL webhooka Make — wklej pełny adres webhooka, np. https://hook.eu2.make.com/xxxxx");
+  }
+
+  return parsedUrl.toString();
+}
+
+function appendFormValue(formData: FormData, key: string, value: unknown) {
+  if (value === null || value === undefined) {
+    return;
+  }
+
+  if (typeof value === "object") {
+    formData.append(key, JSON.stringify(value));
+    return;
+  }
+
+  formData.append(key, String(value));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -29,6 +86,9 @@ Deno.serve(async (req) => {
     const pdfFilename = typeof body?.pdfFilename === "string" ? body.pdfFilename : "faktura.pdf";
     if (!invoiceId) {
       return jsonResponse({ error: "Brak identyfikatora faktury" }, 400);
+    }
+    if (!pdfBase64) {
+      return jsonResponse({ error: "Brak pliku PDF faktury" }, 400);
     }
 
     const supabase = createClient(
@@ -58,11 +118,7 @@ Deno.serve(async (req) => {
       .eq("id", invoice.company_id)
       .single();
 
-    // Read webhook URL from company record, fallback to env var
-    const webhookUrl = company?.make_webhook_url || Deno.env.get("MAKE_WEBHOOK_URL");
-    if (!webhookUrl) {
-      return jsonResponse({ error: "Brak URL webhooka Make — ustaw go w ustawieniach firmy" }, 400);
-    }
+    const webhookUrl = resolveWebhookUrl(company?.make_webhook_url || Deno.env.get("MAKE_WEBHOOK_URL"));
 
     const { data: items } = await supabase
       .from("invoice_items")
@@ -80,27 +136,29 @@ Deno.serve(async (req) => {
       projectName = project?.name ?? null;
     }
 
-    const payload = {
-      invoice_id: invoice.id,
-      ksef_number: invoice.ksef_number,
-      date: invoice.date,
-      vendor: invoice.vendor,
-      vendor_nip: invoice.nip,
-      gross_amount: Number(invoice.gross_amount),
-      bookkeeper_note: invoice.bookkeeper_note,
-      project_name: projectName,
-      company_name: company?.name,
-      company_nip: company?.nip,
-      portal_email: company?.client_portal_email,
-      items: items ?? [],
-      pdf_base64: pdfBase64,
-      pdf_filename: pdfFilename,
-    };
+    const pdfBytes = decodePdfBase64(pdfBase64);
+    const pdfFile = new File([pdfBytes], pdfFilename, { type: "application/pdf" });
+    const formData = new FormData();
+
+    appendFormValue(formData, "invoice_id", invoice.id);
+    appendFormValue(formData, "ksef_number", invoice.ksef_number);
+    appendFormValue(formData, "date", invoice.date);
+    appendFormValue(formData, "vendor", invoice.vendor);
+    appendFormValue(formData, "vendor_nip", invoice.nip);
+    appendFormValue(formData, "gross_amount", Number(invoice.gross_amount));
+    appendFormValue(formData, "bookkeeper_note", invoice.bookkeeper_note);
+    appendFormValue(formData, "project_name", projectName);
+    appendFormValue(formData, "company_name", company?.name);
+    appendFormValue(formData, "company_nip", company?.nip);
+    appendFormValue(formData, "portal_email", company?.client_portal_email);
+    appendFormValue(formData, "items", items ?? []);
+    appendFormValue(formData, "pdf_filename", pdfFilename);
+    appendFormValue(formData, "pdf_content_type", "application/pdf");
+    formData.append("file", pdfFile, pdfFilename);
 
     const makeResponse = await fetch(webhookUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: formData,
     });
 
     if (!makeResponse.ok) {
