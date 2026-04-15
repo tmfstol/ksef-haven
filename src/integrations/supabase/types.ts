@@ -350,6 +350,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          bookkeeper_note: string | null
           company_id: string
           created_at: string
           date: string
@@ -365,6 +366,7 @@ export type Database = {
           xml_path: string | null
         }
         Insert: {
+          bookkeeper_note?: string | null
           company_id: string
           created_at?: string
           date: string
@@ -380,6 +382,7 @@ export type Database = {
           xml_path?: string | null
         }
         Update: {
+          bookkeeper_note?: string | null
           company_id?: string
           created_at?: string
           date?: string
