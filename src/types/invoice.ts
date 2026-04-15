@@ -9,6 +9,7 @@ export interface Invoice {
   xml_path?: string | null;
   pdf_path?: string | null;
   ksef_number?: string | null;
+  project_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }

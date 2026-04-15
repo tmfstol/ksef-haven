@@ -200,6 +200,7 @@ export type Database = {
           id: string
           ocr_data: Json | null
           ocr_status: string
+          project_id: string | null
           updated_at: string
           vendor_name: string | null
         }
@@ -215,6 +216,7 @@ export type Database = {
           id?: string
           ocr_data?: Json | null
           ocr_status?: string
+          project_id?: string | null
           updated_at?: string
           vendor_name?: string | null
         }
@@ -230,6 +232,7 @@ export type Database = {
           id?: string
           ocr_data?: Json | null
           ocr_status?: string
+          project_id?: string | null
           updated_at?: string
           vendor_name?: string | null
         }
@@ -246,6 +249,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -348,6 +358,7 @@ export type Database = {
           ksef_number: string | null
           nip: string
           pdf_path: string | null
+          project_id: string | null
           status: string
           updated_at: string
           vendor: string
@@ -362,6 +373,7 @@ export type Database = {
           ksef_number?: string | null
           nip: string
           pdf_path?: string | null
+          project_id?: string | null
           status?: string
           updated_at?: string
           vendor: string
@@ -376,6 +388,7 @@ export type Database = {
           ksef_number?: string | null
           nip?: string
           pdf_path?: string | null
+          project_id?: string | null
           status?: string
           updated_at?: string
           vendor?: string
@@ -387,6 +400,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -448,6 +468,50 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          budget: number | null
+          color: string
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          budget?: number | null
+          color?: string
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          budget?: number | null
+          color?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

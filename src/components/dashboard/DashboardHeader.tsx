@@ -1,4 +1,4 @@
-import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt } from "lucide-react";
+import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import type { Company } from "@/types/company";
@@ -98,6 +98,17 @@ export function DashboardHeader({
       >
         <Receipt className="h-4 w-4" />
         Wydatki
+      </Button>
+
+      {/* Projekty */}
+      <Button
+        variant="outline"
+        onClick={() => navigate("/projects")}
+        className="rounded-xl px-4 gap-2"
+        title="Foldery inwestycji"
+      >
+        <FolderOpen className="h-4 w-4" />
+        Projekty
       </Button>
 
       {/* Ustawienia */}
