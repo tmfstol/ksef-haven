@@ -166,19 +166,14 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
   };
 
   const handleSendToPortal = async (invoice: Invoice) => {
-    if (!clientPortalEmail) {
-      toast.error("Brak e-maila portalu klienta");
-      return;
-    }
-
     setDownloading({ id: invoice.id, format: "email" });
     try {
-      const { data, error } = await supabase.functions.invoke("send-invoice-email", {
+      const { data, error } = await supabase.functions.invoke("send-invoice-make", {
         body: { invoiceId: invoice.id },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success(`Faktura wysłana na ${clientPortalEmail}`);
+      toast.success("Faktura wysłana do portalu przez Make");
     } catch (err) {
       console.error("Email send error:", err);
       toast.error(`Błąd wysyłki: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
@@ -312,22 +307,20 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                         )}
                         UPO
                       </Button>
-                      {clientPortalEmail && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-3 text-xs rounded-lg gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
-                          disabled={isAnyDownloading}
-                          onClick={() => handleSendToPortal(invoice)}
-                        >
-                          {isSendingEmail ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Send className="h-3.5 w-3.5" />
-                          )}
-                          Portal
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-3 text-xs rounded-lg gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
+                        disabled={isAnyDownloading}
+                        onClick={() => handleSendToPortal(invoice)}
+                      >
+                        {isSendingEmail ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        Portal
+                      </Button>
                     </div>
                   </td>
                 </motion.tr>
