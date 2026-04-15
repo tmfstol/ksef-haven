@@ -358,27 +358,14 @@ function fmtNum(val: string | number): string {
   return n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function base64ToPdfBytes(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
 export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
   const pdfBase64 = await generateInvoicePdfBase64(inv);
-  const bytes = base64ToPdfBytes(pdfBase64);
-  const blob = new Blob([bytes.buffer], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
-  anchor.href = url;
+  anchor.href = `data:application/pdf;base64,${pdfBase64}`;
   anchor.download = `${inv.ksefNumber}.pdf`;
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
 }
 
 export async function generateInvoicePdfBase64(inv: ParsedInvoice): Promise<string> {
