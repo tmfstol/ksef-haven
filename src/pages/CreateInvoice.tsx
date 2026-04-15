@@ -152,7 +152,7 @@ const CreateInvoice = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-xl">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">

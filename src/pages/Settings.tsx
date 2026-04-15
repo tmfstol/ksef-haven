@@ -120,12 +120,12 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     if (editingCompany) {
       updateMutation.mutate(
         { ...data, id: editingCompany.id },
-        { onSuccess: () => isOnboarding && navigate("/") }
+        { onSuccess: () => isOnboarding && navigate("/dashboard") }
       );
     } else {
       addMutation.mutate(data, {
         onSuccess: () => {
-          if (isOnboarding) navigate("/");
+          if (isOnboarding) navigate("/dashboard");
           else handleNewCompany();
         },
       });
@@ -153,7 +153,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     <div className="min-h-screen bg-background">
       <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
         {!isOnboarding && (
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-xl">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         )}
