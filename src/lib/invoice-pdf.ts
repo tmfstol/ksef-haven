@@ -1078,3 +1078,80 @@ export async function generateInvoicePdf(inv: ParsedInvoice): Promise<void> {
 
   pdf.save(`${inv.ksefNumber}.pdf`);
 }
+
+export async function generateInvoicePdfBase64(inv: ParsedInvoice): Promise<string> {
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pw = 210;
+  const mg = 15;
+  const cw = pw - 2 * mg;
+  let y = 15;
+
+  const t = (s: string) => stripPl(s);
+  const bold = (s = 9) => { pdf.setFont("helvetica", "bold"); pdf.setFontSize(s); };
+  const norm = (s = 8) => { pdf.setFont("helvetica", "normal"); pdf.setFontSize(s); };
+  const BLACK = () => pdf.setTextColor(0, 0, 0);
+  const GRAY = () => pdf.setTextColor(80, 80, 80);
+
+  // Simplified PDF for portal - header
+  bold(14); BLACK();
+  pdf.text(t("FAKTURA"), mg, y); y += 6;
+  norm(9); GRAY();
+  pdf.text(t(`Nr KSeF: ${inv.ksefNumber}`), mg, y); y += 5;
+  pdf.text(t(`Nr faktury: ${inv.nrFaktury}`), mg, y); y += 5;
+  pdf.text(t(`Data wystawienia: ${inv.dataWystawienia}`), mg, y); y += 8;
+
+  // Seller / Buyer
+  bold(9); BLACK();
+  pdf.text(t("Sprzedawca:"), mg, y);
+  pdf.text(t("Nabywca:"), mg + cw / 2, y); y += 5;
+  norm(8); GRAY();
+  pdf.text(t(inv.sprzedawca.nazwa), mg, y);
+  pdf.text(t(inv.nabywca.nazwa), mg + cw / 2, y); y += 4;
+  pdf.text(t(`NIP: ${inv.sprzedawca.nip}`), mg, y);
+  pdf.text(t(`NIP: ${inv.nabywca.nip}`), mg + cw / 2, y); y += 4;
+  pdf.text(t(inv.sprzedawca.adres), mg, y, { maxWidth: cw / 2 - 5 });
+  pdf.text(t(inv.nabywca.adres), mg + cw / 2, y, { maxWidth: cw / 2 - 5 }); y += 10;
+
+  // Items table
+  bold(8); BLACK();
+  const cols = [mg, mg+8, mg+68, mg+83, mg+93, mg+113, mg+133, mg+148, mg+168];
+  const headers = ["#", "Nazwa", "Jm.", "Ilosc", "Cena netto", "Netto", "VAT%", "VAT", "Brutto"];
+  headers.forEach((h, i) => pdf.text(t(h), cols[i], y));
+  y += 2;
+  pdf.setDrawColor(180); pdf.setLineWidth(0.3); pdf.line(mg, y, pw - mg, y); y += 4;
+
+  norm(7); GRAY();
+  for (const p of inv.pozycje) {
+    if (y > 270) { pdf.addPage(); y = 15; }
+    pdf.text(p.nr, cols[0], y);
+    pdf.text(t(p.opis).substring(0, 35), cols[1], y);
+    pdf.text(t(p.jm), cols[2], y);
+    pdf.text(p.ilosc, cols[3], y);
+    pdf.text(p.cenaNetto, cols[4], y);
+    pdf.text(p.wartoscNetto, cols[5], y);
+    pdf.text(p.stawkaVat, cols[6], y);
+    pdf.text(p.kwotaVat, cols[7], y);
+    pdf.text(p.brutto, cols[8], y);
+    y += 4;
+  }
+
+  y += 4;
+  pdf.setDrawColor(180); pdf.line(mg, y, pw - mg, y); y += 5;
+  bold(9); BLACK();
+  pdf.text(t(`Netto: ${inv.sumaNetto}  VAT: ${inv.sumaVat}  Brutto: ${inv.sumaBrutto}`), mg, y); y += 6;
+  if (inv.doZaplaty) {
+    pdf.text(t(`Do zaplaty: ${inv.doZaplaty} ${inv.kodWaluty}`), mg, y); y += 5;
+  }
+  if (inv.formaPlatnosci) {
+    norm(8); GRAY();
+    pdf.text(t(`Forma platnosci: ${inv.formaPlatnosci}`), mg, y); y += 4;
+  }
+  if (inv.terminPlatnosci) {
+    pdf.text(t(`Termin platnosci: ${inv.terminPlatnosci}`), mg, y); y += 4;
+  }
+
+  norm(6); GRAY();
+  pdf.text("Krajowy System e-Faktur", pw / 2, 290, { align: "center" });
+
+  return pdf.output("datauristring").split(",")[1];
+}
