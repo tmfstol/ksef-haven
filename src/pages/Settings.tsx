@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCompanies, useAddCompany, useUpdateCompany, useDeleteCompany } from "@/hooks/useCompanies";
 import { useTestConnection } from "@/hooks/useSettings";
-import { ArrowLeft, Save, Loader2, Wifi, Shield, FolderOpen, Building2, Trash2, Plus, MapPin, CreditCard, Hash, Mail } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Wifi, Shield, FolderOpen, Building2, Trash2, Plus, MapPin, CreditCard, Hash, Mail, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import type { Company } from "@/types/company";
@@ -36,6 +36,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
   const [phone, setPhone] = useState("");
   const [invoicePattern, setInvoicePattern] = useState("FV/{NNN}/{MM}/{RRRR}");
   const [clientPortalEmail, setClientPortalEmail] = useState("");
+  const [makeWebhookUrl, setMakeWebhookUrl] = useState("");
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
   // Load company data for editing
@@ -58,6 +59,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
         setPhone(company.phone || "");
         setInvoicePattern(company.invoice_pattern || "FV/{NNN}/{MM}/{RRRR}");
         setClientPortalEmail(company.client_portal_email || "");
+        setMakeWebhookUrl(company.make_webhook_url || "");
       }
     }
   }, [editId, companies]);
@@ -78,6 +80,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     setPhone(company.phone || "");
     setInvoicePattern(company.invoice_pattern || "FV/{NNN}/{MM}/{RRRR}");
     setClientPortalEmail(company.client_portal_email || "");
+    setMakeWebhookUrl(company.make_webhook_url || "");
   };
 
   const handleNewCompany = () => {
@@ -96,6 +99,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     setPhone("");
     setInvoicePattern("FV/{NNN}/{MM}/{RRRR}");
     setClientPortalEmail("");
+    setMakeWebhookUrl("");
   };
 
   const handleSave = () => {
@@ -115,6 +119,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
       phone: phone.trim() || null,
       invoicePattern: invoicePattern.trim() || "FV/{NNN}/{MM}/{RRRR}",
       clientPortalEmail: clientPortalEmail.trim() || null,
+      makeWebhookUrl: makeWebhookUrl.trim() || null,
     };
 
     if (editingCompany) {
