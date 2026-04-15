@@ -337,7 +337,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                 {i > 0 && i % 10 === 9 && (
                   <tr key={`ad-${i}`}>
                     <td colSpan={7} className="px-5 py-2">
-                      <AdBanner slot="1234567890" format="horizontal" />
+                      <AdBanner slot="4278896371" format="horizontal" />
                     </td>
                   </tr>
                 )}
