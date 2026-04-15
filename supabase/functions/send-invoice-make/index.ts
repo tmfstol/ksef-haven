@@ -25,6 +25,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const invoiceId = typeof body?.invoiceId === "string" ? body.invoiceId : null;
+    const pdfBase64 = typeof body?.pdfBase64 === "string" ? body.pdfBase64 : null;
+    const pdfFilename = typeof body?.pdfFilename === "string" ? body.pdfFilename : "faktura.pdf";
     if (!invoiceId) {
       return jsonResponse({ error: "Brak identyfikatora faktury" }, 400);
     }
@@ -90,6 +92,8 @@ Deno.serve(async (req) => {
       company_nip: company?.nip,
       portal_email: company?.client_portal_email,
       items: items ?? [],
+      pdf_base64: pdfBase64,
+      pdf_filename: pdfFilename,
     };
 
     const makeResponse = await fetch(webhookUrl, {
