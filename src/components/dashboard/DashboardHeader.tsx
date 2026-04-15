@@ -100,6 +100,17 @@ export function DashboardHeader({
         Wydatki
       </Button>
 
+      {/* Projekty */}
+      <Button
+        variant="outline"
+        onClick={() => navigate("/projects")}
+        className="rounded-xl px-4 gap-2"
+        title="Foldery inwestycji"
+      >
+        <FolderOpen className="h-4 w-4" />
+        Projekty
+      </Button>
+
       {/* Ustawienia */}
       <Button
         variant="ghost"
