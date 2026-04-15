@@ -241,6 +241,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
             return (
               <AnimatePresence key={invoice.id}>
                 <motion.tr
+                  key={`${invoice.id}-row`}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.03 }}
@@ -331,11 +332,11 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                   </td>
                 </motion.tr>
                 {isExpanded && (
-                  <InvoiceItemsRow invoiceId={invoice.id} colSpan={7} />
+                  <InvoiceItemsRow key={`${invoice.id}-items`} invoiceId={invoice.id} colSpan={7} />
                 )}
                 {/* Ad banner every 10 rows */}
                 {i > 0 && i % 10 === 9 && (
-                  <tr key={`ad-${i}`}>
+                  <tr key={`${invoice.id}-ad-${i}`}>
                     <td colSpan={7} className="px-5 py-2">
                       <AdBanner slot="4278896371" format="horizontal" />
                     </td>

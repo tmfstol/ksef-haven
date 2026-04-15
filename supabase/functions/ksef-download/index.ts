@@ -81,7 +81,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
   throw new Error("Unreachable");
 }
 
-async function authenticate(baseUrl: string, nip: string, ksefToken: string): Promise<string> {
+async function authenticateWithTokenCandidate(baseUrl: string, nip: string, ksefToken: string): Promise<string> {
   // Challenge
   const challengeRes = await fetchWithRetry(`${baseUrl}/api/v2/auth/challenge`, {
     method: "POST",
@@ -165,6 +165,38 @@ async function authenticate(baseUrl: string, nip: string, ksefToken: string): Pr
   const redeemData = JSON.parse(redeemText);
   const at = redeemData.accessToken;
   return typeof at === "object" && at?.token ? at.token : at;
+}
+
+async function authenticate(baseUrl: string, nip: string, ksefToken: string): Promise<string> {
+  const fullToken = ksefToken.trim();
+  const parts = fullToken.split("|");
+  const tokenCandidates = parts.length === 3 ? [parts[0], parts[2], fullToken] : [fullToken];
+
+  let lastError: Error | null = null;
+
+  for (let i = 0; i < tokenCandidates.length; i++) {
+    try {
+      return await authenticateWithTokenCandidate(baseUrl, nip, tokenCandidates[i]);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (i < tokenCandidates.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+  }
+
+  throw lastError || new Error("Nie udało się uwierzytelnić w KSeF.");
+}
+
+function getPublicErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  const retryMatch = message.match(/Spróbuj ponownie po (\d+) sekundach/i);
+
+  if (retryMatch) {
+    return `KSeF chwilowo ogranicza liczbę żądań. Spróbuj ponownie za ${retryMatch[1]} s.`;
+  }
+
+  return message || "Blad pobierania faktury. Sprobuj ponownie.";
 }
 
 Deno.serve(async (req) => {
@@ -331,8 +363,11 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("[ksef-download] Error:", error);
     return new Response(
-      JSON.stringify({ error: "Blad pobierania faktury. Sprobuj ponownie." }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: getPublicErrorMessage(error) }),
+      {
+        status: error instanceof Error && /Spróbuj ponownie po \d+ sekundach/i.test(error.message) ? 429 : 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   }
 });
