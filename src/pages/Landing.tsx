@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   FileText, Shield, RefreshCw, Download, BarChart3, Mail,
@@ -80,6 +82,30 @@ const blogPosts = [
 ];
 
 const Landing = () => {
+  const { data: dbPosts } = useQuery({
+    queryKey: ["landing-blog-posts"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("blog_posts")
+        .select("*")
+        .eq("published", true)
+        .order("published_at", { ascending: false })
+        .limit(3);
+      return data || [];
+    },
+  });
+
+  const displayPosts = dbPosts && dbPosts.length > 0
+    ? dbPosts.map(p => ({
+        title: p.title,
+        excerpt: p.excerpt,
+        category: p.category,
+        gradient: p.cover_gradient,
+        date: p.published_at ? new Date(p.published_at).toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric" }) : "",
+        slug: p.slug,
+      }))
+    : blogPosts.map(p => ({ ...p, slug: "" }));
+
   return (
     <div className="min-h-screen bg-foreground overflow-hidden">
       {/* Navbar */}
@@ -308,44 +334,44 @@ const Landing = () => {
               Bądź na bieżąco z przepisami, nowościami KSeF i praktycznymi wskazówkami.
             </p>
           </div>
-          <Button variant="ghost" className="hidden md:inline-flex text-background/50 hover:text-background hover:bg-background/10 gap-1.5">
-            Wszystkie wpisy
-            <ArrowRight className="h-4 w-4" />
-          </Button>
+          <Link to="/blog">
+            <Button variant="ghost" className="hidden md:inline-flex text-background/50 hover:text-background hover:bg-background/10 gap-1.5">
+              Wszystkie wpisy
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-6">
-          {blogPosts.map((post, i) => (
-            <motion.article
-              key={post.title}
-              custom={i}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              className="group rounded-2xl border border-background/5 bg-background/[0.03] backdrop-blur-sm overflow-hidden hover:border-primary/20 transition-all duration-500 hover:bg-background/[0.06] cursor-pointer"
-            >
-              {/* Decorative top bar */}
-              <div className={`h-1 bg-gradient-to-r ${post.gradient}`} />
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full">{post.category}</span>
-                  <span className="text-xs text-background/30 flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {post.date}
-                  </span>
+          {displayPosts.map((post, i) => {
+            const content = (
+              <article className="group rounded-2xl border border-background/5 bg-background/[0.03] backdrop-blur-sm overflow-hidden hover:border-primary/20 transition-all duration-500 hover:bg-background/[0.06] cursor-pointer">
+                <div className={`h-1 bg-gradient-to-r ${post.gradient}`} />
+                <div className="p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full">{post.category}</span>
+                    <span className="text-xs text-background/30 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {post.date}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-background mb-2 group-hover:text-primary transition-colors leading-snug">
+                    {post.title}
+                  </h3>
+                  <p className="text-sm text-background/40 leading-relaxed">{post.excerpt}</p>
+                  <div className="mt-4 flex items-center gap-1.5 text-sm text-primary/70 group-hover:text-primary transition-colors">
+                    Czytaj więcej
+                    <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+                  </div>
                 </div>
-                <h3 className="font-semibold text-background mb-2 group-hover:text-primary transition-colors leading-snug">
-                  {post.title}
-                </h3>
-                <p className="text-sm text-background/40 leading-relaxed">{post.excerpt}</p>
-                <div className="mt-4 flex items-center gap-1.5 text-sm text-primary/70 group-hover:text-primary transition-colors">
-                  Czytaj więcej
-                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </div>
-            </motion.article>
-          ))}
+              </article>
+            );
+            return (
+              <motion.div key={post.title} custom={i} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}>
+                {post.slug ? <Link to={`/blog/${post.slug}`}>{content}</Link> : content}
+              </motion.div>
+            );
+          })}
         </div>
       </section>
 
