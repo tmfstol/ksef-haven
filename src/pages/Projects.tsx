@@ -29,6 +29,7 @@ const PROJECT_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "
 
 const Projects = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const { data: projects, isLoading } = useProjects(activeCompanyId);
