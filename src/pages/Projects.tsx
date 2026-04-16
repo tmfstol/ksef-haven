@@ -220,7 +220,8 @@ const Projects = () => {
           </div>
         )}
       </main>
-      <AiAssistantChat />
+      {!isMobile && <AiAssistantChat />}
+      <MobileBottomNav />
     </div>
   );
 };
