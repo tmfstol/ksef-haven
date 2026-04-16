@@ -179,13 +179,33 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
       // 2. Generate PDF as base64
       const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number || "");
       const pdfBase64 = await generateInvoicePdfBase64(parsed, xmlData.xml);
+      const pdfFilename = `${invoice.ksef_number || invoice.vendor}.pdf`;
 
-      // 3. Send to Make with PDF
+      // 3. Store PDF in storage for agent access
+      try {
+        const cleanedBase64 = pdfBase64
+          .replace(/^data:application\/pdf;base64,/i, "")
+          .replace(/\s+/g, "");
+        const binary = atob(cleanedBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const pdfBlob = new Blob([bytes], { type: "application/pdf" });
+        const storagePath = `${invoice.company_id}/${invoice.id}/${pdfFilename}`;
+        await supabase.storage.from("invoice-uploads").upload(storagePath, pdfBlob, {
+          upsert: true,
+          contentType: "application/pdf",
+        });
+        await supabase.from("invoices").update({ pdf_path: storagePath }).eq("id", invoice.id);
+      } catch (storageErr) {
+        console.warn("Failed to store PDF in storage:", storageErr);
+      }
+
+      // 4. Send to Make with PDF
       const { data, error } = await supabase.functions.invoke("send-invoice-make", {
         body: {
           invoiceId: invoice.id,
           pdfBase64,
-          pdfFilename: `${invoice.ksef_number || invoice.vendor}.pdf`,
+          pdfFilename,
         },
       });
       if (error) throw error;
