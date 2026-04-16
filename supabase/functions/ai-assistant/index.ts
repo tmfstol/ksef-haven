@@ -358,36 +358,34 @@ async function executeTool(
         if (invErr) return `Błąd: ${invErr.message}`;
         if (!invData) return "Nie znaleziono faktury.";
 
-        // Get company with Make webhook URL
+        // Get company info
         const { data: comp } = await supabase
           .from("companies")
-          .select("name, make_webhook_url, client_portal_email")
+          .select("name, client_portal_email")
           .eq("id", invData.company_id)
           .single();
-        if (!comp?.make_webhook_url) {
-          return `Firma "${comp?.name || ""}" nie ma skonfigurowanego webhooka Make. Skonfiguruj go w ustawieniach firmy.`;
-        }
 
-        // Send to Make webhook
-        const webhookResp = await fetch(comp.make_webhook_url, {
+        // Generate a minimal PDF placeholder as base64 — the send-invoice-make function
+        // will handle the full webhook delivery with PDF attachment
+        // We need to call the send-invoice-make edge function which handles PDF + FormData
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const sendMakeResp = await fetch(`${supabaseUrl}/functions/v1/send-invoice-make`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            Authorization: userAuthHeader,
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
-            invoice_id: invData.id,
-            vendor: invData.vendor,
-            nip: invData.nip,
-            gross_amount: invData.gross_amount,
-            date: invData.date,
-            ksef_number: invData.ksef_number || null,
-            bookkeeper_note: invData.bookkeeper_note || null,
-            company_name: comp.name,
-            client_portal_email: comp.client_portal_email || null,
+            invoiceId: invData.id,
+            pdfBase64: "AGENT_NO_PDF",
+            pdfFilename: `faktura-${invData.vendor.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
           }),
         });
-        if (!webhookResp.ok) {
-          return `Błąd wysyłki na webhook Make (status ${webhookResp.status}). Sprawdź konfigurację webhooka.`;
+        const sendResult = await sendMakeResp.json();
+        if (!sendMakeResp.ok || sendResult.error) {
+          return `Błąd wysyłki: ${sendResult.error || `status ${sendMakeResp.status}`}. Spróbuj wysłać ręcznie z poziomu listy faktur.`;
         }
-        return `Faktura od "${invData.vendor}" na kwotę ${invData.gross_amount} PLN została wysłana przez automatyzację Make${comp.client_portal_email ? ` (portal: ${comp.client_portal_email})` : ""}.`;
+        return `Faktura od "${invData.vendor}" na kwotę ${invData.gross_amount} PLN została wysłana przez automatyzację Make${comp?.client_portal_email ? ` (portal: ${comp.client_portal_email})` : ""}.`;
       }
 
       case "add_bookkeeper_note": {
