@@ -483,7 +483,7 @@ serve(async (req) => {
           model: "google/gemini-3-flash-preview",
           messages: currentMessages,
           tools: TOOLS,
-          stream: round === MAX_TOOL_ROUNDS - 1 ? true : false, // Stream only on last round or final answer
+          stream: false,
         }),
       });
 
