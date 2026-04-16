@@ -127,12 +127,12 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
     if (editingCompany) {
       updateMutation.mutate(
         { ...data, id: editingCompany.id },
-        { onSuccess: () => isOnboarding && navigate("/dashboard") }
+        { onSuccess: () => isOnboarding && navigate("/command-center") }
       );
     } else {
       addMutation.mutate(data, {
         onSuccess: () => {
-          if (isOnboarding) navigate("/dashboard");
+          if (isOnboarding) navigate("/command-center");
           else handleNewCompany();
         },
       });
