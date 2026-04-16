@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Bot, Send, X, Loader2, Trash2 } from "lucide-react";
+import { Bot, Send, X, Loader2, Trash2, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 
@@ -68,19 +68,43 @@ async function streamChat({
 }
 
 const SUGGESTIONS = [
-  "Jakie są terminy składania JPK-V7M?",
-  "Jak kategoryzować wydatki firmowe?",
-  "Co mogę odliczyć od podatku jako JDG?",
-  "Wyjaśnij różnicę między PIT-36 a PIT-36L",
+  "Czy wpadły jakieś nowe faktury?",
+  "Pokaż podsumowanie firmy",
+  "Jakie mam projekty?",
+  "Dodaj wydatek 150 PLN za paliwo",
 ];
+
+// Voice synthesis helper
+function speakText(text: string, onEnd?: () => void) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  // Strip markdown for speech
+  const clean = text
+    .replace(/#{1,6}\s/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/\*/g, "")
+    .replace(/`[^`]*`/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[-•]\s/g, "")
+    .replace(/\n+/g, ". ");
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.lang = "pl-PL";
+  utterance.rate = 1.1;
+  if (onEnd) utterance.onend = onEnd;
+  window.speechSynthesis.speak(utterance);
+}
 
 export function AiAssistantChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -89,6 +113,14 @@ export function AiAssistantChat() {
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+
+  // Cleanup speech on unmount
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis?.cancel();
+      recognitionRef.current?.abort();
+    };
+  }, []);
 
   const send = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -113,13 +145,75 @@ export function AiAssistantChat() {
     await streamChat({
       messages: allMsgs,
       onDelta: upsert,
-      onDone: () => setIsLoading(false),
+      onDone: () => {
+        setIsLoading(false);
+        if (voiceEnabled && assistantSoFar) {
+          setIsSpeaking(true);
+          speakText(assistantSoFar, () => setIsSpeaking(false));
+        }
+      },
       onError: (err) => {
         upsert(`⚠️ ${err}`);
         setIsLoading(false);
       },
     });
-  }, [messages, isLoading]);
+  }, [messages, isLoading, voiceEnabled]);
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setInput("Twoja przeglądarka nie obsługuje rozpoznawania mowy.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "pl-PL";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognitionRef.current = recognition;
+
+    let finalTranscript = "";
+
+    recognition.onresult = (event: any) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setInput(finalTranscript + interim);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      if (finalTranscript.trim()) {
+        send(finalTranscript.trim());
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+    setIsListening(true);
+    // Stop any ongoing speech
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
+  }, [isListening, send]);
+
+  const stopSpeaking = () => {
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
+  };
 
   if (!open) {
     return (
@@ -138,21 +232,34 @@ export function AiAssistantChat() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Bot className="h-4 w-4 text-primary" />
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSpeaking ? "bg-green-500/20 animate-pulse" : isListening ? "bg-red-500/20 animate-pulse" : "bg-primary/10"}`}>
+            <Bot className={`h-4 w-4 ${isSpeaking ? "text-green-500" : isListening ? "text-red-500" : "text-primary"}`} />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">Asystent Księgowy</p>
-            <p className="text-xs text-muted-foreground">AI · Facturo</p>
+            <p className="text-sm font-semibold text-foreground">
+              Asystent Facturo
+              {isListening && <span className="text-red-500 ml-1 text-xs">● Słucham...</span>}
+              {isSpeaking && <span className="text-green-500 ml-1 text-xs">● Mówię...</span>}
+            </p>
+            <p className="text-xs text-muted-foreground">Agent AI · głosowy</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => { setVoiceEnabled(!voiceEnabled); if (isSpeaking) stopSpeaking(); }}
+            title={voiceEnabled ? "Wycisz odpowiedzi" : "Włącz odpowiedzi głosowe"}
+          >
+            {voiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+          </Button>
           {messages.length > 0 && (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMessages([])}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setMessages([]); stopSpeaking(); }}>
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setOpen(false); stopSpeaking(); }}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -165,8 +272,9 @@ export function AiAssistantChat() {
             <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
               <Bot className="h-6 w-6 text-primary" />
             </div>
-            <p className="text-sm font-medium text-foreground mb-1">Cześć! Jestem Twoim asystentem księgowym.</p>
-            <p className="text-xs text-muted-foreground mb-4">Zadaj pytanie o podatki, faktury lub księgowość.</p>
+            <p className="text-sm font-medium text-foreground mb-1">Cześć! Jestem Twoim agentem AI.</p>
+            <p className="text-xs text-muted-foreground mb-1">Zarządzam fakturami, wydatkami i projektami.</p>
+            <p className="text-xs text-muted-foreground mb-4">Kliknij 🎤 aby mówić lub wpisz pytanie.</p>
             <div className="space-y-2 w-full">
               {SUGGESTIONS.map((s) => (
                 <button
@@ -214,6 +322,15 @@ export function AiAssistantChat() {
       {/* Input */}
       <div className="border-t border-border p-3">
         <div className="flex items-end gap-2">
+          <Button
+            size="icon"
+            variant={isListening ? "destructive" : "outline"}
+            className={`h-9 w-9 shrink-0 rounded-xl ${isListening ? "animate-pulse" : ""}`}
+            onClick={toggleListening}
+            title={isListening ? "Zatrzymaj nagrywanie" : "Mów do asystenta"}
+          >
+            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          </Button>
           <textarea
             ref={inputRef}
             value={input}
@@ -224,7 +341,7 @@ export function AiAssistantChat() {
                 send(input);
               }
             }}
-            placeholder="Zadaj pytanie..."
+            placeholder="Zadaj pytanie lub kliknij 🎤..."
             rows={1}
             className="flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
           />
