@@ -1,16 +1,27 @@
-import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen } from "lucide-react";
+import { useState } from "react";
+import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen, CalendarIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { pl } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import type { Company } from "@/types/company";
 import { useAuth } from "@/hooks/useAuth";
+
+interface SyncParams {
+  dateFrom?: string;
+  dateTo?: string;
+}
 
 interface DashboardHeaderProps {
   isConnected: boolean;
   isSyncing: boolean;
   searchQuery: string;
   onSearchChange: (q: string) => void;
-  onSync: () => void;
-  onSyncAll?: () => void;
+  onSync: (params?: SyncParams) => void;
+  onSyncAll?: (params?: SyncParams) => void;
   isSyncingAll?: boolean;
   activeCompany?: Company | null;
 }
@@ -27,6 +38,20 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const [syncDateFrom, setSyncDateFrom] = useState<Date | undefined>(undefined);
+  const [syncDateTo, setSyncDateTo] = useState<Date | undefined>(undefined);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const buildParams = (): SyncParams | undefined => {
+    const params: SyncParams = {};
+    if (syncDateFrom) params.dateFrom = syncDateFrom.toISOString().split("T")[0];
+    if (syncDateTo) params.dateTo = syncDateTo.toISOString().split("T")[0];
+    return Object.keys(params).length > 0 ? params : undefined;
+  };
+
+  const handleSync = () => onSync(buildParams());
+  const handleSyncAll = () => onSyncAll?.(buildParams());
+
   return (
     <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
       {/* Status połączenia */}
