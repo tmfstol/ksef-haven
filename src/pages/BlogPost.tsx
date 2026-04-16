@@ -45,14 +45,8 @@ const BlogPost = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border backdrop-blur-2xl bg-background/80 sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center">
-          <Link to="/blog" className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Wróć do bloga</span>
-          </Link>
-        </div>
-      </header>
+      <PublicNav variant="light" />
+      <div className="h-16" />
 
       {/* Cover image */}
       {(post as any).cover_image_url && (

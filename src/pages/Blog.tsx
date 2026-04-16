@@ -81,21 +81,19 @@ const Blog = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border backdrop-blur-2xl bg-background/80 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Strona główna</span>
-          </Link>
-          {isAdmin && (
-            <Button onClick={generatePost} disabled={generating} size="sm" className="gap-2">
-              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              {generating ? "Generuję..." : "Generuj artykuł"}
-            </Button>
-          )}
+      <PublicNav variant="light" />
+      {/* Spacer for fixed nav */}
+      <div className="h-16" />
+
+      {/* Admin generate button */}
+      {isAdmin && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 flex justify-end">
+          <Button onClick={generatePost} disabled={generating} size="sm" className="gap-2">
+            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {generating ? "Generuję..." : "Generuj artykuł"}
+          </Button>
         </div>
-      </header>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
         <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>

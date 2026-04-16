@@ -108,35 +108,7 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-foreground overflow-hidden">
-      {/* Navbar */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-muted-foreground/10 backdrop-blur-2xl bg-foreground/80">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-fuchsia-500 flex items-center justify-center">
-              <FileText className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-semibold text-background tracking-tight">KSeF Archiwum</span>
-          </div>
-          <nav className="hidden md:flex items-center gap-8 text-sm text-background/50">
-            <a href="#modules" className="hover:text-background transition-colors">Moduły</a>
-            <a href="#features" className="hover:text-background transition-colors">Funkcje</a>
-            <a href="#blog" className="hover:text-background transition-colors">Blog</a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <Link to="/login">
-              <Button variant="ghost" size="sm" className="text-sm text-background/70 hover:text-background hover:bg-muted-foreground/10">
-                Zaloguj się
-              </Button>
-            </Link>
-            <Link to="/login">
-              <Button size="sm" className="text-sm gap-1.5 bg-gradient-to-r from-primary to-fuchsia-500 border-0 shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-shadow">
-                Rozpocznij
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <PublicNav variant="dark" />
 
       {/* Hero */}
       <section className="relative pt-32 pb-24 px-6">
