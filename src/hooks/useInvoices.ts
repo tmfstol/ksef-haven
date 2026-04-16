@@ -26,6 +26,7 @@ export function useInvoices(companyId?: string | null) {
         nip: row.nip,
         gross_amount: Number(row.gross_amount),
         status: row.status,
+        invoice_type: row.invoice_type || "kosztowa",
         xml_path: row.xml_path,
         pdf_path: row.pdf_path,
         ksef_number: row.ksef_number,

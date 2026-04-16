@@ -1,3 +1,5 @@
+export type InvoiceType = "kosztowa" | "przychodowa";
+
 export interface Invoice {
   id: string;
   company_id: string;
@@ -6,6 +8,7 @@ export interface Invoice {
   nip: string;
   gross_amount: number;
   status: "new" | "processed" | "error";
+  invoice_type: InvoiceType;
   xml_path?: string | null;
   pdf_path?: string | null;
   ksef_number?: string | null;
