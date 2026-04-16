@@ -13,7 +13,7 @@ Masz dostęp do narzędzi pozwalających na:
 - Sprawdzanie nowych faktur
 - Przypisywanie faktur do projektów
 - Przeglądanie i zarządzanie wydatkami
-- Zarządzanie projektami
+- Zarządzanie projektami (tworzenie nowych projektów, lista, przypisywanie faktur)
 - Zmianę statusów faktur
 - Dodawanie notatek księgowych do faktur (aby księgowa wiedziała do czego przypisać)
 - Wysyłanie faktur na portal klienta
@@ -49,6 +49,24 @@ const TOOLS = [
         properties: {
           company_name: { type: "string", description: "Nazwa firmy (opcjonalna)" },
         },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_project",
+      description: "Tworzy nowy projekt / folder inwestycji dla firmy. Użyj gdy użytkownik prosi o utworzenie projektu.",
+      parameters: {
+        type: "object",
+        properties: {
+          company_name: { type: "string", description: "Nazwa firmy (opcjonalna, domyślnie pierwsza firma użytkownika)" },
+          name: { type: "string", description: "Nazwa projektu" },
+          description: { type: "string", description: "Opis projektu (opcjonalny)" },
+          budget: { type: "number", description: "Budżet w PLN (opcjonalny)" },
+          color: { type: "string", description: "Kolor HEX np. #3b82f6 (opcjonalny)" },
+        },
+        required: ["name"],
       },
     },
   },
@@ -255,6 +273,26 @@ async function executeTool(
           faktury: `${invoicesByProject[p.id] || 0} PLN`,
           opis: p.description || "",
         })));
+      }
+
+      case "create_project": {
+        const ids = findCompanyIds(args.company_name as string);
+        const targetCompanyId = ids[0];
+        if (!targetCompanyId) return "Brak firmy, do której można przypisać projekt.";
+        if (!args.name) return "Wymagana nazwa projektu.";
+        const { data, error } = await supabase
+          .from("projects")
+          .insert({
+            company_id: targetCompanyId,
+            name: args.name as string,
+            description: (args.description as string) || null,
+            budget: args.budget ? Number(args.budget) : null,
+            color: (args.color as string) || "#3b82f6",
+          })
+          .select("id, name")
+          .single();
+        if (error) return `Błąd przy tworzeniu projektu: ${error.message}`;
+        return `Utworzono projekt "${data.name}" (ID: ${data.id}).`;
       }
 
       case "assign_invoice_to_project": {
