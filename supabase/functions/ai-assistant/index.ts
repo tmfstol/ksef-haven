@@ -385,6 +385,25 @@ async function executeTool(
         return `Faktura od "${invData.vendor}" na kwotę ${invData.gross_amount} PLN została wysłana na portal klienta (${comp.client_portal_email}).`;
       }
 
+      case "add_bookkeeper_note": {
+        let noteQuery = supabase
+          .from("invoices")
+          .select("id, vendor, bookkeeper_note")
+          .in("company_id", companyIds);
+        if (args.invoice_id) noteQuery = noteQuery.eq("id", args.invoice_id);
+        if (args.vendor_name) noteQuery = noteQuery.ilike("vendor", `%${args.vendor_name}%`);
+        const { data: noteInv, error: noteErr } = await noteQuery.order("date", { ascending: false }).limit(1).maybeSingle();
+        if (noteErr) return `Błąd: ${noteErr.message}`;
+        if (!noteInv) return "Nie znaleziono faktury.";
+        const { error: updateErr } = await supabase
+          .from("invoices")
+          .update({ bookkeeper_note: args.note as string })
+          .eq("id", noteInv.id)
+          .in("company_id", companyIds);
+        if (updateErr) return `Błąd: ${updateErr.message}`;
+        return `Notatka księgowa została dodana do faktury od "${noteInv.vendor}": "${args.note}"`;
+      }
+
       default:
         return `Nieznane narzędzie: ${toolName}`;
     }
