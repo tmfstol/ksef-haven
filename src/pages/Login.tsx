@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, Lock, Mail, FileText, ArrowLeft } from "lucide-react";
+import { Loader2, Lock, Mail, FileText, ArrowLeft, Shield, Zap, Brain } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Login = () => {
@@ -43,14 +43,16 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-foreground flex">
       {/* Left panel — branding */}
       <div className="hidden lg:flex flex-1 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-violet-600" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(255,255,255,0.1),transparent)]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary via-fuchsia-500 to-cyan-500" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(255,255,255,0.15),transparent)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:48px_48px]" />
+
         <div className="relative flex flex-col justify-between p-12 text-primary-foreground w-full">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary-foreground/20 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-primary-foreground/20 backdrop-blur-sm flex items-center justify-center">
               <FileText className="h-4 w-4" />
             </div>
             <span className="text-lg font-semibold tracking-tight">KSeF Archiwum</span>
@@ -58,15 +60,30 @@ const Login = () => {
 
           <div>
             <h2 className="text-4xl font-bold leading-tight tracking-tight mb-4">
-              Twoja księgowość.<br />Inteligentna.
+              Twoja księgowość.<br />
+              <span className="text-primary-foreground/80">Inteligentna.</span>
             </h2>
-            <p className="text-primary-foreground/70 text-lg max-w-md leading-relaxed">
+            <p className="text-primary-foreground/60 text-lg max-w-md leading-relaxed mb-8">
               Synchronizuj faktury z KSeF, zarządzaj kosztami i przychodami,
               generuj deklaracje — z jednego panelu.
             </p>
+            <div className="flex flex-col gap-3">
+              {[
+                { icon: Shield, text: "Szyfrowanie end-to-end i pełna izolacja danych" },
+                { icon: Brain, text: "Asystent AI do rozpoznawania dokumentów" },
+                { icon: Zap, text: "Automatyczna synchronizacja z KSeF" },
+              ].map(({ icon: Icon, text }) => (
+                <div key={text} className="flex items-center gap-3 text-sm text-primary-foreground/60">
+                  <div className="w-8 h-8 rounded-lg bg-primary-foreground/10 flex items-center justify-center shrink-0">
+                    <Icon className="h-4 w-4 text-primary-foreground/80" />
+                  </div>
+                  {text}
+                </div>
+              ))}
+            </div>
           </div>
 
-          <p className="text-sm text-primary-foreground/50">
+          <p className="text-sm text-primary-foreground/30">
             © {new Date().getFullYear()} KSeF Archiwum
           </p>
         </div>
@@ -83,18 +100,18 @@ const Login = () => {
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-10">
             <Link to="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-fuchsia-500 flex items-center justify-center">
                 <FileText className="h-4 w-4 text-primary-foreground" />
               </div>
-              <span className="text-lg font-semibold text-foreground tracking-tight">KSeF Archiwum</span>
+              <span className="text-lg font-semibold text-background tracking-tight">KSeF Archiwum</span>
             </Link>
           </div>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">
+            <h1 className="text-2xl font-bold text-background tracking-tight">
               {isReset ? "Resetowanie hasła" : isSignUp ? "Utwórz konto" : "Zaloguj się"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1.5">
+            <p className="text-sm text-background/40 mt-1.5">
               {isReset
                 ? "Podaj email, wyślemy link do resetowania."
                 : isSignUp
@@ -105,9 +122,9 @@ const Login = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-xs font-medium">Email</Label>
+              <Label htmlFor="email" className="text-xs font-medium text-background/60">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-background/30" />
                 <Input
                   id="email"
                   type="email"
@@ -115,16 +132,16 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="pl-10 h-11"
+                  className="pl-10 h-11 bg-background/5 border-background/10 text-background placeholder:text-background/20 focus:border-primary/50 focus:ring-primary/20"
                 />
               </div>
             </div>
 
             {!isReset && (
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-xs font-medium">Hasło</Label>
+                <Label htmlFor="password" className="text-xs font-medium text-background/60">Hasło</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-background/30" />
                   <Input
                     id="password"
                     type="password"
@@ -133,13 +150,13 @@ const Login = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
-                    className="pl-10 h-11"
+                    className="pl-10 h-11 bg-background/5 border-background/10 text-background placeholder:text-background/20 focus:border-primary/50 focus:ring-primary/20"
                   />
                 </div>
               </div>
             )}
 
-            <Button type="submit" className="w-full h-11 shadow-lg shadow-primary/20" disabled={loading}>
+            <Button type="submit" className="w-full h-11 bg-gradient-to-r from-primary to-fuchsia-500 border-0 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isReset ? "Wyślij link" : isSignUp ? "Zarejestruj się" : "Zaloguj się"}
             </Button>
@@ -150,7 +167,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setIsReset(true)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="text-xs text-background/30 hover:text-background/60 transition-colors"
               >
                 Zapomniałeś hasła?
               </button>
@@ -168,7 +185,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setIsReset(false)}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-background/30 hover:text-background/60 transition-colors"
               >
                 <ArrowLeft className="h-3 w-3" />
                 Wróć do logowania
