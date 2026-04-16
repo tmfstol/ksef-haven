@@ -122,7 +122,7 @@ const TOOLS = [
           description: { type: "string", description: "Opis wydatku" },
           date: { type: "string", description: "Data wydatku (YYYY-MM-DD)" },
         },
-        required: ["amount"],
+    required: ["amount"],
       },
     },
   },
@@ -135,6 +135,20 @@ const TOOLS = [
         type: "object",
         properties: {
           company_name: { type: "string", description: "Nazwa firmy (opcjonalna, bez niej podsumowanie wszystkich)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_invoice_to_portal",
+      description: "Wysyła fakturę na portal klienta (email). Wymaga ID faktury.",
+      parameters: {
+        type: "object",
+        properties: {
+          invoice_id: { type: "string", description: "ID faktury do wysłania" },
+          vendor_name: { type: "string", description: "Nazwa dostawcy (do wyszukania faktury)" },
         },
       },
     },
