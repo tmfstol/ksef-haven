@@ -501,6 +501,34 @@ async function executeTool(
         return `Oznaczono ${matches.length} faktur jako ${verb}:\n${list}`;
       }
 
+      case "get_invoice_pdf_link": {
+        let q = supabase
+          .from("invoices")
+          .select("id, vendor, ksef_number, pdf_path, gross_amount, date")
+          .in("company_id", companyIds);
+        if (args.invoice_id) q = q.eq("id", args.invoice_id as string);
+        if (args.ksef_number) q = q.eq("ksef_number", args.ksef_number as string);
+        if (args.vendor_name) q = q.ilike("vendor", `%${args.vendor_name}%`);
+        const { data: pdfMatches, error: pdfErr } = await q.order("date", { ascending: false }).limit(5);
+        if (pdfErr) return `Błąd: ${pdfErr.message}`;
+        if (!pdfMatches?.length) return "Nie znaleziono faktury.";
+
+        const results: string[] = [];
+        for (const inv of pdfMatches) {
+          if (inv.pdf_path) {
+            const { data: signed, error: signErr } = await supabase.storage
+              .from("invoice-uploads")
+              .createSignedUrl(inv.pdf_path as string, 600);
+            if (!signErr && signed?.signedUrl) {
+              results.push(`📄 **${inv.vendor}** (${inv.gross_amount} PLN, ${inv.date}) — [Pobierz PDF](${signed.signedUrl})`);
+              continue;
+            }
+          }
+          results.push(`📄 **${inv.vendor}** (${inv.gross_amount} PLN, ${inv.date}) — PDF nie został jeszcze wygenerowany. Wejdź w Faktury i kliknij "Pobierz PDF" przy tej fakturze, aby go utworzyć.`);
+        }
+        return results.join("\n\n");
+      }
+
       default:
         return `Nieznane narzędzie: ${toolName}`;
     }
