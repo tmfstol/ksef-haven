@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   FileText, Shield, RefreshCw, Download, BarChart3, Mail,
@@ -308,10 +310,12 @@ const Landing = () => {
               Bądź na bieżąco z przepisami, nowościami KSeF i praktycznymi wskazówkami.
             </p>
           </div>
-          <Button variant="ghost" className="hidden md:inline-flex text-background/50 hover:text-background hover:bg-background/10 gap-1.5">
-            Wszystkie wpisy
-            <ArrowRight className="h-4 w-4" />
-          </Button>
+          <Link to="/blog">
+            <Button variant="ghost" className="hidden md:inline-flex text-background/50 hover:text-background hover:bg-background/10 gap-1.5">
+              Wszystkie wpisy
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-6">
