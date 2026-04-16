@@ -312,10 +312,11 @@ async function redeemToken(baseUrl: string, authToken: string) {
 }
 
 // Step 7: Query invoices using accessToken
-async function queryInvoices(baseUrl: string, accessToken: string, nip: string, subjectType: string = "subject2") {
+async function queryInvoices(baseUrl: string, accessToken: string, nip: string, subjectType: string = "subject2", dateFrom?: string, dateTo?: string) {
   const now = new Date();
-  const threeMonthsAgo = new Date(now);
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  const fromDate = dateFrom ? new Date(dateFrom) : new Date(now);
+  if (!dateFrom) fromDate.setMonth(fromDate.getMonth() - 3);
+  const toDate = dateTo ? new Date(dateTo) : now;
 
   const allInvoices: any[] = [];
   let pageNum = 0;
@@ -326,7 +327,8 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string, 
       dateRange: {
         dateType: "issue",
         from: threeMonthsAgo.toISOString(),
-        to: now.toISOString(),
+        from: fromDate.toISOString(),
+        to: toDate.toISOString(),
       },
     };
 
@@ -470,7 +472,9 @@ function parseInvoiceXml(xml: string) {
 async function syncCompany(
   supabase: ReturnType<typeof createClient>,
   company: { id: string; nip: string; ksef_token: string },
-  ksefEnv: string
+  ksefEnv: string,
+  dateFrom?: string,
+  dateTo?: string
 ) {
   const baseUrl = KSEF_URLS[ksefEnv] || KSEF_URLS.prod;
 
@@ -527,8 +531,8 @@ async function syncCompany(
 
       // Step 7: Query invoices — both subject1 (przychodowe) and subject2 (kosztowe)
       const [queryResult2, queryResult1] = await Promise.all([
-        queryInvoices(baseUrl, accessToken, company.nip, "subject2"),
-        queryInvoices(baseUrl, accessToken, company.nip, "subject1"),
+        queryInvoices(baseUrl, accessToken, company.nip, "subject2", dateFrom, dateTo),
+        queryInvoices(baseUrl, accessToken, company.nip, "subject1", dateFrom, dateTo),
       ]);
 
       // Tag each invoice ref with its type
@@ -706,6 +710,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const companyId = body.company_id || null;
     const ksefEnv = body.ksef_env || "prod";
+    const dateFrom = body.date_from || null;
+    const dateTo = body.date_to || null;
 
     const [{ data: ownedCompanies, error: ownedCompaniesError }, { data: companyRoles, error: companyRolesError }] = await Promise.all([
       supabase.from("companies").select("id").eq("user_id", userId),
@@ -764,7 +770,7 @@ Deno.serve(async (req) => {
 
     for (const company of validCompanies) {
       try {
-        const result = await syncCompany(supabase, company, ksefEnv);
+        const result = await syncCompany(supabase, company, ksefEnv, dateFrom, dateTo);
         results.push(result);
       } catch (err) {
         console.error(`[ksef-sync] Error syncing ${company.nip}:`, err);

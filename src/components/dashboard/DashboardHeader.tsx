@@ -1,16 +1,27 @@
-import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen } from "lucide-react";
+import { useState } from "react";
+import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen, CalendarIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { pl } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import type { Company } from "@/types/company";
 import { useAuth } from "@/hooks/useAuth";
+
+interface SyncParams {
+  dateFrom?: string;
+  dateTo?: string;
+}
 
 interface DashboardHeaderProps {
   isConnected: boolean;
   isSyncing: boolean;
   searchQuery: string;
   onSearchChange: (q: string) => void;
-  onSync: () => void;
-  onSyncAll?: () => void;
+  onSync: (params?: SyncParams) => void;
+  onSyncAll?: (params?: SyncParams) => void;
   isSyncingAll?: boolean;
   activeCompany?: Company | null;
 }
@@ -27,6 +38,20 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const [syncDateFrom, setSyncDateFrom] = useState<Date | undefined>(undefined);
+  const [syncDateTo, setSyncDateTo] = useState<Date | undefined>(undefined);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const buildParams = (): SyncParams | undefined => {
+    const params: SyncParams = {};
+    if (syncDateFrom) params.dateFrom = syncDateFrom.toISOString().split("T")[0];
+    if (syncDateTo) params.dateTo = syncDateTo.toISOString().split("T")[0];
+    return Object.keys(params).length > 0 ? params : undefined;
+  };
+
+  const handleSync = () => onSync(buildParams());
+  const handleSyncAll = () => onSyncAll?.(buildParams());
+
   return (
     <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
       {/* Status połączenia */}
@@ -137,7 +162,7 @@ export function DashboardHeader({
       {onSyncAll && (
         <Button
           variant="outline"
-          onClick={onSyncAll}
+          onClick={handleSyncAll}
           disabled={isSyncingAll}
           className="rounded-xl px-4 gap-2"
         >
@@ -151,8 +176,59 @@ export function DashboardHeader({
       )}
 
       {/* Synchronizacja */}
+      <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="rounded-xl"
+            title="Filtruj daty synchronizacji"
+          >
+            <CalendarIcon className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-4" align="end">
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">Zakres dat do synchronizacji</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Od</p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left text-xs rounded-lg", !syncDateFrom && "text-muted-foreground")}>
+                      {syncDateFrom ? format(syncDateFrom, "dd.MM.yyyy") : "Domyślnie"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={syncDateFrom} onSelect={setSyncDateFrom} locale={pl} className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Do</p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left text-xs rounded-lg", !syncDateTo && "text-muted-foreground")}>
+                      {syncDateTo ? format(syncDateTo, "dd.MM.yyyy") : "Dzisiaj"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={syncDateTo} onSelect={setSyncDateTo} locale={pl} className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            {(syncDateFrom || syncDateTo) && (
+              <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setSyncDateFrom(undefined); setSyncDateTo(undefined); }}>
+                Wyczyść (domyślnie 3 miesiące)
+              </Button>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+
       <Button
-        onClick={onSync}
+        onClick={handleSync}
         disabled={isSyncing}
         className="rounded-xl px-5 gap-2 shadow-sm"
       >
