@@ -16,6 +16,7 @@ import { format } from "date-fns";
 
 const Expenses = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const { data: expenses, isLoading } = useExpenses(activeCompanyId);
@@ -208,7 +209,8 @@ const Expenses = () => {
           </div>
         )}
       </main>
-      <AiAssistantChat />
+      {!isMobile && <AiAssistantChat />}
+      <MobileBottomNav />
     </div>
   );
 };
