@@ -225,7 +225,7 @@ const Index = () => {
         </main>
       </div>
 
-      {!isMobile && <AiAssistantChat />}
+      <AiAssistantChat />
       {isMobile && <MobileBottomNav />}
 
       {activeCompanyId && (
