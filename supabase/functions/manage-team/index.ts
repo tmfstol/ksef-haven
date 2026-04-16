@@ -18,7 +18,6 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify caller is authenticated
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -27,22 +26,34 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { action, companyId, email, role, userId } = await req.json();
+    const { action, email, role, userId } = await req.json();
 
-    // Verify caller is admin of this company
-    const { data: callerRole } = await adminClient
+    // Get ALL companies owned by the caller
+    const { data: callerCompanies, error: compError } = await adminClient
+      .from("companies")
+      .select("id, name")
+      .eq("user_id", user.id);
+
+    if (compError || !callerCompanies?.length) {
+      throw new Error("Nie znaleziono firm należących do Ciebie");
+    }
+
+    const companyIds = callerCompanies.map((c) => c.id);
+
+    // Verify caller is admin in at least one company
+    const { data: callerRoles } = await adminClient
       .from("user_roles")
-      .select("role")
+      .select("role, company_id")
       .eq("user_id", user.id)
-      .eq("company_id", companyId)
-      .single();
+      .in("company_id", companyIds)
+      .eq("role", "admin");
 
-    if (!callerRole || callerRole.role !== "admin") {
+    if (!callerRoles?.length) {
       throw new Error("Tylko admin może zarządzać zespołem");
     }
 
     if (action === "invite") {
-      if (!email || !role || !companyId) throw new Error("Brak wymaganych danych");
+      if (!email || !role) throw new Error("Brak wymaganych danych");
 
       // Check if user already exists
       const { data: existingUsers } = await adminClient.auth.admin.listUsers();
@@ -51,7 +62,6 @@ Deno.serve(async (req) => {
       );
 
       if (!targetUser) {
-        // Invite new user
         const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email);
         if (inviteError) throw new Error(`Nie udało się zaprosić: ${inviteError.message}`);
         targetUser = inviteData.user;
@@ -59,27 +69,29 @@ Deno.serve(async (req) => {
 
       if (!targetUser) throw new Error("Nie udało się znaleźć/utworzyć użytkownika");
 
-      // Check if role already exists
-      const { data: existingRole } = await adminClient
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", targetUser.id)
-        .eq("company_id", companyId)
-        .single();
-
-      if (existingRole) {
-        // Update existing role
-        await adminClient
+      // Assign role to ALL companies owned by admin
+      let assigned = 0;
+      for (const companyId of companyIds) {
+        const { data: existingRole } = await adminClient
           .from("user_roles")
-          .update({ role })
+          .select("id")
           .eq("user_id", targetUser.id)
-          .eq("company_id", companyId);
-      } else {
-        // Insert new role
-        const { error: roleError } = await adminClient
-          .from("user_roles")
-          .insert({ user_id: targetUser.id, company_id: companyId, role });
-        if (roleError) throw new Error(`Nie udało się przypisać roli: ${roleError.message}`);
+          .eq("company_id", companyId)
+          .single();
+
+        if (existingRole) {
+          await adminClient
+            .from("user_roles")
+            .update({ role })
+            .eq("user_id", targetUser.id)
+            .eq("company_id", companyId);
+        } else {
+          const { error: roleError } = await adminClient
+            .from("user_roles")
+            .insert({ user_id: targetUser.id, company_id: companyId, role });
+          if (roleError) console.error(`Role insert error for ${companyId}:`, roleError.message);
+        }
+        assigned++;
       }
 
       // Ensure profile exists
@@ -98,56 +110,78 @@ Deno.serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ success: true, message: `Zaproszono ${email} jako ${role}` }),
+        JSON.stringify({ success: true, message: `Zaproszono ${email} jako ${role} do ${assigned} firm` }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (action === "remove") {
-      if (!userId || !companyId) throw new Error("Brak wymaganych danych");
+      if (!userId) throw new Error("Brak wymaganych danych");
       if (userId === user.id) throw new Error("Nie możesz usunąć samego siebie");
 
+      // Remove from ALL companies owned by admin
       const { error: deleteError } = await adminClient
         .from("user_roles")
         .delete()
         .eq("user_id", userId)
-        .eq("company_id", companyId);
+        .in("company_id", companyIds);
 
       if (deleteError) throw new Error(`Nie udało się usunąć: ${deleteError.message}`);
 
       return new Response(
-        JSON.stringify({ success: true, message: "Użytkownik usunięty z firmy" }),
+        JSON.stringify({ success: true, message: "Użytkownik usunięty ze wszystkich firm" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (action === "list") {
-      if (!companyId) throw new Error("Brak ID firmy");
-
+      // Get all roles across all admin's companies
       const { data: roles, error: rolesError } = await adminClient
         .from("user_roles")
-        .select("user_id, role, created_at")
-        .eq("company_id", companyId);
+        .select("user_id, role, company_id, created_at")
+        .in("company_id", companyIds);
 
       if (rolesError) throw rolesError;
 
-      // Get profiles for these users
-      const userIds = roles?.map((r) => r.user_id) || [];
+      // Get unique user IDs (exclude admin themselves)
+      const userIds = [...new Set(roles?.map((r) => r.user_id) || [])];
       const { data: profiles } = await adminClient
         .from("profiles")
         .select("user_id, email, display_name")
         .in("user_id", userIds);
 
-      const members = roles?.map((r) => {
-        const profile = profiles?.find((p) => p.user_id === r.user_id);
-        return {
-          user_id: r.user_id,
-          role: r.role,
-          created_at: r.created_at,
-          email: profile?.email || "—",
-          display_name: profile?.display_name || "—",
-        };
-      }) || [];
+      // Group by user - show role + how many companies
+      const userMap = new Map<string, {
+        user_id: string;
+        role: string;
+        email: string;
+        display_name: string;
+        created_at: string;
+        company_count: number;
+        company_names: string[];
+      }>();
+
+      for (const r of roles || []) {
+        const existing = userMap.get(r.user_id);
+        const companyName = callerCompanies.find((c) => c.id === r.company_id)?.name || "";
+        if (existing) {
+          existing.company_count++;
+          existing.company_names.push(companyName);
+        } else {
+          const profile = profiles?.find((p) => p.user_id === r.user_id);
+          userMap.set(r.user_id, {
+            user_id: r.user_id,
+            role: r.role,
+            email: profile?.email || "—",
+            display_name: profile?.display_name || "—",
+            created_at: r.created_at,
+            company_count: 1,
+            company_names: [companyName],
+          });
+        }
+      }
+
+      const members = Array.from(userMap.values());
 
       return new Response(
         JSON.stringify({ success: true, members }),

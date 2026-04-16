@@ -445,9 +445,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
           </motion.div>
 
           {/* Zarządzanie zespołem */}
-          {editingCompany && (
-            <TeamManagement companyId={editingCompany.id} companyName={editingCompany.name} />
-          )}
+          <TeamManagement />
 
           {/* Przyciski */}
           <motion.div

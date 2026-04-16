@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, UserPlus, Trash2, Loader2, Crown, Calculator, ShoppingCart } from "lucide-react";
+import { Users, UserPlus, Trash2, Loader2, Crown, Calculator, ShoppingCart, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,11 +14,8 @@ interface TeamMember {
   email: string;
   display_name: string;
   created_at: string;
-}
-
-interface TeamManagementProps {
-  companyId: string;
-  companyName: string;
+  company_count: number;
+  company_names: string[];
 }
 
 const roleLabels: Record<string, string> = {
@@ -39,7 +36,7 @@ const roleColors: Record<string, string> = {
   handlowiec: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
 };
 
-export default function TeamManagement({ companyId, companyName }: TeamManagementProps) {
+export default function TeamManagement() {
   const { user } = useAuth();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,9 +48,8 @@ export default function TeamManagement({ companyId, companyName }: TeamManagemen
   const fetchMembers = async () => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const res = await supabase.functions.invoke("manage-team", {
-        body: { action: "list", companyId },
+        body: { action: "list" },
       });
       if (res.data?.success) {
         setMembers(res.data.members);
@@ -66,15 +62,15 @@ export default function TeamManagement({ companyId, companyName }: TeamManagemen
   };
 
   useEffect(() => {
-    if (companyId) fetchMembers();
-  }, [companyId]);
+    fetchMembers();
+  }, []);
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
     setInviting(true);
     try {
       const res = await supabase.functions.invoke("manage-team", {
-        body: { action: "invite", companyId, email: inviteEmail.trim(), role: inviteRole },
+        body: { action: "invite", email: inviteEmail.trim(), role: inviteRole },
       });
       if (res.data?.success) {
         toast.success(res.data.message);
@@ -94,7 +90,7 @@ export default function TeamManagement({ companyId, companyName }: TeamManagemen
     setRemoving(userId);
     try {
       const res = await supabase.functions.invoke("manage-team", {
-        body: { action: "remove", companyId, userId },
+        body: { action: "remove", userId },
       });
       if (res.data?.success) {
         toast.success(res.data.message);
@@ -116,18 +112,20 @@ export default function TeamManagement({ companyId, companyName }: TeamManagemen
       transition={{ delay: 0.3 }}
       className="glass-panel-elevated rounded-2xl p-6"
     >
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex items-center gap-3 mb-1">
         <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
           <Users className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Zespół — {companyName}</h2>
-          <p className="text-xs text-muted-foreground">Zapraszaj użytkowników i zarządzaj dostępem</p>
+          <h2 className="text-sm font-semibold text-foreground">Zespół</h2>
+          <p className="text-xs text-muted-foreground">
+            Zaproś osobę — automatycznie otrzyma dostęp do wszystkich Twoich firm
+          </p>
         </div>
       </div>
 
       {/* Invite form */}
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-5 mt-4">
         <Input
           type="email"
           placeholder="email@example.com"
@@ -181,7 +179,13 @@ export default function TeamManagement({ companyId, companyName }: TeamManagemen
                       <span className="text-xs text-muted-foreground ml-2">(Ty)</span>
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground">{member.email}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground">{member.email}</p>
+                    <span className="text-xs text-muted-foreground/60 flex items-center gap-1">
+                      <Building2 className="h-3 w-3" />
+                      {member.company_count} {member.company_count === 1 ? "firma" : member.company_count < 5 ? "firmy" : "firm"}
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
