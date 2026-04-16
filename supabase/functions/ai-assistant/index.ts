@@ -275,6 +275,26 @@ async function executeTool(
         })));
       }
 
+      case "create_project": {
+        const ids = findCompanyIds(args.company_name as string);
+        const targetCompanyId = ids[0];
+        if (!targetCompanyId) return "Brak firmy, do której można przypisać projekt.";
+        if (!args.name) return "Wymagana nazwa projektu.";
+        const { data, error } = await supabase
+          .from("projects")
+          .insert({
+            company_id: targetCompanyId,
+            name: args.name as string,
+            description: (args.description as string) || null,
+            budget: args.budget ? Number(args.budget) : null,
+            color: (args.color as string) || "#3b82f6",
+          })
+          .select("id, name")
+          .single();
+        if (error) return `Błąd przy tworzeniu projektu: ${error.message}`;
+        return `Utworzono projekt "${data.name}" (ID: ${data.id}).`;
+      }
+
       case "assign_invoice_to_project": {
         const { error } = await supabase
           .from("invoices")
