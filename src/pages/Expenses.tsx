@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useExpenses, useExpenseCategories, useDeleteExpense, type Expense } from "@/hooks/useExpenses";
 import { AddExpenseForm } from "@/components/expenses/AddExpenseForm";
-import { AiAssistantChat } from "@/components/dashboard/AiAssistantChat";
+
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -209,7 +209,7 @@ const Expenses = () => {
           </div>
         )}
       </main>
-      {!isMobile && <AiAssistantChat />}
+      
       <MobileBottomNav />
     </div>
   );

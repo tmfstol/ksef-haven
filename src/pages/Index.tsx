@@ -12,7 +12,7 @@ import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { InvoiceCard } from "@/components/dashboard/InvoiceCard";
 import { UploadInvoiceModal } from "@/components/dashboard/UploadInvoiceModal";
 import { Loader2, Upload } from "lucide-react";
-import { AiAssistantChat } from "@/components/dashboard/AiAssistantChat";
+
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { InvoiceType } from "@/types/invoice";
@@ -225,7 +225,7 @@ const Index = () => {
         </main>
       </div>
 
-      <AiAssistantChat />
+      
       {isMobile && <MobileBottomNav />}
 
       {activeCompanyId && (
