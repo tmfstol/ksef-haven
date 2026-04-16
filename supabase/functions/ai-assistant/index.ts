@@ -55,6 +55,24 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "create_project",
+      description: "Tworzy nowy projekt / folder inwestycji dla firmy. Użyj gdy użytkownik prosi o utworzenie projektu.",
+      parameters: {
+        type: "object",
+        properties: {
+          company_name: { type: "string", description: "Nazwa firmy (opcjonalna, domyślnie pierwsza firma użytkownika)" },
+          name: { type: "string", description: "Nazwa projektu" },
+          description: { type: "string", description: "Opis projektu (opcjonalny)" },
+          budget: { type: "number", description: "Budżet w PLN (opcjonalny)" },
+          color: { type: "string", description: "Kolor HEX np. #3b82f6 (opcjonalny)" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "assign_invoice_to_project",
       description: "Przypisuje fakturę do projektu",
       parameters: {
