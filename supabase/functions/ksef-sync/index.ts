@@ -312,70 +312,92 @@ async function redeemToken(baseUrl: string, authToken: string) {
 }
 
 // Step 7: Query invoices using accessToken
+// KSeF API enforces max 3-month date ranges, so we chunk automatically.
 async function queryInvoices(baseUrl: string, accessToken: string, nip: string, subjectType: string = "subject2", dateFrom?: string, dateTo?: string) {
   const now = new Date();
-  const fromDate = dateFrom ? new Date(dateFrom) : new Date(now);
-  if (!dateFrom) fromDate.setMonth(fromDate.getMonth() - 3);
-  const toDate = dateTo ? new Date(dateTo) : now;
+  const globalFrom = dateFrom ? new Date(dateFrom) : new Date(now);
+  if (!dateFrom) globalFrom.setMonth(globalFrom.getMonth() - 3);
+  const globalTo = dateTo ? new Date(dateTo) : now;
+
+  // Build 3-month windows
+  const windows: { from: Date; to: Date }[] = [];
+  let wStart = new Date(globalFrom);
+  while (wStart < globalTo) {
+    const wEnd = new Date(wStart);
+    wEnd.setMonth(wEnd.getMonth() + 3);
+    // cap at globalTo
+    const actualEnd = wEnd > globalTo ? globalTo : wEnd;
+    windows.push({ from: new Date(wStart), to: actualEnd });
+    wStart = new Date(actualEnd);
+    // avoid infinite loop if dates are equal
+    if (wStart >= globalTo) break;
+  }
+  if (windows.length === 0) {
+    windows.push({ from: globalFrom, to: globalTo });
+  }
+
+  console.log(`[ksef-sync] queryInvoices ${subjectType}: ${windows.length} window(s) from ${globalFrom.toISOString()} to ${globalTo.toISOString()}`);
 
   const allInvoices: any[] = [];
-  let pageNum = 0;
 
-  while (true) {
-    const queryBody: any = {
-      subjectType,
-      dateRange: {
-        dateType: "issue",
-        from: fromDate.toISOString(),
-        to: toDate.toISOString(),
-      },
-    };
+  for (const window of windows) {
+    let pageNum = 0;
+    while (true) {
+      const queryBody: any = {
+        subjectType,
+        dateRange: {
+          dateType: "issue",
+          from: window.from.toISOString(),
+          to: window.to.toISOString(),
+        },
+      };
 
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    };
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      };
 
-    if (pageNum > 0) {
-      await new Promise(r => setTimeout(r, 500));
-    }
-
-    const url = `${baseUrl}/api/v2/invoices/query/metadata?pageSize=100&pageOffset=${pageNum}`;
-    console.log(`[ksef-sync] POST ${url} page=${pageNum} subjectType=${subjectType}`);
-
-    let res: Response;
-    for (let retry = 0; retry < 3; retry++) {
-      res = await fetchWithRetry(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(queryBody),
-      });
-      if (res.status === 429) {
-        const wait = Math.pow(2, retry + 1) * 1000;
-        console.log(`[ksef-sync] Rate limited on page ${pageNum}, waiting ${wait}ms`);
-        await new Promise(r => setTimeout(r, wait));
-        continue;
+      if (pageNum > 0) {
+        await new Promise(r => setTimeout(r, 500));
       }
-      break;
-    }
-    const rawText = await res!.text();
-    const text = rawText.replace(/^\uFEFF/, "").trim();
-    console.log(`[ksef-sync] Invoice query page ${pageNum} response (${res!.status}): ${text.substring(0, 300)}`);
-    if (!res!.ok) throw new Error(`Invoice query failed (${res!.status}): ${text.substring(0, 300)}`);
 
-    const data = JSON.parse(text);
+      const url = `${baseUrl}/api/v2/invoices/query/metadata?pageSize=100&pageOffset=${pageNum}`;
+      console.log(`[ksef-sync] POST ${url} page=${pageNum} subjectType=${subjectType}`);
 
-    const pageInvoices = data?.invoices || data?.invoiceHeaderList || [];
-    allInvoices.push(...pageInvoices);
+      let res: Response;
+      for (let retry = 0; retry < 3; retry++) {
+        res = await fetchWithRetry(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(queryBody),
+        });
+        if (res.status === 429) {
+          const wait = Math.pow(2, retry + 1) * 1000;
+          console.log(`[ksef-sync] Rate limited on page ${pageNum}, waiting ${wait}ms`);
+          await new Promise(r => setTimeout(r, wait));
+          continue;
+        }
+        break;
+      }
+      const rawText = await res!.text();
+      const text = rawText.replace(/^\uFEFF/, "").trim();
+      console.log(`[ksef-sync] Invoice query page ${pageNum} response (${res!.status}): ${text.substring(0, 300)}`);
+      if (!res!.ok) throw new Error(`Invoice query failed (${res!.status}): ${text.substring(0, 300)}`);
 
-    if (!data.hasMore || pageInvoices.length === 0) {
-      break;
-    }
+      const data = JSON.parse(text);
 
-    pageNum++;
-    if (pageNum > 50) {
-      break;
+      const pageInvoices = data?.invoices || data?.invoiceHeaderList || [];
+      allInvoices.push(...pageInvoices);
+
+      if (!data.hasMore || pageInvoices.length === 0) {
+        break;
+      }
+
+      pageNum++;
+      if (pageNum > 50) {
+        break;
+      }
     }
   }
 
