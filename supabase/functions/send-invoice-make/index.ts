@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
 
     const { data: invoice, error: invoiceError } = await supabase
       .from("invoices")
-      .select("id, company_id, date, vendor, nip, gross_amount, ksef_number, bookkeeper_note, project_id")
+      .select("id, company_id, date, vendor, nip, gross_amount, ksef_number, bookkeeper_note, project_id, pdf_path")
       .eq("id", invoiceId)
       .single();
 
@@ -158,11 +158,28 @@ Deno.serve(async (req) => {
     appendFormValue(formData, "items", items ?? []);
 
     if (pdfBase64) {
+      // PDF provided directly (manual send)
       const pdfBytes = decodePdfBase64(pdfBase64);
       const pdfFile = new File([pdfBytes], pdfFilename, { type: "application/pdf" });
       appendFormValue(formData, "pdf_filename", pdfFilename);
       appendFormValue(formData, "pdf_content_type", "application/pdf");
       formData.append("file", pdfFile, pdfFilename);
+    } else if (invoice.pdf_path) {
+      // No PDF provided (agent) — try to download from storage
+      console.log(`Downloading PDF from storage: ${invoice.pdf_path}`);
+      const { data: storedPdf, error: storageErr } = await supabase.storage
+        .from("invoice-uploads")
+        .download(invoice.pdf_path);
+      if (!storageErr && storedPdf) {
+        const storedFilename = invoice.pdf_path.split("/").pop() || pdfFilename;
+        const pdfFile = new File([storedPdf], storedFilename, { type: "application/pdf" });
+        appendFormValue(formData, "pdf_filename", storedFilename);
+        appendFormValue(formData, "pdf_content_type", "application/pdf");
+        formData.append("file", pdfFile, storedFilename);
+        console.log(`PDF attached from storage: ${storedFilename}`);
+      } else {
+        console.warn(`Failed to download PDF from storage: ${storageErr?.message}`);
+      }
     }
 
     const makeResponse = await fetch(webhookUrl, {
