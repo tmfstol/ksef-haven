@@ -91,13 +91,10 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const invoiceId = typeof body?.invoiceId === "string" ? body.invoiceId : null;
-    const pdfBase64 = typeof body?.pdfBase64 === "string" ? body.pdfBase64 : null;
+    const pdfBase64 = typeof body?.pdfBase64 === "string" && body.pdfBase64 !== "AGENT_NO_PDF" ? body.pdfBase64 : null;
     const pdfFilename = typeof body?.pdfFilename === "string" ? body.pdfFilename : "faktura.pdf";
     if (!invoiceId) {
       return jsonResponse({ error: "Brak identyfikatora faktury" }, 400);
-    }
-    if (!pdfBase64) {
-      return jsonResponse({ error: "Brak pliku PDF faktury" }, 400);
     }
 
     const supabase = createClient(
