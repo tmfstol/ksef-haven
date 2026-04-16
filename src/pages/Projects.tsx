@@ -237,6 +237,19 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
   const { data: allInvoices } = useInvoices(companyId);
   const assignInvoice = useAssignInvoiceToProject();
   const [assignOpen, setAssignOpen] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownloadPdf = async (inv: any) => {
+    setDownloadingId(inv.id);
+    try {
+      await downloadInvoicePdf(inv);
+      toast.success("PDF pobrany");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Błąd pobierania PDF");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const unassignedInvoices = useMemo(
     () => (allInvoices || []).filter((i) => !i.project_id || i.project_id !== project.id),
