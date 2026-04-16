@@ -155,6 +155,22 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "add_bookkeeper_note",
+      description: "Dodaje lub aktualizuje notatkę księgową do faktury, aby księgowa wiedziała do czego przypisać fakturę (np. kategoria kosztu, projekt, uwagi).",
+      parameters: {
+        type: "object",
+        properties: {
+          invoice_id: { type: "string", description: "ID faktury" },
+          vendor_name: { type: "string", description: "Nazwa dostawcy (do wyszukania faktury jeśli brak ID)" },
+          note: { type: "string", description: "Treść notatki dla księgowej" },
+        },
+        required: ["note"],
+      },
+    },
+  },
 ];
 
 async function executeTool(
