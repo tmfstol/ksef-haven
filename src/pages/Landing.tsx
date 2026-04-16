@@ -379,6 +379,57 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* FAQ */}
+      <section id="faq" className="max-w-4xl mx-auto px-6 py-24">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-16">
+          <span className="text-sm font-medium text-primary uppercase tracking-widest">FAQ</span>
+          <h2 className="text-3xl md:text-4xl font-bold text-background tracking-tight mt-3">
+            Najczęściej zadawane pytania
+          </h2>
+        </motion.div>
+
+        <div className="space-y-4">
+          {faqItems.map((item, i) => (
+            <motion.details
+              key={i}
+              custom={i + 1}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              className="group rounded-2xl border border-background/10 bg-background/5 backdrop-blur-sm overflow-hidden"
+            >
+              <summary className="flex items-center justify-between px-6 py-5 cursor-pointer list-none text-background font-medium hover:text-primary transition-colors">
+                <span>{item.q}</span>
+                <ChevronRight className="h-4 w-4 text-background/40 group-open:rotate-90 transition-transform" />
+              </summary>
+              <div className="px-6 pb-5 text-sm text-background/50 leading-relaxed">
+                {item.a}
+              </div>
+            </motion.details>
+          ))}
+        </div>
+
+        {/* FAQ JSON-LD */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              "mainEntity": faqItems.map((item) => ({
+                "@type": "Question",
+                "name": item.q,
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": item.a,
+                },
+              })),
+            }),
+          }}
+        />
+      </section>
+
       {/* CTA */}
       <section className="max-w-4xl mx-auto px-6 py-24">
         <motion.div
