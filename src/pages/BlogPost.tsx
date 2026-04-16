@@ -28,7 +28,7 @@ const BlogPost = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-foreground flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -36,23 +36,34 @@ const BlogPost = () => {
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-foreground flex flex-col items-center justify-center gap-4">
-        <p className="text-background/40 text-lg">Artykuł nie został znaleziony</p>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <p className="text-muted-foreground text-lg">Artykuł nie został znaleziony</p>
         <Link to="/blog" className="text-primary hover:underline">Wróć do bloga</Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-foreground">
-      <header className="border-b border-muted-foreground/10 backdrop-blur-2xl bg-foreground/80 sticky top-0 z-50">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border backdrop-blur-2xl bg-background/80 sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center">
-          <Link to="/blog" className="flex items-center gap-2 text-background hover:text-primary transition-colors">
+          <Link to="/blog" className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
             <ArrowLeft className="h-4 w-4" />
             <span className="text-sm">Wróć do bloga</span>
           </Link>
         </div>
       </header>
+
+      {/* Cover image */}
+      {(post as any).cover_image_url && (
+        <div className="w-full max-h-[400px] overflow-hidden">
+          <img
+            src={(post as any).cover_image_url}
+            alt={post.title}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
 
       <motion.article
         initial={{ opacity: 0, y: 20 }}
@@ -67,32 +78,33 @@ const BlogPost = () => {
             {post.category}
           </span>
           {post.published_at && (
-            <span className="text-sm text-background/30 flex items-center gap-1.5">
+            <span className="text-sm text-muted-foreground flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" />
               {formatDate(post.published_at)}
             </span>
           )}
         </div>
 
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-background tracking-tight leading-tight mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight mb-4 sm:mb-6">
           {post.title}
         </h1>
 
         {post.excerpt && (
-          <p className="text-base sm:text-lg text-background/50 leading-relaxed mb-8 sm:mb-12 border-l-2 border-primary/30 pl-4">
+          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed mb-8 sm:mb-12 border-l-2 border-primary/30 pl-4">
             {post.excerpt}
           </p>
         )}
 
-        <div className="prose prose-invert prose-sm sm:prose-base max-w-none
-          prose-headings:text-background prose-headings:font-semibold
-          prose-p:text-background/60 prose-p:leading-relaxed
-          prose-strong:text-background/80
+        <div className="prose prose-sm sm:prose-base max-w-none
+          prose-headings:text-foreground prose-headings:font-semibold
+          prose-p:text-foreground/70 prose-p:leading-relaxed
+          prose-strong:text-foreground/90
           prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-          prose-ul:text-background/60 prose-ol:text-background/60
+          prose-ul:text-foreground/70 prose-ol:text-foreground/70
           prose-li:marker:text-primary/50
-          prose-blockquote:border-primary/30 prose-blockquote:text-background/50
+          prose-blockquote:border-primary/30 prose-blockquote:text-foreground/50
           prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+          prose-h2:mt-8 prose-h2:mb-4 prose-h3:mt-6 prose-h3:mb-3
         ">
           <ReactMarkdown>{post.content}</ReactMarkdown>
         </div>

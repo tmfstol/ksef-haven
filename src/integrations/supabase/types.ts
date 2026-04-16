@@ -46,6 +46,7 @@ export type Database = {
           category: string
           content: string
           cover_gradient: string
+          cover_image_url: string | null
           created_at: string
           excerpt: string
           id: string
@@ -59,6 +60,7 @@ export type Database = {
           category?: string
           content?: string
           cover_gradient?: string
+          cover_image_url?: string | null
           created_at?: string
           excerpt?: string
           id?: string
@@ -72,6 +74,7 @@ export type Database = {
           category?: string
           content?: string
           cover_gradient?: string
+          cover_image_url?: string | null
           created_at?: string
           excerpt?: string
           id?: string

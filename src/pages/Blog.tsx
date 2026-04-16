@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Link } from "react-router-dom";
-import { ArrowRight, ArrowLeft, Clock, Loader2, RefreshCw } from "lucide-react";
+import { ArrowRight, ArrowLeft, Clock, Loader2, RefreshCw, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -17,6 +18,22 @@ const fadeUp = {
 
 const Blog = () => {
   const [generating, setGenerating] = useState(false);
+  const { user } = useAuth();
+
+  // Check if user is admin (owns a company)
+  const { data: isAdmin } = useQuery({
+    queryKey: ["is-blog-admin", user?.id],
+    queryFn: async () => {
+      if (!user) return false;
+      const { data } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+      return (data && data.length > 0) || false;
+    },
+    enabled: !!user,
+  });
 
   const { data: posts, isLoading, refetch } = useQuery({
     queryKey: ["blog-posts"],
@@ -34,54 +51,60 @@ const Blog = () => {
   const generatePost = async () => {
     setGenerating(true);
     try {
-      const { error } = await supabase.functions.invoke("generate-blog-post");
-      if (error) throw error;
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-blog-post`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({}),
+        }
+      );
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Błąd generowania");
+      }
       toast.success("Nowy artykuł został wygenerowany!");
       refetch();
     } catch (e: any) {
-      toast.error("Błąd generowania artykułu: " + (e.message || "Nieznany błąd"));
+      toast.error(e.message || "Nieznany błąd");
     } finally {
       setGenerating(false);
     }
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("pl-PL", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
+  const formatDate = (date: string) =>
+    new Date(date).toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric" });
 
   return (
-    <div className="min-h-screen bg-foreground">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-muted-foreground/10 backdrop-blur-2xl bg-foreground/80 sticky top-0 z-50">
+      <header className="border-b border-border backdrop-blur-2xl bg-background/80 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-background hover:text-primary transition-colors">
+          <Link to="/" className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
             <ArrowLeft className="h-4 w-4" />
             <span className="text-sm">Strona główna</span>
           </Link>
-          <Button
-            onClick={generatePost}
-            disabled={generating}
-            size="sm"
-            className="gap-2"
-          >
-            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            {generating ? "Generuję..." : "Generuj artykuł"}
-          </Button>
+          {isAdmin && (
+            <Button onClick={generatePost} disabled={generating} size="sm" className="gap-2">
+              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {generating ? "Generuję..." : "Generuj artykuł"}
+            </Button>
+          )}
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
         <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
           <span className="text-sm font-medium text-primary uppercase tracking-widest">Blog</span>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-background tracking-tight mt-3">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground tracking-tight mt-3">
             Aktualności i poradniki
           </h1>
-          <p className="text-background/40 mt-3 max-w-lg text-base sm:text-lg">
-            Artykuły generowane przez AI o księgowości, podatkach i systemie KSeF.
+          <p className="text-muted-foreground mt-3 max-w-lg text-base sm:text-lg">
+            Artykuły o księgowości, podatkach i systemie KSeF.
           </p>
         </motion.div>
 
@@ -91,35 +114,50 @@ const Blog = () => {
           </div>
         ) : !posts?.length ? (
           <div className="text-center py-24">
-            <p className="text-background/40 text-lg mb-4">Brak artykułów. Wygeneruj pierwszy!</p>
-            <Button onClick={generatePost} disabled={generating} className="gap-2">
-              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Generuj artykuł
-            </Button>
+            <p className="text-muted-foreground text-lg mb-4">Brak artykułów.</p>
+            {isAdmin && (
+              <Button onClick={generatePost} disabled={generating} className="gap-2">
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Generuj pierwszy artykuł
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-12 sm:mt-16">
             {posts.map((post, i) => (
               <motion.div key={post.id} custom={i + 1} initial="hidden" animate="visible" variants={fadeUp}>
                 <Link to={`/blog/${post.slug}`}>
-                  <article className="group rounded-2xl border border-background/5 bg-background/[0.03] backdrop-blur-sm overflow-hidden hover:border-primary/20 transition-all duration-500 hover:bg-background/[0.06]">
-                    <div className={`h-1 bg-gradient-to-r ${post.cover_gradient}`} />
+                  <article className="group rounded-2xl border border-border bg-card overflow-hidden hover:border-primary/30 transition-all duration-500 hover:shadow-lg">
+                    {/* Cover image or gradient */}
+                    {(post as any).cover_image_url ? (
+                      <div className="aspect-[16/9] overflow-hidden">
+                        <img
+                          src={(post as any).cover_image_url}
+                          alt={post.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      </div>
+                    ) : (
+                      <div className={`h-32 bg-gradient-to-br ${post.cover_gradient} flex items-center justify-center`}>
+                        <ImageIcon className="h-8 w-8 text-white/30" />
+                      </div>
+                    )}
                     <div className="p-4 sm:p-6">
-                      <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center gap-3 mb-3">
                         <span className="text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full">
                           {post.category}
                         </span>
                         {post.published_at && (
-                          <span className="text-xs text-background/30 flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {formatDate(post.published_at)}
                           </span>
                         )}
                       </div>
-                      <h3 className="font-semibold text-background mb-2 group-hover:text-primary transition-colors leading-snug line-clamp-2">
+                      <h3 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors leading-snug line-clamp-2">
                         {post.title}
                       </h3>
-                      <p className="text-sm text-background/40 leading-relaxed line-clamp-3">{post.excerpt}</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
                       <div className="mt-4 flex items-center gap-1.5 text-sm text-primary/70 group-hover:text-primary transition-colors">
                         Czytaj więcej
                         <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
