@@ -76,6 +76,7 @@ export default function TeamManagement() {
       if (res.data?.success) {
         toast.success(res.data.message);
         setInviteEmail("");
+        setInvitePassword("");
         fetchMembers();
       } else {
         toast.error(res.data?.error || "Błąd zapraszania");
