@@ -206,6 +206,21 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_invoice_pdf_link",
+      description: "Zwraca link do pobrania PDF faktury (ważny 10 minut). Wyszukuje fakturę po ID lub nazwie dostawcy. Jeśli PDF jest jeszcze nie wygenerowany, zwraca informację co zrobić.",
+      parameters: {
+        type: "object",
+        properties: {
+          invoice_id: { type: "string", description: "ID faktury (opcjonalne)" },
+          vendor_name: { type: "string", description: "Nazwa dostawcy (częściowe dopasowanie)" },
+          ksef_number: { type: "string", description: "Numer KSeF (opcjonalny)" },
+        },
+      },
+    },
+  },
 ];
 
 async function executeTool(
