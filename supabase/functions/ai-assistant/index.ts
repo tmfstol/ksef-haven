@@ -162,7 +162,8 @@ async function executeTool(
   toolName: string,
   args: Record<string, unknown>,
   companyIds: string[],
-  companiesMap: Record<string, { id: string; name: string; nip: string }>
+  companiesMap: Record<string, { id: string; name: string; nip: string }>,
+  userAuthHeader: string
 ): Promise<string> {
   // Helper to find company IDs by name
   const findCompanyIds = (name?: string): string[] => {
