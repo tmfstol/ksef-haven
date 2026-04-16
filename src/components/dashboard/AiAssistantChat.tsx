@@ -143,7 +143,7 @@ export function AiAssistantChat() {
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Asystent Księgowy</p>
-            <p className="text-xs text-muted-foreground">AI · KSeF Archiwum</p>
+            <p className="text-xs text-muted-foreground">AI · Facturo</p>
           </div>
         </div>
         <div className="flex items-center gap-1">

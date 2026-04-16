@@ -166,7 +166,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
         )}
         <div>
           <h1 className="text-lg font-semibold text-foreground">
-            {isOnboarding ? "Witaj w KSeF Archiwum" : "Ustawienia firm"}
+            {isOnboarding ? "Witaj w Facturo" : "Ustawienia firm"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isOnboarding

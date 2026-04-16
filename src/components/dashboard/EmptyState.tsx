@@ -17,7 +17,7 @@ export function EmptyState({
   description,
   actionLabel,
 }: EmptyStateProps) {
-  const resolvedTitle = title ?? (isError ? "Błąd połączenia" : "Witaj w KSeF Archiwum");
+  const resolvedTitle = title ?? (isError ? "Błąd połączenia" : "Witaj w Facturo");
   const resolvedDescription =
     description ??
     (isError
