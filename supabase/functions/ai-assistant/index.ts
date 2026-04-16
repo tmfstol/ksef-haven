@@ -351,14 +351,13 @@ async function executeTool(
           return `Firma nie ma skonfigurowanego adresu email portalu klienta. Skonfiguruj go w ustawieniach firmy.`;
         }
 
-        // Call send-invoice-email edge function
+        // Call send-invoice-email edge function with user's auth
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const sendResp = await fetch(`${supabaseUrl}/functions/v1/send-invoice-email`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${serviceKey}`,
+            Authorization: userAuthHeader,
             apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
           },
           body: JSON.stringify({ invoiceId: invData.id }),
