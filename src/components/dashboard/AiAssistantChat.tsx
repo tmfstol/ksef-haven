@@ -75,10 +75,15 @@ const SUGGESTIONS = [
 ];
 
 // Voice synthesis helper
+function getPolishVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find(v => v.lang.startsWith("pl")) || null;
+}
+
 function speakText(text: string, onEnd?: () => void) {
-  if (!("speechSynthesis" in window)) return;
+  if (!("speechSynthesis" in window)) { onEnd?.(); return; }
   window.speechSynthesis.cancel();
-  // Strip markdown for speech
+
   const clean = text
     .replace(/#{1,6}\s/g, "")
     .replace(/\*\*/g, "")
@@ -87,11 +92,50 @@ function speakText(text: string, onEnd?: () => void) {
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/[-•]\s/g, "")
     .replace(/\n+/g, ". ");
-  const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.lang = "pl-PL";
-  utterance.rate = 1.1;
-  if (onEnd) utterance.onend = onEnd;
-  window.speechSynthesis.speak(utterance);
+
+  const doSpeak = () => {
+    // Split into chunks of ~200 chars at sentence boundaries to avoid silent failures
+    const chunks: string[] = [];
+    let remaining = clean;
+    while (remaining.length > 0) {
+      if (remaining.length <= 200) {
+        chunks.push(remaining);
+        break;
+      }
+      let splitAt = remaining.lastIndexOf(". ", 200);
+      if (splitAt === -1 || splitAt < 50) splitAt = 200;
+      else splitAt += 2;
+      chunks.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt);
+    }
+
+    const voice = getPolishVoice();
+    chunks.forEach((chunk, i) => {
+      const utterance = new SpeechSynthesisUtterance(chunk);
+      utterance.lang = "pl-PL";
+      utterance.rate = 1.1;
+      if (voice) utterance.voice = voice;
+      if (i === chunks.length - 1 && onEnd) utterance.onend = onEnd;
+      window.speechSynthesis.speak(utterance);
+    });
+
+    if (chunks.length === 0) onEnd?.();
+  };
+
+  // Voices may not be loaded yet
+  if (window.speechSynthesis.getVoices().length === 0) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.onvoiceschanged = null;
+      doSpeak();
+    };
+    // Fallback if event never fires
+    setTimeout(() => {
+      window.speechSynthesis.onvoiceschanged = null;
+      doSpeak();
+    }, 500);
+  } else {
+    doSpeak();
+  }
 }
 
 export function AiAssistantChat() {
