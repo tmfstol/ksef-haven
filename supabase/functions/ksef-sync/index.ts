@@ -312,7 +312,7 @@ async function redeemToken(baseUrl: string, authToken: string) {
 }
 
 // Step 7: Query invoices using accessToken
-async function queryInvoices(baseUrl: string, accessToken: string, nip: string) {
+async function queryInvoices(baseUrl: string, accessToken: string, nip: string, subjectType: string = "subject2") {
   const now = new Date();
   const threeMonthsAgo = new Date(now);
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
@@ -322,7 +322,7 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
 
   while (true) {
     const queryBody: any = {
-      subjectType: "subject2",
+      subjectType,
       dateRange: {
         dateType: "issue",
         from: threeMonthsAgo.toISOString(),
@@ -336,13 +336,12 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
       Accept: "application/json",
     };
 
-    // Rate limit: wait between pages
     if (pageNum > 0) {
       await new Promise(r => setTimeout(r, 500));
     }
 
     const url = `${baseUrl}/api/v2/invoices/query/metadata?pageSize=100&pageOffset=${pageNum}`;
-    console.log(`[ksef-sync] POST ${url} page=${pageNum}`);
+    console.log(`[ksef-sync] POST ${url} page=${pageNum} subjectType=${subjectType}`);
 
     let res: Response;
     for (let retry = 0; retry < 3; retry++) {
@@ -365,27 +364,21 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
     if (!res!.ok) throw new Error(`Invoice query failed (${res!.status}): ${text.substring(0, 300)}`);
 
     const data = JSON.parse(text);
-    console.log(`[ksef-sync] Response keys: ${Object.keys(data).join(', ')}`);
 
     const pageInvoices = data?.invoices || data?.invoiceHeaderList || [];
     allInvoices.push(...pageInvoices);
 
-    // Stop if no more pages or empty page
     if (!data.hasMore || pageInvoices.length === 0) {
-      console.log(`[ksef-sync] No more pages. hasMore=${data.hasMore}, invoiceCount=${pageInvoices.length}`);
       break;
     }
 
     pageNum++;
-
-    // Safety limit
     if (pageNum > 50) {
-      console.log(`[ksef-sync] Reached page limit (50), stopping pagination`);
       break;
     }
   }
 
-  console.log(`[ksef-sync] Total invoices fetched across ${pageNum + 1} pages: ${allInvoices.length}`);
+  console.log(`[ksef-sync] Total ${subjectType} invoices fetched: ${allInvoices.length}`);
   return { invoices: allInvoices };
 }
 
