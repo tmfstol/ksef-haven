@@ -209,7 +209,7 @@ const Expenses = () => {
           </div>
         )}
       </main>
-      {!isMobile && <AiAssistantChat />}
+      
       <MobileBottomNav />
     </div>
   );
