@@ -180,8 +180,11 @@ const Projects = () => {
                   <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> {p.invoice_count} faktur</span>
                   <span className="flex items-center gap-1"><Receipt className="h-3.5 w-3.5" /> {p.expense_count} wydatków</span>
+                  <span className="flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> {p.invoice_count} faktur</span>
+                </div>
+                <div className="mt-2 text-sm font-semibold text-foreground">
+                  {((p.total_invoices || 0) + (p.total_expenses || 0)).toLocaleString("pl-PL", { style: "currency", currency: "PLN" })}
                 </div>
                 {p.budget && (
                   <div className="mt-3">
@@ -271,11 +274,11 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
         )}
       </div>
 
-      <Tabs defaultValue="invoices">
+      <Tabs defaultValue="expenses">
         <div className="flex items-center justify-between mb-4">
           <TabsList>
-            <TabsTrigger value="invoices">Faktury kosztowe</TabsTrigger>
             <TabsTrigger value="expenses">Wydatki</TabsTrigger>
+            <TabsTrigger value="invoices">Faktury</TabsTrigger>
           </TabsList>
 
           <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
