@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "invite") {
-      if (!email || !role) throw new Error("Brak wymaganych danych");
+      if (!email || !role || !password) throw new Error("Brak wymaganych danych (email, rola, hasło)");
 
       // Check if user already exists
       const { data: existingUsers } = await adminClient.auth.admin.listUsers();
