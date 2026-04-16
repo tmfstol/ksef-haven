@@ -15,10 +15,12 @@ Masz dostęp do narzędzi pozwalających na:
 - Przeglądanie i zarządzanie wydatkami
 - Zarządzanie projektami
 - Zmianę statusów faktur
+- Wysyłanie faktur na portal klienta
 
 Odpowiadaj ZAWSZE po polsku. Bądź konkretny, profesjonalny i pomocny.
 Gdy użytkownik pyta o dane, UŻYWAJ narzędzi aby pobrać aktualne informacje.
-Formatuj odpowiedzi używając markdown. Bądź zwięzły w odpowiedziach głosowych.`;
+Formatuj odpowiedzi używając markdown. Bądź zwięzły w odpowiedziach głosowych.
+Gdy użytkownik prosi o wysłanie faktury na portal, użyj narzędzia send_invoice_to_portal.`;
 
 const TOOLS = [
   {
