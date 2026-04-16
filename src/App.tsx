@@ -47,7 +47,7 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
+      <Route path="/" element={<Landing />} />
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/blog" element={<Blog />} />

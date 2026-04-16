@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen, CalendarIcon, Menu } from "lucide-react";
+import { Link } from "react-router-dom";
+import logoFacturo from "@/assets/logo-facturo.png";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -117,6 +119,11 @@ export function DashboardHeader({
   // Desktop header
   return (
     <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
+      <Link to="/" className="flex items-center gap-2 mr-2 hover:opacity-80 transition-opacity">
+        <img src={logoFacturo} alt="Facturo" className="h-7 w-7 rounded-lg object-contain" />
+        <span className="text-sm font-bold tracking-tight text-foreground">Facturo</span>
+      </Link>
+      <div className="h-5 w-px bg-border/60" />
       <div className="flex items-center gap-2 text-sm">
         {isConnected ? (
           <>
