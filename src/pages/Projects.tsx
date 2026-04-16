@@ -21,9 +21,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Loader2, Plus, FolderOpen, Trash2, FileText,
-  Receipt, ChevronRight, FolderPlus
+  Receipt, ChevronRight, FolderPlus, Download
 } from "lucide-react";
 import { format } from "date-fns";
+import { downloadInvoicePdf } from "@/lib/invoice-pdf-download";
+import { toast } from "sonner";
 
 const PROJECT_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
