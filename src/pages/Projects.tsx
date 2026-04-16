@@ -21,9 +21,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Loader2, Plus, FolderOpen, Trash2, FileText,
-  Receipt, ChevronRight, FolderPlus
+  Receipt, ChevronRight, FolderPlus, Download
 } from "lucide-react";
 import { format } from "date-fns";
+import { downloadInvoicePdf } from "@/lib/invoice-pdf-download";
+import { toast } from "sonner";
 
 const PROJECT_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
@@ -235,6 +237,19 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
   const { data: allInvoices } = useInvoices(companyId);
   const assignInvoice = useAssignInvoiceToProject();
   const [assignOpen, setAssignOpen] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownloadPdf = async (inv: any) => {
+    setDownloadingId(inv.id);
+    try {
+      await downloadInvoicePdf(inv);
+      toast.success("PDF pobrany");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Błąd pobierania PDF");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const unassignedInvoices = useMemo(
     () => (allInvoices || []).filter((i) => !i.project_id || i.project_id !== project.id),
@@ -331,7 +346,7 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
                     <TableHead>Kontrahent</TableHead>
                     <TableHead>NIP</TableHead>
                     <TableHead className="text-right">Kwota brutto</TableHead>
-                    <TableHead className="w-10" />
+                    <TableHead className="w-24 text-right">Akcje</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -342,15 +357,31 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
                       <TableCell className="text-sm text-muted-foreground">{inv.nip}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{Number(inv.gross_amount).toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          title="Odłącz od projektu"
-                          onClick={() => assignInvoice.mutate({ invoiceId: inv.id, projectId: null })}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            title="Pobierz PDF"
+                            disabled={downloadingId === inv.id}
+                            onClick={() => handleDownloadPdf(inv)}
+                          >
+                            {downloadingId === inv.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            title="Odłącz od projektu"
+                            onClick={() => assignInvoice.mutate({ invoiceId: inv.id, projectId: null })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -353,8 +353,16 @@ export function AiAssistantChat() {
               }`}
             >
               {msg.role === "assistant" ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:mb-1">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:mb-1 [&_a]:text-primary [&_a]:underline [&_a]:font-medium">
+                  <ReactMarkdown
+                    components={{
+                      a: ({ href, children }) => (
+                        <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+                      ),
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
                 </div>
               ) : (
                 msg.content

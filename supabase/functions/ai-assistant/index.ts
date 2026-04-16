@@ -17,6 +17,7 @@ Masz dostęp do narzędzi pozwalających na:
 - Zmianę statusów faktur
 - Dodawanie notatek księgowych do faktur (aby księgowa wiedziała do czego przypisać)
 - Wysyłanie faktur na portal klienta
+- Wysyłanie linków do PDF faktur (użyj get_invoice_pdf_link gdy użytkownik prosi o fakturę PDF, plik, dokument)
 
 Odpowiadaj ZAWSZE po polsku. Bądź konkretny, profesjonalny i pomocny.
 Gdy użytkownik pyta o dane, UŻYWAJ narzędzi aby pobrać aktualne informacje.
@@ -202,6 +203,21 @@ const TOOLS = [
           vendor_name: { type: "string", description: "Nazwa dostawcy (częściowe dopasowanie)" },
           amount: { type: "number", description: "Kwota brutto do dopasowania konkretnej faktury (opcjonalne)" },
           paid: { type: "boolean", description: "true = opłacona (domyślnie), false = cofa oznaczenie" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_invoice_pdf_link",
+      description: "Zwraca link do pobrania PDF faktury (ważny 10 minut). Wyszukuje fakturę po ID lub nazwie dostawcy. Jeśli PDF jest jeszcze nie wygenerowany, zwraca informację co zrobić.",
+      parameters: {
+        type: "object",
+        properties: {
+          invoice_id: { type: "string", description: "ID faktury (opcjonalne)" },
+          vendor_name: { type: "string", description: "Nazwa dostawcy (częściowe dopasowanie)" },
+          ksef_number: { type: "string", description: "Numer KSeF (opcjonalny)" },
         },
       },
     },
@@ -484,6 +500,34 @@ async function executeTool(
         const verb = newStatus === "paid" ? "opłacone" : "nieopłacone";
         const list = matches.map((m: any) => `• ${m.vendor} — ${m.gross_amount} PLN`).join("\n");
         return `Oznaczono ${matches.length} faktur jako ${verb}:\n${list}`;
+      }
+
+      case "get_invoice_pdf_link": {
+        let q = supabase
+          .from("invoices")
+          .select("id, vendor, ksef_number, pdf_path, gross_amount, date")
+          .in("company_id", companyIds);
+        if (args.invoice_id) q = q.eq("id", args.invoice_id as string);
+        if (args.ksef_number) q = q.eq("ksef_number", args.ksef_number as string);
+        if (args.vendor_name) q = q.ilike("vendor", `%${args.vendor_name}%`);
+        const { data: pdfMatches, error: pdfErr } = await q.order("date", { ascending: false }).limit(5);
+        if (pdfErr) return `Błąd: ${pdfErr.message}`;
+        if (!pdfMatches?.length) return "Nie znaleziono faktury.";
+
+        const results: string[] = [];
+        for (const inv of pdfMatches) {
+          if (inv.pdf_path) {
+            const { data: signed, error: signErr } = await supabase.storage
+              .from("invoice-uploads")
+              .createSignedUrl(inv.pdf_path as string, 600);
+            if (!signErr && signed?.signedUrl) {
+              results.push(`📄 **${inv.vendor}** (${inv.gross_amount} PLN, ${inv.date}) — [Pobierz PDF](${signed.signedUrl})`);
+              continue;
+            }
+          }
+          results.push(`📄 **${inv.vendor}** (${inv.gross_amount} PLN, ${inv.date}) — PDF nie został jeszcze wygenerowany. Wejdź w Faktury i kliknij "Pobierz PDF" przy tej fakturze, aby go utworzyć.`);
+        }
+        return results.join("\n\n");
       }
 
       default:
