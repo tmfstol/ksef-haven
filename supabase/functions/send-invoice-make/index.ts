@@ -91,13 +91,10 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const invoiceId = typeof body?.invoiceId === "string" ? body.invoiceId : null;
-    const pdfBase64 = typeof body?.pdfBase64 === "string" ? body.pdfBase64 : null;
+    const pdfBase64 = typeof body?.pdfBase64 === "string" && body.pdfBase64 !== "AGENT_NO_PDF" ? body.pdfBase64 : null;
     const pdfFilename = typeof body?.pdfFilename === "string" ? body.pdfFilename : "faktura.pdf";
     if (!invoiceId) {
       return jsonResponse({ error: "Brak identyfikatora faktury" }, 400);
-    }
-    if (!pdfBase64) {
-      return jsonResponse({ error: "Brak pliku PDF faktury" }, 400);
     }
 
     const supabase = createClient(
@@ -145,8 +142,6 @@ Deno.serve(async (req) => {
       projectName = project?.name ?? null;
     }
 
-    const pdfBytes = decodePdfBase64(pdfBase64);
-    const pdfFile = new File([pdfBytes], pdfFilename, { type: "application/pdf" });
     const formData = new FormData();
 
     appendFormValue(formData, "invoice_id", invoice.id);
@@ -161,9 +156,14 @@ Deno.serve(async (req) => {
     appendFormValue(formData, "company_nip", company?.nip);
     appendFormValue(formData, "portal_email", company?.client_portal_email);
     appendFormValue(formData, "items", items ?? []);
-    appendFormValue(formData, "pdf_filename", pdfFilename);
-    appendFormValue(formData, "pdf_content_type", "application/pdf");
-    formData.append("file", pdfFile, pdfFilename);
+
+    if (pdfBase64) {
+      const pdfBytes = decodePdfBase64(pdfBase64);
+      const pdfFile = new File([pdfBytes], pdfFilename, { type: "application/pdf" });
+      appendFormValue(formData, "pdf_filename", pdfFilename);
+      appendFormValue(formData, "pdf_content_type", "application/pdf");
+      formData.append("file", pdfFile, pdfFilename);
+    }
 
     const makeResponse = await fetch(webhookUrl, {
       method: "POST",
