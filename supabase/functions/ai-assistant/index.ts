@@ -162,7 +162,8 @@ async function executeTool(
   toolName: string,
   args: Record<string, unknown>,
   companyIds: string[],
-  companiesMap: Record<string, { id: string; name: string; nip: string }>
+  companiesMap: Record<string, { id: string; name: string; nip: string }>,
+  userAuthHeader: string
 ): Promise<string> {
   // Helper to find company IDs by name
   const findCompanyIds = (name?: string): string[] => {
@@ -350,14 +351,13 @@ async function executeTool(
           return `Firma nie ma skonfigurowanego adresu email portalu klienta. Skonfiguruj go w ustawieniach firmy.`;
         }
 
-        // Call send-invoice-email edge function
+        // Call send-invoice-email edge function with user's auth
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const sendResp = await fetch(`${supabaseUrl}/functions/v1/send-invoice-email`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${serviceKey}`,
+            Authorization: userAuthHeader,
             apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
           },
           body: JSON.stringify({ invoiceId: invData.id }),
@@ -400,13 +400,15 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
+    if (authError || !claimsData?.claims?.sub) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const user = { id: claimsData.claims.sub };
 
     const { messages } = await req.json();
     if (!messages || !Array.isArray(messages)) {
@@ -480,7 +482,7 @@ serve(async (req) => {
           const args = typeof tc.function.arguments === "string"
             ? JSON.parse(tc.function.arguments)
             : tc.function.arguments;
-          const result = await executeTool(supabase, tc.function.name, args, companyIds, companiesMap);
+          const result = await executeTool(supabase, tc.function.name, args, companyIds, companiesMap, authHeader!);
           currentMessages.push({
             role: "tool",
             tool_call_id: tc.id,
