@@ -1,9 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { FileText, ArrowRight, Menu, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import logoFacturo from "@/assets/logo-facturo.png";
 
 interface PublicNavProps {
   variant?: "dark" | "light";
@@ -36,16 +37,14 @@ const PublicNav = ({ variant = "dark" }: PublicNavProps) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-fuchsia-500 flex items-center justify-center">
-            <FileText className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <img src={logoFacturo} alt="Facturo" className="h-9 w-9 rounded-xl object-contain" />
           <span
             className={cn(
-              "text-lg font-semibold tracking-tight",
+              "text-lg font-bold tracking-tight",
               isDark ? "text-background" : "text-foreground"
             )}
           >
-            KSeF Archiwum
+            Facturo
           </span>
         </Link>
 

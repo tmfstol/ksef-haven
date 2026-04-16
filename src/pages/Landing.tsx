@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import PublicNav from "@/components/PublicNav";
+import logoFacturo from "@/assets/logo-facturo.png";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -414,15 +415,13 @@ const Landing = () => {
       <footer className="border-t border-background/5 py-10">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 text-sm text-background/30">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary/20 to-fuchsia-500/20 flex items-center justify-center">
-              <FileText className="h-3.5 w-3.5 text-primary" />
-            </div>
-            <span>KSeF Archiwum — platforma księgowa z AI</span>
+            <img src={logoFacturo} alt="Facturo" className="h-6 w-6 rounded-md object-contain" />
+            <span>Facturo — platforma księgowa z AI</span>
           </div>
           <div className="flex items-center gap-6 text-xs text-background/20">
             <a href="#" className="hover:text-background/50 transition-colors">Polityka prywatności</a>
             <a href="#" className="hover:text-background/50 transition-colors">Regulamin</a>
-            <span>© {new Date().getFullYear()} KSeF Archiwum</span>
+            <span>© {new Date().getFullYear()} Facturo</span>
           </div>
         </div>
       </footer>

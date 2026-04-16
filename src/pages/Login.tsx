@@ -1,4 +1,5 @@
 import { useState } from "react";
+import logoFacturo from "@/assets/logo-facturo.png";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -52,10 +53,8 @@ const Login = () => {
 
         <div className="relative flex flex-col justify-between p-12 text-primary-foreground w-full">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-primary-foreground/20 backdrop-blur-sm flex items-center justify-center">
-              <FileText className="h-4 w-4" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight">KSeF Archiwum</span>
+            <img src={logoFacturo} alt="Facturo" className="h-9 w-9 rounded-xl object-contain" />
+            <span className="text-lg font-bold tracking-tight">Facturo</span>
           </Link>
 
           <div>
@@ -84,7 +83,7 @@ const Login = () => {
           </div>
 
           <p className="text-sm text-primary-foreground/30">
-            © {new Date().getFullYear()} KSeF Archiwum
+            © {new Date().getFullYear()} Facturo
           </p>
         </div>
       </div>
@@ -100,10 +99,8 @@ const Login = () => {
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-10">
             <Link to="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-fuchsia-500 flex items-center justify-center">
-                <FileText className="h-4 w-4 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-semibold text-background tracking-tight">KSeF Archiwum</span>
+              <img src={logoFacturo} alt="Facturo" className="h-9 w-9 rounded-xl object-contain" />
+              <span className="text-lg font-bold text-foreground tracking-tight">Facturo</span>
             </Link>
           </div>
 
