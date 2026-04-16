@@ -137,7 +137,7 @@ export function DashboardHeader({
       {onSyncAll && (
         <Button
           variant="outline"
-          onClick={onSyncAll}
+          onClick={handleSyncAll}
           disabled={isSyncingAll}
           className="rounded-xl px-4 gap-2"
         >
@@ -151,8 +151,59 @@ export function DashboardHeader({
       )}
 
       {/* Synchronizacja */}
+      <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="rounded-xl"
+            title="Filtruj daty synchronizacji"
+          >
+            <CalendarIcon className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-4" align="end">
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">Zakres dat do synchronizacji</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Od</p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left text-xs rounded-lg", !syncDateFrom && "text-muted-foreground")}>
+                      {syncDateFrom ? format(syncDateFrom, "dd.MM.yyyy") : "Domyślnie"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={syncDateFrom} onSelect={setSyncDateFrom} locale={pl} className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Do</p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left text-xs rounded-lg", !syncDateTo && "text-muted-foreground")}>
+                      {syncDateTo ? format(syncDateTo, "dd.MM.yyyy") : "Dzisiaj"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={syncDateTo} onSelect={setSyncDateTo} locale={pl} className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            {(syncDateFrom || syncDateTo) && (
+              <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setSyncDateFrom(undefined); setSyncDateTo(undefined); }}>
+                Wyczyść (domyślnie 3 miesiące)
+              </Button>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+
       <Button
-        onClick={onSync}
+        onClick={handleSync}
         disabled={isSyncing}
         className="rounded-xl px-5 gap-2 shadow-sm"
       >
