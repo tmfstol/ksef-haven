@@ -110,8 +110,8 @@ const Index = () => {
           isSyncing={syncMutation.isPending}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onSync={() => syncMutation.mutate()}
-          onSyncAll={() => syncAllMutation.mutate()}
+          onSync={(params) => syncMutation.mutate(params)}
+          onSyncAll={(params) => syncAllMutation.mutate(params)}
           isSyncingAll={syncAllMutation.isPending}
           activeCompany={activeCompany}
         />
