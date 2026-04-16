@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import TeamManagement from "@/components/settings/TeamManagement";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCompanies, useAddCompany, useUpdateCompany, useDeleteCompany } from "@/hooks/useCompanies";
 import { useTestConnection } from "@/hooks/useSettings";
@@ -442,6 +443,11 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
             </div>
             <input type="text" value={invoicePattern} onChange={(e) => setInvoicePattern(e.target.value)} placeholder="FV/{NNN}/{MM}/{RRRR}" className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono" />
           </motion.div>
+
+          {/* Zarządzanie zespołem */}
+          {editingCompany && (
+            <TeamManagement companyId={editingCompany.id} companyName={editingCompany.name} />
+          )}
 
           {/* Przyciski */}
           <motion.div
