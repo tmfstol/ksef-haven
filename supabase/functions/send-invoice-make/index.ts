@@ -142,8 +142,6 @@ Deno.serve(async (req) => {
       projectName = project?.name ?? null;
     }
 
-    const pdfBytes = decodePdfBase64(pdfBase64);
-    const pdfFile = new File([pdfBytes], pdfFilename, { type: "application/pdf" });
     const formData = new FormData();
 
     appendFormValue(formData, "invoice_id", invoice.id);
@@ -158,9 +156,14 @@ Deno.serve(async (req) => {
     appendFormValue(formData, "company_nip", company?.nip);
     appendFormValue(formData, "portal_email", company?.client_portal_email);
     appendFormValue(formData, "items", items ?? []);
-    appendFormValue(formData, "pdf_filename", pdfFilename);
-    appendFormValue(formData, "pdf_content_type", "application/pdf");
-    formData.append("file", pdfFile, pdfFilename);
+
+    if (pdfBase64) {
+      const pdfBytes = decodePdfBase64(pdfBase64);
+      const pdfFile = new File([pdfBytes], pdfFilename, { type: "application/pdf" });
+      appendFormValue(formData, "pdf_filename", pdfFilename);
+      appendFormValue(formData, "pdf_content_type", "application/pdf");
+      formData.append("file", pdfFile, pdfFilename);
+    }
 
     const makeResponse = await fetch(webhookUrl, {
       method: "POST",
