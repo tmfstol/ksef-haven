@@ -461,6 +461,31 @@ async function executeTool(
         return `Notatka księgowa została dodana do faktury od "${noteInv.vendor}": "${args.note}"`;
       }
 
+      case "mark_invoice_paid": {
+        const newStatus = args.paid === false ? "unpaid" : "paid";
+        let q = supabase
+          .from("invoices")
+          .select("id, vendor, gross_amount, payment_status")
+          .in("company_id", companyIds);
+        if (args.invoice_id) q = q.eq("id", args.invoice_id as string);
+        if (args.vendor_name) q = q.ilike("vendor", `%${args.vendor_name}%`);
+        if (args.amount) q = q.eq("gross_amount", Number(args.amount));
+        if (newStatus === "paid" && !args.invoice_id) q = q.neq("payment_status", "paid");
+        const { data: matches, error: findErr } = await q.order("date", { ascending: false }).limit(20);
+        if (findErr) return `Błąd: ${findErr.message}`;
+        if (!matches?.length) return "Nie znaleziono pasującej faktury do oznaczenia.";
+        const ids = matches.map((m: any) => m.id);
+        const { error: updErr } = await supabase
+          .from("invoices")
+          .update({ payment_status: newStatus })
+          .in("id", ids)
+          .in("company_id", companyIds);
+        if (updErr) return `Błąd: ${updErr.message}`;
+        const verb = newStatus === "paid" ? "opłacone" : "nieopłacone";
+        const list = matches.map((m: any) => `• ${m.vendor} — ${m.gross_amount} PLN`).join("\n");
+        return `Oznaczono ${matches.length} faktur jako ${verb}:\n${list}`;
+      }
+
       default:
         return `Nieznane narzędzie: ${toolName}`;
     }
