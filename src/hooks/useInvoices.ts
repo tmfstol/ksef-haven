@@ -43,9 +43,13 @@ export function useSync(companyId?: string | null) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (params?: { dateFrom?: string; dateTo?: string }) => {
       const { data, error } = await supabase.functions.invoke("ksef-sync", {
-        body: { company_id: companyId },
+        body: {
+          company_id: companyId,
+          date_from: params?.dateFrom || null,
+          date_to: params?.dateTo || null,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
