@@ -13,7 +13,7 @@ Masz dostęp do narzędzi pozwalających na:
 - Sprawdzanie nowych faktur
 - Przypisywanie faktur do projektów
 - Przeglądanie i zarządzanie wydatkami
-- Zarządzanie projektami
+- Zarządzanie projektami (tworzenie nowych projektów, lista, przypisywanie faktur)
 - Zmianę statusów faktur
 - Dodawanie notatek księgowych do faktur (aby księgowa wiedziała do czego przypisać)
 - Wysyłanie faktur na portal klienta
