@@ -279,6 +279,7 @@ export type Database = {
           client_portal_email: string | null
           country_code: string
           created_at: string
+          default_vat_rate: string
           email: string | null
           id: string
           invoice_pattern: string
@@ -291,6 +292,7 @@ export type Database = {
           postal_code: string | null
           storage_path: string
           street: string | null
+          tax_type: string
           updated_at: string
           user_id: string | null
         }
@@ -301,6 +303,7 @@ export type Database = {
           client_portal_email?: string | null
           country_code?: string
           created_at?: string
+          default_vat_rate?: string
           email?: string | null
           id?: string
           invoice_pattern?: string
@@ -313,6 +316,7 @@ export type Database = {
           postal_code?: string | null
           storage_path?: string
           street?: string | null
+          tax_type?: string
           updated_at?: string
           user_id?: string | null
         }
@@ -323,6 +327,7 @@ export type Database = {
           client_portal_email?: string | null
           country_code?: string
           created_at?: string
+          default_vat_rate?: string
           email?: string | null
           id?: string
           invoice_pattern?: string
@@ -335,10 +340,79 @@ export type Database = {
           postal_code?: string | null
           storage_path?: string
           street?: string | null
+          tax_type?: string
           updated_at?: string
           user_id?: string | null
         }
         Relationships: []
+      }
+      contacts: {
+        Row: {
+          city: string | null
+          company_id: string
+          created_at: string
+          email: string | null
+          id: string
+          invoice_count: number
+          last_invoice_date: string | null
+          name: string
+          nip: string | null
+          notes: string | null
+          payment_reliability: string
+          phone: string | null
+          postal_code: string | null
+          street: string | null
+          total_cost: number
+          total_revenue: number
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          company_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          invoice_count?: number
+          last_invoice_date?: string | null
+          name: string
+          nip?: string | null
+          notes?: string | null
+          payment_reliability?: string
+          phone?: string | null
+          postal_code?: string | null
+          street?: string | null
+          total_cost?: number
+          total_revenue?: number
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          invoice_count?: number
+          last_invoice_date?: string | null
+          name?: string
+          nip?: string | null
+          notes?: string | null
+          payment_reliability?: string
+          phone?: string | null
+          postal_code?: string | null
+          street?: string | null
+          total_cost?: number
+          total_revenue?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       expense_categories: {
         Row: {
@@ -531,6 +605,7 @@ export type Database = {
       invoices: {
         Row: {
           bookkeeper_note: string | null
+          category: string | null
           company_id: string
           created_at: string
           date: string
@@ -539,15 +614,20 @@ export type Database = {
           invoice_type: string
           ksef_number: string | null
           nip: string
+          payment_due_date: string | null
+          payment_status: string
           pdf_path: string | null
           project_id: string | null
+          source: string
           status: string
+          tags: string[] | null
           updated_at: string
           vendor: string
           xml_path: string | null
         }
         Insert: {
           bookkeeper_note?: string | null
+          category?: string | null
           company_id: string
           created_at?: string
           date: string
@@ -556,15 +636,20 @@ export type Database = {
           invoice_type?: string
           ksef_number?: string | null
           nip: string
+          payment_due_date?: string | null
+          payment_status?: string
           pdf_path?: string | null
           project_id?: string | null
+          source?: string
           status?: string
+          tags?: string[] | null
           updated_at?: string
           vendor: string
           xml_path?: string | null
         }
         Update: {
           bookkeeper_note?: string | null
+          category?: string | null
           company_id?: string
           created_at?: string
           date?: string
@@ -573,9 +658,13 @@ export type Database = {
           invoice_type?: string
           ksef_number?: string | null
           nip?: string
+          payment_due_date?: string | null
+          payment_status?: string
           pdf_path?: string | null
           project_id?: string | null
+          source?: string
           status?: string
+          tags?: string[] | null
           updated_at?: string
           vendor?: string
           xml_path?: string | null
@@ -822,6 +911,10 @@ export type Database = {
       get_user_company_role: {
         Args: { _company_id: string; _user_id: string }
         Returns: string
+      }
+      sync_contacts_from_invoices: {
+        Args: { _company_id: string }
+        Returns: undefined
       }
       user_has_company_access: {
         Args: { _company_id: string; _user_id: string }
