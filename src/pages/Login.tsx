@@ -1,4 +1,5 @@
 import { useState } from "react";
+import logoFacturo from "@/assets/logo-facturo.png";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,6 @@ const Login = () => {
           <Link to="/" className="flex items-center gap-2.5">
             <img src={logoFacturo} alt="Facturo" className="h-9 w-9 rounded-xl object-contain" />
             <span className="text-lg font-bold tracking-tight">Facturo</span>
-          </Link>
           </Link>
 
           <div>
