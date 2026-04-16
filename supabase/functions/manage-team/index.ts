@@ -5,6 +5,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const VALID_ROLES = new Set(["admin", "księgowy", "handlowiec"]);
+
+function isValidRole(role: unknown): role is "admin" | "księgowy" | "handlowiec" {
+  return typeof role === "string" && VALID_ROLES.has(role);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -54,6 +60,7 @@ Deno.serve(async (req) => {
 
     if (action === "invite") {
       if (!email || !role || !password) throw new Error("Brak wymaganych danych (email, rola, hasło)");
+      if (!isValidRole(role)) throw new Error("Nieprawidłowa rola");
 
       // Check if user already exists
       const { data: existingUsers } = await adminClient.auth.admin.listUsers();
@@ -89,7 +96,7 @@ Deno.serve(async (req) => {
           .select("id")
           .eq("user_id", targetUser.id)
           .eq("company_id", companyId)
-          .single();
+          .maybeSingle();
 
         if (existingRole) {
           await adminClient
@@ -111,7 +118,7 @@ Deno.serve(async (req) => {
         .from("profiles")
         .select("id")
         .eq("user_id", targetUser.id)
-        .single();
+        .maybeSingle();
 
       if (!existingProfile) {
         await adminClient.from("profiles").insert({
@@ -123,6 +130,49 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ success: true, message: `Zaproszono ${email} jako ${role} do ${assigned} firm` }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "update_role") {
+      if (!userId || !role) throw new Error("Brak wymaganych danych");
+      if (!isValidRole(role)) throw new Error("Nieprawidłowa rola");
+      if (userId === user.id) throw new Error("Nie możesz zmienić własnej roli");
+
+      let updated = 0;
+      for (const companyId of companyIds) {
+        const { data: existingRole } = await adminClient
+          .from("user_roles")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .maybeSingle();
+
+        if (existingRole) {
+          const { error: updateError } = await adminClient
+            .from("user_roles")
+            .update({ role })
+            .eq("user_id", userId)
+            .eq("company_id", companyId);
+
+          if (updateError) {
+            throw new Error(`Nie udało się zaktualizować roli: ${updateError.message}`);
+          }
+        } else {
+          const { error: insertError } = await adminClient
+            .from("user_roles")
+            .insert({ user_id: userId, company_id: companyId, role });
+
+          if (insertError) {
+            throw new Error(`Nie udało się przypisać roli: ${insertError.message}`);
+          }
+        }
+
+        updated++;
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, message: `Zmieniono rolę na ${role} w ${updated} firmach` }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

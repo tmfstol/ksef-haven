@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
     // Get invoice and verify ownership through company -> user_id
     const { data: invoice, error: invErr } = await supabase
       .from("invoices")
-      .select("ksef_number, company_id")
+      .select("ksef_number, company_id, invoice_type")
       .eq("id", invoice_id)
       .single();
 
@@ -260,24 +260,75 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify the invoice belongs to the authenticated user's company
-    const { data: company, error: compErr } = await supabase
+    let company: { nip: string; ksef_token: string } | null = null;
+
+    const { data: ownedCompany, error: ownedCompanyError } = await supabase
       .from("companies")
       .select("nip, ksef_token")
       .eq("id", invoice.company_id)
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
-    if (compErr || !company || !company.ksef_token) {
-      return new Response(JSON.stringify({ error: "Firma nie znaleziona lub brak dostępu" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (ownedCompanyError) throw ownedCompanyError;
+
+    if (ownedCompany?.ksef_token) {
+      company = ownedCompany;
+    } else {
+      const { data: membership, error: membershipError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("company_id", invoice.company_id)
+        .maybeSingle();
+
+      if (membershipError) throw membershipError;
+
+      if (!membership) {
+        return new Response(JSON.stringify({ error: "Firma nie znaleziona lub brak dostępu" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const canAccessInvoice =
+        membership.role === "admin" ||
+        (membership.role === "księgowy" && invoice.invoice_type === "kosztowa") ||
+        (membership.role === "handlowiec" && invoice.invoice_type === "przychodowa");
+
+      if (!canAccessInvoice) {
+        return new Response(JSON.stringify({ error: "Ta rola nie ma dostępu do tego typu faktury" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: invitedCompany, error: invitedCompanyError } = await supabase
+        .from("companies")
+        .select("nip, ksef_token")
+        .eq("id", invoice.company_id)
+        .maybeSingle();
+
+      if (invitedCompanyError) throw invitedCompanyError;
+      if (!invitedCompany?.ksef_token) {
+        return new Response(JSON.stringify({ error: "Firma nie ma skonfigurowanego tokenu KSeF" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      company = invitedCompany;
     }
 
     if (!invoice.ksef_number) {
       return new Response(JSON.stringify({ error: "Faktura nie ma numeru KSeF" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!company?.ksef_token) {
+      return new Response(JSON.stringify({ error: "Firma nie znaleziona lub brak dostępu" }), {
+        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
