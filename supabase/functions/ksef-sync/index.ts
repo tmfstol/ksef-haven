@@ -651,7 +651,7 @@ async function syncCompany(
       return {
         companyId: company.id,
         companyNip: company.nip,
-        totalFound: invoiceRefs.length,
+        totalFound: allRefs.length,
         newInvoices: upsertedCount,
       };
     } catch (err) {
@@ -707,11 +707,40 @@ Deno.serve(async (req) => {
     const companyId = body.company_id || null;
     const ksefEnv = body.ksef_env || "prod";
 
-    // Only fetch companies belonging to the authenticated user
-    let query = supabase.from("companies").select("id, nip, ksef_token").eq("user_id", userId);
-    if (companyId) query = query.eq("id", companyId);
+    const [{ data: ownedCompanies, error: ownedCompaniesError }, { data: companyRoles, error: companyRolesError }] = await Promise.all([
+      supabase.from("companies").select("id").eq("user_id", userId),
+      supabase.from("user_roles").select("company_id").eq("user_id", userId),
+    ]);
 
-    const { data: companies, error: companiesError } = await query;
+    if (ownedCompaniesError) throw new Error(`DB error: ${ownedCompaniesError.message}`);
+    if (companyRolesError) throw new Error(`DB error: ${companyRolesError.message}`);
+
+    const accessibleCompanyIds = Array.from(
+      new Set([
+        ...(ownedCompanies ?? []).map((company: { id: string }) => company.id),
+        ...(companyRoles ?? []).map((role: { company_id: string }) => role.company_id),
+      ])
+    );
+
+    if (accessibleCompanyIds.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Nie znaleziono firm do synchronizacji" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (companyId && !accessibleCompanyIds.includes(companyId)) {
+      return new Response(
+        JSON.stringify({ error: "Brak dostępu do wybranej firmy" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: companies, error: companiesError } = await supabase
+      .from("companies")
+      .select("id, nip, ksef_token")
+      .in("id", companyId ? [companyId] : accessibleCompanyIds);
+
     if (companiesError) throw new Error(`DB error: ${companiesError.message}`);
     if (!companies || companies.length === 0) {
       return new Response(
