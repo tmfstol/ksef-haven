@@ -4,6 +4,8 @@ import { useCompanies } from "@/hooks/useCompanies";
 import { useExpenses, useExpenseCategories, useDeleteExpense, type Expense } from "@/hooks/useExpenses";
 import { AddExpenseForm } from "@/components/expenses/AddExpenseForm";
 import { AiAssistantChat } from "@/components/dashboard/AiAssistantChat";
+import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
