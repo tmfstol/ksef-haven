@@ -83,6 +83,33 @@ const blogPosts = [
   },
 ];
 
+const faqItems = [
+  {
+    q: "Czym jest KSeF i dlaczego muszę go używać?",
+    a: "KSeF (Krajowy System e-Faktur) to obowiązkowy system Ministerstwa Finansów do wystawiania i odbierania faktur elektronicznych. Od 2026 roku każda firma w Polsce musi korzystać z KSeF. Facturo automatycznie synchronizuje się z KSeF, więc nie musisz robić tego ręcznie.",
+  },
+  {
+    q: "Czy Facturo jest darmowy?",
+    a: "Facturo oferuje darmowe konto do przetestowania wszystkich funkcji. Pełna wersja z nieograniczoną liczbą faktur, asystentem AI i wsparciem kosztuje 15 PLN miesięcznie — bez ukrytych opłat i długoterminowych zobowiązań.",
+  },
+  {
+    q: "Jak działa asystent AI w Facturo?",
+    a: "Asystent AI automatycznie rozpoznaje dokumenty (OCR), kategoryzuje wydatki, analizuje koszty i odpowiada na pytania dotyczące księgowości. Działa w czasie rzeczywistym i uczy się na podstawie Twoich danych, oszczędzając godziny pracy.",
+  },
+  {
+    q: "Czy mogę wystawiać faktury VAT przez Facturo?",
+    a: "Tak! Facturo obsługuje faktury VAT zgodne ze schematem FA(3), w tym faktury zaliczkowe i korekty. Każda faktura generuje XML do KSeF oraz PDF z kodem QR do weryfikacji.",
+  },
+  {
+    q: "Jak bezpieczne są moje dane w Facturo?",
+    a: "Dane są szyfrowane, a każda firma ma pełną izolację danych (Row Level Security). Logowanie wymaga weryfikacji email, a tokeny KSeF są maskowane. Spełniamy najwyższe standardy bezpieczeństwa danych finansowych.",
+  },
+  {
+    q: "Czy Facturo obsługuje wiele firm?",
+    a: "Tak, możesz zarządzać wieloma firmami z jednego konta. Każda firma ma własne ustawienia, faktury, wydatki i zespół z rolami (administrator, księgowy, handlowiec).",
+  },
+];
+
 const Landing = () => {
   const { data: dbPosts } = useQuery({
     queryKey: ["landing-blog-posts"],
