@@ -62,9 +62,14 @@ Deno.serve(async (req) => {
       );
 
       if (!targetUser) {
-        const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email);
-        if (inviteError) throw new Error(`Nie udało się zaprosić: ${inviteError.message}`);
-        targetUser = inviteData.user;
+        // Create user with password set by admin
+        const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+        });
+        if (createError) throw new Error(`Nie udało się utworzyć konta: ${createError.message}`);
+        targetUser = createData.user;
       }
 
       if (!targetUser) throw new Error("Nie udało się znaleźć/utworzyć użytkownika");
