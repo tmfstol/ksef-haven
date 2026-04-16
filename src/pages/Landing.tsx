@@ -83,6 +83,33 @@ const blogPosts = [
   },
 ];
 
+const faqItems = [
+  {
+    q: "Czym jest KSeF i dlaczego muszę go używać?",
+    a: "KSeF (Krajowy System e-Faktur) to obowiązkowy system Ministerstwa Finansów do wystawiania i odbierania faktur elektronicznych. Od 2026 roku każda firma w Polsce musi korzystać z KSeF. Facturo automatycznie synchronizuje się z KSeF, więc nie musisz robić tego ręcznie.",
+  },
+  {
+    q: "Czy Facturo jest darmowy?",
+    a: "Facturo oferuje darmowe konto do przetestowania wszystkich funkcji. Pełna wersja z nieograniczoną liczbą faktur, asystentem AI i wsparciem kosztuje 15 PLN miesięcznie — bez ukrytych opłat i długoterminowych zobowiązań.",
+  },
+  {
+    q: "Jak działa asystent AI w Facturo?",
+    a: "Asystent AI automatycznie rozpoznaje dokumenty (OCR), kategoryzuje wydatki, analizuje koszty i odpowiada na pytania dotyczące księgowości. Działa w czasie rzeczywistym i uczy się na podstawie Twoich danych, oszczędzając godziny pracy.",
+  },
+  {
+    q: "Czy mogę wystawiać faktury VAT przez Facturo?",
+    a: "Tak! Facturo obsługuje faktury VAT zgodne ze schematem FA(3), w tym faktury zaliczkowe i korekty. Każda faktura generuje XML do KSeF oraz PDF z kodem QR do weryfikacji.",
+  },
+  {
+    q: "Jak bezpieczne są moje dane w Facturo?",
+    a: "Dane są szyfrowane, a każda firma ma pełną izolację danych (Row Level Security). Logowanie wymaga weryfikacji email, a tokeny KSeF są maskowane. Spełniamy najwyższe standardy bezpieczeństwa danych finansowych.",
+  },
+  {
+    q: "Czy Facturo obsługuje wiele firm?",
+    a: "Tak, możesz zarządzać wieloma firmami z jednego konta. Każda firma ma własne ustawienia, faktury, wydatki i zespół z rolami (administrator, księgowy, handlowiec).",
+  },
+];
+
 const Landing = () => {
   const { data: dbPosts } = useQuery({
     queryKey: ["landing-blog-posts"],
@@ -377,6 +404,57 @@ const Landing = () => {
             </motion.div>
           ))}
         </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="max-w-4xl mx-auto px-6 py-24">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-16">
+          <span className="text-sm font-medium text-primary uppercase tracking-widest">FAQ</span>
+          <h2 className="text-3xl md:text-4xl font-bold text-background tracking-tight mt-3">
+            Najczęściej zadawane pytania
+          </h2>
+        </motion.div>
+
+        <div className="space-y-4">
+          {faqItems.map((item, i) => (
+            <motion.details
+              key={i}
+              custom={i + 1}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              className="group rounded-2xl border border-background/10 bg-background/5 backdrop-blur-sm overflow-hidden"
+            >
+              <summary className="flex items-center justify-between px-6 py-5 cursor-pointer list-none text-background font-medium hover:text-primary transition-colors">
+                <span>{item.q}</span>
+                <ChevronRight className="h-4 w-4 text-background/40 group-open:rotate-90 transition-transform" />
+              </summary>
+              <div className="px-6 pb-5 text-sm text-background/50 leading-relaxed">
+                {item.a}
+              </div>
+            </motion.details>
+          ))}
+        </div>
+
+        {/* FAQ JSON-LD */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              "mainEntity": faqItems.map((item) => ({
+                "@type": "Question",
+                "name": item.q,
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": item.a,
+                },
+              })),
+            }),
+          }}
+        />
       </section>
 
       {/* CTA */}
