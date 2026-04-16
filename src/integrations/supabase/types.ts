@@ -359,6 +359,7 @@ export type Database = {
           date: string
           gross_amount: number
           id: string
+          invoice_type: string
           ksef_number: string | null
           nip: string
           pdf_path: string | null
@@ -375,6 +376,7 @@ export type Database = {
           date: string
           gross_amount?: number
           id?: string
+          invoice_type?: string
           ksef_number?: string | null
           nip: string
           pdf_path?: string | null
@@ -391,6 +393,7 @@ export type Database = {
           date?: string
           gross_amount?: number
           id?: string
+          invoice_type?: string
           ksef_number?: string | null
           nip?: string
           pdf_path?: string | null
@@ -572,15 +575,53 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["company_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["company_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["company_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_company_role: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: string
+      }
     }
     Enums: {
-      [_ in never]: never
+      company_role: "admin" | "księgowy" | "handlowiec"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -707,6 +748,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      company_role: ["admin", "księgowy", "handlowiec"],
+    },
   },
 } as const
