@@ -82,6 +82,30 @@ const blogPosts = [
 ];
 
 const Landing = () => {
+  const { data: dbPosts } = useQuery({
+    queryKey: ["landing-blog-posts"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("blog_posts")
+        .select("*")
+        .eq("published", true)
+        .order("published_at", { ascending: false })
+        .limit(3);
+      return data || [];
+    },
+  });
+
+  const displayPosts = dbPosts && dbPosts.length > 0
+    ? dbPosts.map(p => ({
+        title: p.title,
+        excerpt: p.excerpt,
+        category: p.category,
+        gradient: p.cover_gradient,
+        date: p.published_at ? new Date(p.published_at).toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric" }) : "",
+        slug: p.slug,
+      }))
+    : blogPosts.map(p => ({ ...p, slug: "" }));
+
   return (
     <div className="min-h-screen bg-foreground overflow-hidden">
       {/* Navbar */}
