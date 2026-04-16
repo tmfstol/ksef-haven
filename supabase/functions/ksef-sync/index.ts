@@ -326,7 +326,6 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string, 
       subjectType,
       dateRange: {
         dateType: "issue",
-        from: threeMonthsAgo.toISOString(),
         from: fromDate.toISOString(),
         to: toDate.toISOString(),
       },
