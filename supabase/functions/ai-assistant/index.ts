@@ -326,6 +326,47 @@ async function executeTool(
         });
       }
 
+      case "send_invoice_to_portal": {
+        // Find invoice
+        let invoiceQuery = supabase
+          .from("invoices")
+          .select("id, vendor, nip, gross_amount, date, company_id")
+          .in("company_id", companyIds);
+        if (args.invoice_id) invoiceQuery = invoiceQuery.eq("id", args.invoice_id);
+        if (args.vendor_name) invoiceQuery = invoiceQuery.ilike("vendor", `%${args.vendor_name}%`);
+        const { data: invData, error: invErr } = await invoiceQuery.limit(1).maybeSingle();
+        if (invErr) return `Błąd: ${invErr.message}`;
+        if (!invData) return "Nie znaleziono faktury.";
+
+        // Get company portal email
+        const { data: comp } = await supabase
+          .from("companies")
+          .select("name, client_portal_email")
+          .eq("id", invData.company_id)
+          .single();
+        if (!comp?.client_portal_email) {
+          return `Firma nie ma skonfigurowanego adresu email portalu klienta. Skonfiguruj go w ustawieniach firmy.`;
+        }
+
+        // Call send-invoice-email edge function
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const sendResp = await fetch(`${supabaseUrl}/functions/v1/send-invoice-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+            apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
+          },
+          body: JSON.stringify({ invoiceId: invData.id }),
+        });
+        const sendResult = await sendResp.json();
+        if (!sendResp.ok) {
+          return `Błąd wysyłki: ${sendResult.error || "nieznany błąd"}`;
+        }
+        return `Faktura od "${invData.vendor}" na kwotę ${invData.gross_amount} PLN została wysłana na portal klienta (${comp.client_portal_email}).`;
+      }
+
       default:
         return `Nieznane narzędzie: ${toolName}`;
     }
