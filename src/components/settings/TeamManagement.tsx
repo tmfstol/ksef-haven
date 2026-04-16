@@ -71,7 +71,7 @@ export default function TeamManagement() {
     setInviting(true);
     try {
       const res = await supabase.functions.invoke("manage-team", {
-        body: { action: "invite", email: inviteEmail.trim(), role: inviteRole },
+        body: { action: "invite", email: inviteEmail.trim(), role: inviteRole, password: invitePassword.trim() },
       });
       if (res.data?.success) {
         toast.success(res.data.message);
