@@ -480,7 +480,7 @@ serve(async (req) => {
           const args = typeof tc.function.arguments === "string"
             ? JSON.parse(tc.function.arguments)
             : tc.function.arguments;
-          const result = await executeTool(supabase, tc.function.name, args, companyIds, companiesMap);
+          const result = await executeTool(supabase, tc.function.name, args, companyIds, companiesMap, authHeader!);
           currentMessages.push({
             role: "tool",
             tool_call_id: tc.id,
