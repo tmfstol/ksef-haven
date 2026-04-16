@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { action, email, role, userId } = await req.json();
+    const { action, email, role, userId, password } = await req.json();
 
     // Get ALL companies owned by the caller
     const { data: callerCompanies, error: compError } = await adminClient
