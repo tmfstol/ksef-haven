@@ -219,16 +219,16 @@ export function AiAssistantChat() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-primary-foreground shadow-lg hover:bg-primary/90 transition-all hover:scale-105"
+        className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 flex items-center gap-2 rounded-full bg-primary px-4 sm:px-5 py-2.5 sm:py-3 text-primary-foreground shadow-lg hover:bg-primary/90 transition-all hover:scale-105"
       >
         <Bot className="h-5 w-5" />
-        <span className="text-sm font-medium">Asystent AI</span>
+        <span className="text-sm font-medium">AI Agent</span>
       </button>
     );
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[420px] h-[600px] flex flex-col rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
+    <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 w-[calc(100vw-24px)] sm:w-[420px] h-[calc(100vh-160px)] sm:h-[600px] flex flex-col rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
         <div className="flex items-center gap-2">
