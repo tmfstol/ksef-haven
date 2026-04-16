@@ -190,6 +190,22 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "mark_invoice_paid",
+      description: "Oznacza fakturę jako opłaconą. Można wskazać po ID lub po nazwie dostawcy (vendor_name) — w tym drugim przypadku oznacza wszystkie nieopłacone faktury danego dostawcy lub konkretną jeśli podano kwotę.",
+      parameters: {
+        type: "object",
+        properties: {
+          invoice_id: { type: "string", description: "ID faktury (opcjonalne)" },
+          vendor_name: { type: "string", description: "Nazwa dostawcy (częściowe dopasowanie)" },
+          amount: { type: "number", description: "Kwota brutto do dopasowania konkretnej faktury (opcjonalne)" },
+          paid: { type: "boolean", description: "true = opłacona (domyślnie), false = cofa oznaczenie" },
+        },
+      },
+    },
+  },
 ];
 
 async function executeTool(
