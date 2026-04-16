@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen, CalendarIcon } from "lucide-react";
+import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen, CalendarIcon, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { Company } from "@/types/company";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SyncParams {
   dateFrom?: string;
@@ -24,6 +26,9 @@ interface DashboardHeaderProps {
   onSyncAll?: (params?: SyncParams) => void;
   isSyncingAll?: boolean;
   activeCompany?: Company | null;
+  companies?: Company[];
+  activeCompanyId?: string | null;
+  onSelectCompany?: (id: string) => void;
 }
 
 export function DashboardHeader({
@@ -35,9 +40,13 @@ export function DashboardHeader({
   onSyncAll,
   isSyncingAll,
   activeCompany,
+  companies,
+  activeCompanyId,
+  onSelectCompany,
 }: DashboardHeaderProps) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const isMobile = useIsMobile();
   const [syncDateFrom, setSyncDateFrom] = useState<Date | undefined>(undefined);
   const [syncDateTo, setSyncDateTo] = useState<Date | undefined>(undefined);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -52,9 +61,62 @@ export function DashboardHeader({
   const handleSync = () => onSync(buildParams());
   const handleSyncAll = () => onSyncAll?.(buildParams());
 
+  if (isMobile) {
+    return (
+      <header className="glass-panel border-b border-border/50 px-4 py-3 space-y-3">
+        {/* Top row: company selector + sync */}
+        <div className="flex items-center gap-2">
+          {companies && companies.length > 1 && onSelectCompany ? (
+            <Select value={activeCompanyId || ""} onValueChange={(v) => onSelectCompany(v)}>
+              <SelectTrigger className="flex-1 h-9 rounded-xl text-sm">
+                <SelectValue placeholder="Wybierz firmę" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : activeCompany ? (
+            <div className="flex-1 flex items-center gap-2 min-w-0">
+              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                {activeCompany.name.charAt(0)}
+              </div>
+              <span className="text-sm font-semibold truncate">{activeCompany.name}</span>
+            </div>
+          ) : <div className="flex-1" />}
+
+          <div className="flex items-center gap-1.5">
+            {isConnected ? (
+              <Wifi className="h-3.5 w-3.5 text-success" />
+            ) : (
+              <WifiOff className="h-3.5 w-3.5 text-destructive" />
+            )}
+            <Button size="sm" onClick={handleSync} disabled={isSyncing} className="rounded-xl h-8 px-3 gap-1.5 text-xs">
+              {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Sync
+            </Button>
+          </div>
+        </div>
+
+        {/* Search bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Szukaj faktur..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+          />
+        </div>
+      </header>
+    );
+  }
+
+  // Desktop header
   return (
     <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
-      {/* Status połączenia */}
       <div className="flex items-center gap-2 text-sm">
         {isConnected ? (
           <>
@@ -71,7 +133,6 @@ export function DashboardHeader({
         )}
       </div>
 
-      {/* Aktywna firma */}
       {activeCompany && (
         <>
           <div className="h-5 w-px bg-border/60" />
@@ -89,7 +150,6 @@ export function DashboardHeader({
 
       <div className="h-5 w-px bg-border/60" />
 
-      {/* Wyszukiwarka */}
       <div className="relative flex-1 max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <input
@@ -103,87 +163,32 @@ export function DashboardHeader({
 
       <div className="flex-1" />
 
-      {/* Nowa faktura */}
-      <Button
-        variant="outline"
-        onClick={() => navigate("/invoices/new")}
-        className="rounded-xl px-4 gap-2"
-        title="Utwórz nową fakturę"
-      >
-        <FilePlus className="h-4 w-4" />
-        Nowa faktura
+      <Button variant="outline" onClick={() => navigate("/invoices/new")} className="rounded-xl px-4 gap-2" title="Utwórz nową fakturę">
+        <FilePlus className="h-4 w-4" /> Nowa faktura
       </Button>
-
-      {/* Wydatki */}
-      <Button
-        variant="outline"
-        onClick={() => navigate("/expenses")}
-        className="rounded-xl px-4 gap-2"
-        title="Zarządzaj wydatkami"
-      >
-        <Receipt className="h-4 w-4" />
-        Wydatki
+      <Button variant="outline" onClick={() => navigate("/expenses")} className="rounded-xl px-4 gap-2" title="Zarządzaj wydatkami">
+        <Receipt className="h-4 w-4" /> Wydatki
       </Button>
-
-      {/* Projekty */}
-      <Button
-        variant="outline"
-        onClick={() => navigate("/projects")}
-        className="rounded-xl px-4 gap-2"
-        title="Foldery inwestycji"
-      >
-        <FolderOpen className="h-4 w-4" />
-        Projekty
+      <Button variant="outline" onClick={() => navigate("/projects")} className="rounded-xl px-4 gap-2" title="Foldery inwestycji">
+        <FolderOpen className="h-4 w-4" /> Projekty
       </Button>
-
-      {/* Ustawienia */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => navigate("/settings")}
-        className="rounded-xl"
-        title="Ustawienia"
-      >
+      <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="rounded-xl" title="Ustawienia">
         <Settings className="h-4 w-4" />
       </Button>
-
-      {/* Wyloguj */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={signOut}
-        className="rounded-xl text-muted-foreground hover:text-destructive"
-        title="Wyloguj"
-      >
+      <Button variant="ghost" size="icon" onClick={signOut} className="rounded-xl text-muted-foreground hover:text-destructive" title="Wyloguj">
         <LogOut className="h-4 w-4" />
       </Button>
 
-      {/* Sync All */}
       {onSyncAll && (
-        <Button
-          variant="outline"
-          onClick={handleSyncAll}
-          disabled={isSyncingAll}
-          className="rounded-xl px-4 gap-2"
-        >
-          {isSyncingAll ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Zap className="h-4 w-4" />
-          )}
+        <Button variant="outline" onClick={handleSyncAll} disabled={isSyncingAll} className="rounded-xl px-4 gap-2">
+          {isSyncingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
           Sync. wszystkich
         </Button>
       )}
 
-      {/* Synchronizacja */}
       <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
         <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="icon"
-            className="rounded-xl"
-            title="Filtruj daty synchronizacji"
-          >
+          <Button variant="outline" size="icon" className="rounded-xl" title="Filtruj daty synchronizacji">
             <CalendarIcon className="h-4 w-4" />
           </Button>
         </PopoverTrigger>
@@ -227,16 +232,8 @@ export function DashboardHeader({
         </PopoverContent>
       </Popover>
 
-      <Button
-        onClick={handleSync}
-        disabled={isSyncing}
-        className="rounded-xl px-5 gap-2 shadow-sm"
-      >
-        {isSyncing ? (
-          <Loader2 className="h-4 w-4 animate-spin-slow" />
-        ) : (
-          <RefreshCw className="h-4 w-4" />
-        )}
+      <Button onClick={handleSync} disabled={isSyncing} className="rounded-xl px-5 gap-2 shadow-sm">
+        {isSyncing ? <Loader2 className="h-4 w-4 animate-spin-slow" /> : <RefreshCw className="h-4 w-4" />}
         {isSyncing ? "Synchronizuję..." : "Synchronizuj z KSeF"}
       </Button>
     </header>

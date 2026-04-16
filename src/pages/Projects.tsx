@@ -8,6 +8,8 @@ import {
 } from "@/hooks/useProjects";
 import { useInvoices } from "@/hooks/useInvoices";
 import { AiAssistantChat } from "@/components/dashboard/AiAssistantChat";
+import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +29,7 @@ const PROJECT_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "
 
 const Projects = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const { data: projects, isLoading } = useProjects(activeCompanyId);
@@ -217,7 +220,8 @@ const Projects = () => {
           </div>
         )}
       </main>
-      <AiAssistantChat />
+      {!isMobile && <AiAssistantChat />}
+      <MobileBottomNav />
     </div>
   );
 };

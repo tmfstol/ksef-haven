@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import TeamManagement from "@/components/settings/TeamManagement";
+import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCompanies, useAddCompany, useUpdateCompany, useDeleteCompany } from "@/hooks/useCompanies";
 import { useTestConnection } from "@/hooks/useSettings";
@@ -156,7 +157,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <header className="glass-panel border-b border-border/50 px-6 py-4 flex items-center gap-4">
         {!isOnboarding && (
           <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-xl">
@@ -175,7 +176,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto p-6 flex gap-6">
+      <main className="max-w-4xl mx-auto p-4 md:p-6 flex flex-col md:flex-row gap-4 md:gap-6">
         {/* Company list (not shown in onboarding if no companies) */}
         {(!isOnboarding || (companies && companies.length > 0)) && (
           <motion.div
@@ -495,6 +496,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
           </motion.div>
         </div>
       </main>
+      <MobileBottomNav />
     </div>
   );
 };
