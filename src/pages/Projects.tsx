@@ -7,7 +7,7 @@ import {
   type Project,
 } from "@/hooks/useProjects";
 import { useInvoices } from "@/hooks/useInvoices";
-import { AiAssistantChat } from "@/components/dashboard/AiAssistantChat";
+
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
