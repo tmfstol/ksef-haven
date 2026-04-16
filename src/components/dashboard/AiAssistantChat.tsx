@@ -193,6 +193,14 @@ export function AiAssistantChat() {
       onDelta: upsert,
       onDone: () => {
         setIsLoading(false);
+        // Auto-refresh data after agent actions
+        queryClient.invalidateQueries({ queryKey: ["projects"] });
+        queryClient.invalidateQueries({ queryKey: ["invoices"] });
+        queryClient.invalidateQueries({ queryKey: ["expenses"] });
+        queryClient.invalidateQueries({ queryKey: ["command-center"] });
+        queryClient.invalidateQueries({ queryKey: ["contacts"] });
+        queryClient.invalidateQueries({ queryKey: ["project-invoices"] });
+        queryClient.invalidateQueries({ queryKey: ["project-expenses"] });
         if (voiceEnabled && assistantSoFar) {
           setIsSpeaking(true);
           speakText(assistantSoFar, () => setIsSpeaking(false));
@@ -203,7 +211,7 @@ export function AiAssistantChat() {
         setIsLoading(false);
       },
     });
-  }, [messages, isLoading, voiceEnabled]);
+  }, [messages, isLoading, voiceEnabled, queryClient]);
 
   const toggleListening = useCallback(() => {
     if (isListening) {
