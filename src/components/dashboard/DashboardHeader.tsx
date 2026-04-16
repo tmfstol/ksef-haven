@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen, CalendarIcon, Menu } from "lucide-react";
+import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen, CalendarIcon, Menu, LayoutDashboard } from "lucide-react";
 import { Link } from "react-router-dom";
 import logoFacturo from "@/assets/logo-facturo.png";
 import { useNavigate } from "react-router-dom";
@@ -170,6 +170,9 @@ export function DashboardHeader({
 
       <div className="flex-1" />
 
+      <Button variant="outline" onClick={() => navigate("/command-center")} className="rounded-xl px-4 gap-2" title="Centrum dowodzenia">
+        <LayoutDashboard className="h-4 w-4" /> Centrum
+      </Button>
       <Button variant="outline" onClick={() => navigate("/invoices/new")} className="rounded-xl px-4 gap-2" title="Utwórz nową fakturę">
         <FilePlus className="h-4 w-4" /> Nowa faktura
       </Button>

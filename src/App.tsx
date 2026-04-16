@@ -12,6 +12,7 @@ import Expenses from "./pages/Expenses";
 import Projects from "./pages/Projects";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
+import CommandCenter from "./pages/CommandCenter";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
@@ -65,6 +66,7 @@ const AppRoutes = () => {
         <Route path="/invoices/new" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
         <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
         <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+        <Route path="/command-center" element={<ProtectedRoute><CommandCenter /></ProtectedRoute>} />
         <Route path="/onboarding" element={<ProtectedRoute><Settings isOnboarding /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

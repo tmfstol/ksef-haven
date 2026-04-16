@@ -41,6 +41,138 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_accounts: {
+        Row: {
+          bank_name: string
+          company_id: string
+          created_at: string
+          holder_name: string | null
+          iban: string
+          id: string
+          last_synced_at: string | null
+          provider: string
+          provider_account_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bank_name: string
+          company_id: string
+          created_at?: string
+          holder_name?: string | null
+          iban: string
+          id?: string
+          last_synced_at?: string | null
+          provider?: string
+          provider_account_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bank_name?: string
+          company_id?: string
+          created_at?: string
+          holder_name?: string | null
+          iban?: string
+          id?: string
+          last_synced_at?: string | null
+          provider?: string
+          provider_account_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_transactions: {
+        Row: {
+          amount: number
+          bank_account_id: string
+          company_id: string
+          counterparty_iban: string | null
+          counterparty_name: string | null
+          created_at: string
+          currency: string
+          date: string
+          description: string | null
+          id: string
+          match_confidence: number | null
+          match_status: string
+          matched_invoice_id: string | null
+          reference: string | null
+          transaction_id: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          bank_account_id: string
+          company_id: string
+          counterparty_iban?: string | null
+          counterparty_name?: string | null
+          created_at?: string
+          currency?: string
+          date: string
+          description?: string | null
+          id?: string
+          match_confidence?: number | null
+          match_status?: string
+          matched_invoice_id?: string | null
+          reference?: string | null
+          transaction_id?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string
+          company_id?: string
+          counterparty_iban?: string | null
+          counterparty_name?: string | null
+          created_at?: string
+          currency?: string
+          date?: string
+          description?: string | null
+          id?: string
+          match_confidence?: number | null
+          match_status?: string
+          matched_invoice_id?: string | null
+          reference?: string | null
+          transaction_id?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_matched_invoice_id_fkey"
+            columns: ["matched_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blog_posts: {
         Row: {
           category: string
