@@ -272,7 +272,7 @@ export function AiAssistantChat() {
   }
 
   return (
-    <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 w-[calc(100vw-24px)] sm:w-[420px] h-[calc(100vh-160px)] sm:h-[600px] flex flex-col rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
+    <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 w-[calc(100vw-24px)] sm:w-[420px] h-[60vh] sm:h-[600px] max-h-[calc(100dvh-100px)] flex flex-col rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
         <div className="flex items-center gap-2">
