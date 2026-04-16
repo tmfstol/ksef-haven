@@ -45,6 +45,7 @@ export default function TeamManagement() {
   const [invitePassword, setInvitePassword] = useState("");
   const [inviting, setInviting] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -107,6 +108,25 @@ export default function TeamManagement() {
     }
   };
 
+  const handleUpdateRole = async (userId: string, role: string) => {
+    setUpdatingRoleId(userId);
+    try {
+      const res = await supabase.functions.invoke("manage-team", {
+        body: { action: "update_role", userId, role },
+      });
+      if (res.data?.success) {
+        toast.success(res.data.message);
+        fetchMembers();
+      } else {
+        toast.error(res.data?.error || "Błąd zmiany roli");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Błąd zmiany roli");
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -121,7 +141,7 @@ export default function TeamManagement() {
         <div>
           <h2 className="text-sm font-semibold text-foreground">Zespół</h2>
           <p className="text-xs text-muted-foreground">
-            Zaproś osobę — automatycznie otrzyma dostęp do wszystkich Twoich firm
+            Zaproś osobę i ustaw jej rolę — rola decyduje, które faktury zobaczy
           </p>
         </div>
       </div>
@@ -164,6 +184,9 @@ export default function TeamManagement() {
             Zaproś
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground px-1">
+          Księgowy widzi faktury kosztowe, handlowiec widzi faktury przychodowe, administrator widzi wszystko.
+        </p>
       </div>
 
       {/* Members list */}
@@ -201,10 +224,30 @@ export default function TeamManagement() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border ${roleColors[member.role] || "bg-secondary text-foreground"}`}>
-                  {roleIcons[member.role]}
-                  {roleLabels[member.role] || member.role}
-                </span>
+                {member.user_id === user?.id ? (
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border ${roleColors[member.role] || "bg-secondary text-foreground"}`}>
+                    {roleIcons[member.role]}
+                    {roleLabels[member.role] || member.role}
+                  </span>
+                ) : (
+                  <Select
+                    value={member.role}
+                    onValueChange={(role) => handleUpdateRole(member.user_id, role)}
+                    disabled={updatingRoleId === member.user_id || removing === member.user_id}
+                  >
+                    <SelectTrigger className="h-8 min-w-[150px] rounded-lg bg-background/70 text-xs border-border/50">
+                      <div className="flex items-center gap-2 truncate">
+                        {updatingRoleId === member.user_id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Administrator</SelectItem>
+                      <SelectItem value="księgowy">Księgowy</SelectItem>
+                      <SelectItem value="handlowiec">Handlowiec</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
                 {member.user_id !== user?.id && (
                   <Button
                     variant="ghost"
