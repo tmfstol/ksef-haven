@@ -67,7 +67,7 @@ export default function TeamManagement() {
   }, []);
 
   const handleInvite = async () => {
-    if (!inviteEmail.trim()) return;
+    if (!inviteEmail.trim() || !invitePassword.trim()) return;
     setInviting(true);
     try {
       const res = await supabase.functions.invoke("manage-team", {
