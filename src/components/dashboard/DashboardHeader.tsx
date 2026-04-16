@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen, CalendarIcon, Menu } from "lucide-react";
+import { RefreshCw, Search, Wifi, WifiOff, Loader2, Settings, Zap, LogOut, FilePlus, Receipt, FolderOpen, CalendarIcon, Menu, LayoutDashboard } from "lucide-react";
 import { Link } from "react-router-dom";
 import logoFacturo from "@/assets/logo-facturo.png";
 import { useNavigate } from "react-router-dom";
