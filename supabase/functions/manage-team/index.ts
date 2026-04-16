@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { action, email, role, userId } = await req.json();
+    const { action, email, role, userId, password } = await req.json();
 
     // Get ALL companies owned by the caller
     const { data: callerCompanies, error: compError } = await adminClient
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "invite") {
-      if (!email || !role) throw new Error("Brak wymaganych danych");
+      if (!email || !role || !password) throw new Error("Brak wymaganych danych (email, rola, hasło)");
 
       // Check if user already exists
       const { data: existingUsers } = await adminClient.auth.admin.listUsers();
@@ -62,9 +62,14 @@ Deno.serve(async (req) => {
       );
 
       if (!targetUser) {
-        const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email);
-        if (inviteError) throw new Error(`Nie udało się zaprosić: ${inviteError.message}`);
-        targetUser = inviteData.user;
+        // Create user with password set by admin
+        const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+        });
+        if (createError) throw new Error(`Nie udało się utworzyć konta: ${createError.message}`);
+        targetUser = createData.user;
       }
 
       if (!targetUser) throw new Error("Nie udało się znaleźć/utworzyć użytkownika");

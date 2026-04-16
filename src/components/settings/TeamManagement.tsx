@@ -42,6 +42,7 @@ export default function TeamManagement() {
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<string>("księgowy");
+  const [invitePassword, setInvitePassword] = useState("");
   const [inviting, setInviting] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
 
@@ -66,15 +67,16 @@ export default function TeamManagement() {
   }, []);
 
   const handleInvite = async () => {
-    if (!inviteEmail.trim()) return;
+    if (!inviteEmail.trim() || !invitePassword.trim()) return;
     setInviting(true);
     try {
       const res = await supabase.functions.invoke("manage-team", {
-        body: { action: "invite", email: inviteEmail.trim(), role: inviteRole },
+        body: { action: "invite", email: inviteEmail.trim(), role: inviteRole, password: invitePassword.trim() },
       });
       if (res.data?.success) {
         toast.success(res.data.message);
         setInviteEmail("");
+        setInvitePassword("");
         fetchMembers();
       } else {
         toast.error(res.data?.error || "Błąd zapraszania");
@@ -125,33 +127,43 @@ export default function TeamManagement() {
       </div>
 
       {/* Invite form */}
-      <div className="flex gap-2 mb-5 mt-4">
-        <Input
-          type="email"
-          placeholder="email@example.com"
-          value={inviteEmail}
-          onChange={(e) => setInviteEmail(e.target.value)}
-          className="flex-1 rounded-xl bg-secondary/50 border-0"
-          onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-        />
-        <Select value={inviteRole} onValueChange={setInviteRole}>
-          <SelectTrigger className="w-40 rounded-xl bg-secondary/50 border-0">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="admin">Administrator</SelectItem>
-            <SelectItem value="księgowy">Księgowy</SelectItem>
-            <SelectItem value="handlowiec">Handlowiec</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button
-          onClick={handleInvite}
-          disabled={!inviteEmail.trim() || inviting}
-          className="rounded-xl gap-2"
-        >
-          {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-          Zaproś
-        </Button>
+      <div className="space-y-2 mb-5 mt-4">
+        <div className="flex gap-2">
+          <Input
+            type="email"
+            placeholder="email@example.com"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            className="flex-1 rounded-xl bg-secondary/50 border-0"
+          />
+          <Input
+            type="password"
+            placeholder="Hasło do logowania"
+            value={invitePassword}
+            onChange={(e) => setInvitePassword(e.target.value)}
+            className="w-48 rounded-xl bg-secondary/50 border-0"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Select value={inviteRole} onValueChange={setInviteRole}>
+            <SelectTrigger className="w-40 rounded-xl bg-secondary/50 border-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Administrator</SelectItem>
+              <SelectItem value="księgowy">Księgowy</SelectItem>
+              <SelectItem value="handlowiec">Handlowiec</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={handleInvite}
+            disabled={!inviteEmail.trim() || !invitePassword.trim() || inviting}
+            className="rounded-xl gap-2"
+          >
+            {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+            Zaproś
+          </Button>
+        </div>
       </div>
 
       {/* Members list */}
