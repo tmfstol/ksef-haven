@@ -12,6 +12,7 @@ import Expenses from "./pages/Expenses";
 import Projects from "./pages/Projects";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
+import CommandCenter from "./pages/CommandCenter";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
