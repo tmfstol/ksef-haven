@@ -10,6 +10,7 @@ import { StatsBar } from "@/components/dashboard/StatsBar";
 import { InvoiceFilters, applyFilters, type InvoiceFiltersState } from "@/components/dashboard/InvoiceFilters";
 import { Loader2 } from "lucide-react";
 import { AiAssistantChat } from "@/components/dashboard/AiAssistantChat";
+import type { InvoiceType } from "@/types/invoice";
 
 const EMPTY_FILTERS: InvoiceFiltersState = {
   dateFrom: undefined,
@@ -30,9 +31,9 @@ const Index = () => {
   const [selectedNip, setSelectedNip] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<InvoiceFiltersState>(EMPTY_FILTERS);
+  const [activeTab, setActiveTab] = useState<InvoiceType>("kosztowa");
   const [lastSeenTimestamp] = useState<string | null>(() => {
     const prev = localStorage.getItem("ksef_last_seen");
-    // Immediately save current time so next visit won't re-highlight these invoices
     localStorage.setItem("ksef_last_seen", new Date().toISOString());
     return prev;
   });
@@ -54,11 +55,16 @@ const Index = () => {
     [companies, activeCompanyId]
   );
 
-  const vendors = useMemo(() => extractVendors(invoices), [invoices]);
+  // Filter by tab first
+  const tabInvoices = useMemo(
+    () => invoices?.filter((i) => i.invoice_type === activeTab) ?? [],
+    [invoices, activeTab]
+  );
+
+  const vendors = useMemo(() => extractVendors(tabInvoices), [tabInvoices]);
 
   const filteredInvoices = useMemo(() => {
-    if (!invoices) return [];
-    let result = invoices;
+    let result = tabInvoices;
     if (selectedNip) result = result.filter((i) => i.nip === selectedNip);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -71,7 +77,10 @@ const Index = () => {
     }
     result = applyFilters(result, filters);
     return result;
-  }, [invoices, activeCompany, selectedNip, searchQuery, filters]);
+  }, [tabInvoices, selectedNip, searchQuery, filters]);
+
+  const kosztCount = useMemo(() => invoices?.filter((i) => i.invoice_type === "kosztowa").length ?? 0, [invoices]);
+  const przychCount = useMemo(() => invoices?.filter((i) => i.invoice_type === "przychodowa").length ?? 0, [invoices]);
 
   if (companiesLoading) {
     return (
@@ -107,6 +116,38 @@ const Index = () => {
           activeCompany={activeCompany}
         />
 
+        {/* Invoice type tabs */}
+        <div className="px-6 pt-4 flex gap-1 border-b border-border/50">
+          <button
+            onClick={() => { setActiveTab("kosztowa"); setSelectedNip(null); }}
+            className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors relative ${
+              activeTab === "kosztowa"
+                ? "text-foreground bg-secondary/60"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+            }`}
+          >
+            Kosztowe
+            <span className="ml-2 text-xs text-muted-foreground">({kosztCount})</span>
+            {activeTab === "kosztowa" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+            )}
+          </button>
+          <button
+            onClick={() => { setActiveTab("przychodowa"); setSelectedNip(null); }}
+            className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors relative ${
+              activeTab === "przychodowa"
+                ? "text-foreground bg-secondary/60"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+            }`}
+          >
+            Przychodowe
+            <span className="ml-2 text-xs text-muted-foreground">({przychCount})</span>
+            {activeTab === "przychodowa" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+            )}
+          </button>
+        </div>
+
         <main className="flex-1 overflow-y-auto scrollbar-thin p-6">
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center h-full">
@@ -129,6 +170,11 @@ const Index = () => {
               onRetry={() =>
                 navigate(activeCompany ? `/settings?company=${activeCompany.id}` : "/settings")
               }
+            />
+          ) : tabInvoices.length === 0 ? (
+            <EmptyState
+              title={`Brak faktur ${activeTab === "kosztowa" ? "kosztowych" : "przychodowych"}`}
+              description="Po synchronizacji z KSeF faktury zostaną automatycznie sklasyfikowane."
             />
           ) : (
             <>

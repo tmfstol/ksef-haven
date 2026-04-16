@@ -312,7 +312,7 @@ async function redeemToken(baseUrl: string, authToken: string) {
 }
 
 // Step 7: Query invoices using accessToken
-async function queryInvoices(baseUrl: string, accessToken: string, nip: string) {
+async function queryInvoices(baseUrl: string, accessToken: string, nip: string, subjectType: string = "subject2") {
   const now = new Date();
   const threeMonthsAgo = new Date(now);
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
@@ -322,7 +322,7 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
 
   while (true) {
     const queryBody: any = {
-      subjectType: "subject2",
+      subjectType,
       dateRange: {
         dateType: "issue",
         from: threeMonthsAgo.toISOString(),
@@ -336,13 +336,12 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
       Accept: "application/json",
     };
 
-    // Rate limit: wait between pages
     if (pageNum > 0) {
       await new Promise(r => setTimeout(r, 500));
     }
 
     const url = `${baseUrl}/api/v2/invoices/query/metadata?pageSize=100&pageOffset=${pageNum}`;
-    console.log(`[ksef-sync] POST ${url} page=${pageNum}`);
+    console.log(`[ksef-sync] POST ${url} page=${pageNum} subjectType=${subjectType}`);
 
     let res: Response;
     for (let retry = 0; retry < 3; retry++) {
@@ -365,27 +364,21 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string) 
     if (!res!.ok) throw new Error(`Invoice query failed (${res!.status}): ${text.substring(0, 300)}`);
 
     const data = JSON.parse(text);
-    console.log(`[ksef-sync] Response keys: ${Object.keys(data).join(', ')}`);
 
     const pageInvoices = data?.invoices || data?.invoiceHeaderList || [];
     allInvoices.push(...pageInvoices);
 
-    // Stop if no more pages or empty page
     if (!data.hasMore || pageInvoices.length === 0) {
-      console.log(`[ksef-sync] No more pages. hasMore=${data.hasMore}, invoiceCount=${pageInvoices.length}`);
       break;
     }
 
     pageNum++;
-
-    // Safety limit
     if (pageNum > 50) {
-      console.log(`[ksef-sync] Reached page limit (50), stopping pagination`);
       break;
     }
   }
 
-  console.log(`[ksef-sync] Total invoices fetched across ${pageNum + 1} pages: ${allInvoices.length}`);
+  console.log(`[ksef-sync] Total ${subjectType} invoices fetched: ${allInvoices.length}`);
   return { invoices: allInvoices };
 }
 
@@ -532,20 +525,22 @@ async function syncCompany(
       }
       console.log(`[ksef-sync] SUCCESS with candidate ${ci}! Got accessToken`);
 
-      // Step 7: Query invoices
-      const queryResult = await queryInvoices(baseUrl, accessToken, company.nip);
+      // Step 7: Query invoices — both subject1 (przychodowe) and subject2 (kosztowe)
+      const [queryResult2, queryResult1] = await Promise.all([
+        queryInvoices(baseUrl, accessToken, company.nip, "subject2"),
+        queryInvoices(baseUrl, accessToken, company.nip, "subject1"),
+      ]);
 
-      const invoiceRefs =
-        queryResult?.invoices ||
-        queryResult?.invoiceHeaderList ||
-        queryResult?.invoicesList ||
-        queryResult?.items ||
-        [];
-      console.log(`[ksef-sync] Found ${invoiceRefs.length} invoices`);
+      // Tag each invoice ref with its type
+      const kosztowe = (queryResult2?.invoices || []).map((r: any) => ({ ...r, _invoiceType: "kosztowa" }));
+      const przychodowe = (queryResult1?.invoices || []).map((r: any) => ({ ...r, _invoiceType: "przychodowa" }));
+      const allRefs = [...kosztowe, ...przychodowe];
+
+      console.log(`[ksef-sync] Found ${kosztowe.length} kosztowych, ${przychodowe.length} przychodowych`);
 
       // Step 8: Upsert invoices
       let upsertedCount = 0;
-      for (const ref of invoiceRefs) {
+      for (const ref of allRefs) {
         const ksefNumber =
           ref.ksefNumber ||
           ref.ksefReferenceNumber ||
@@ -561,16 +556,14 @@ async function syncCompany(
             .eq("company_id", company.id)
             .maybeSingle();
 
-          // If invoice exists, check if it has items — if not, fetch XML and add them
           if (existing) {
             const { count } = await supabase
               .from("invoice_items")
               .select("id", { count: "exact", head: true })
               .eq("invoice_id", existing.id);
 
-            if (count && count > 0) continue; // Already has items, skip
+            if (count && count > 0) continue;
 
-            // Fetch XML and parse items for existing invoice without items
             try {
               const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
               const parsed = parseInvoiceXml(xml);
@@ -588,12 +581,7 @@ async function syncCompany(
                   gross_amount: item.gross_amount,
                 }));
                 const { error: itemsError } = await supabase.from("invoice_items").insert(itemRows);
-                if (itemsError) {
-                  console.error(`[ksef-sync] Backfill items error for ${ksefNumber}:`, itemsError);
-                } else {
-                  console.log(`[ksef-sync] Backfilled ${itemRows.length} items for existing ${ksefNumber}`);
-                  upsertedCount++;
-                }
+                if (!itemsError) upsertedCount++;
               }
             } catch (xmlErr) {
               console.log(`[ksef-sync] Could not backfill XML for ${ksefNumber}: ${xmlErr}`);
@@ -605,6 +593,7 @@ async function syncCompany(
           let nip = ref.seller?.nip || ref.subjectNip || ref.nip || company.nip;
           let date = ref.issueDate || ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
           let grossAmount = ref.grossAmount || ref.grossValue || ref.grossAmount || 0;
+          const invoiceType = ref._invoiceType || "kosztowa";
 
           let parsedItems: any[] = [];
 
@@ -628,13 +617,13 @@ async function syncCompany(
             gross_amount: grossAmount,
             ksef_number: ksefNumber,
             status: "new",
+            invoice_type: invoiceType,
           }).select("id").single();
 
           if (insertError) {
             console.error(`[ksef-sync] Insert error for ${ksefNumber}:`, insertError);
           } else {
             upsertedCount++;
-            // Insert line items
             if (parsedItems.length > 0 && inserted?.id) {
               const itemRows = parsedItems.map(item => ({
                 invoice_id: inserted.id,
@@ -649,9 +638,7 @@ async function syncCompany(
                 gross_amount: item.gross_amount,
               }));
               const { error: itemsError } = await supabase.from("invoice_items").insert(itemRows);
-              if (itemsError) {
-                console.error(`[ksef-sync] Items insert error for ${ksefNumber}:`, itemsError);
-              } else {
+              if (!itemsError) {
                 console.log(`[ksef-sync] Inserted ${itemRows.length} items for ${ksefNumber}`);
               }
             }
