@@ -346,7 +346,7 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
                     <TableHead>Kontrahent</TableHead>
                     <TableHead>NIP</TableHead>
                     <TableHead className="text-right">Kwota brutto</TableHead>
-                    <TableHead className="w-10" />
+                    <TableHead className="w-24 text-right">Akcje</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -357,15 +357,31 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
                       <TableCell className="text-sm text-muted-foreground">{inv.nip}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{Number(inv.gross_amount).toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          title="Odłącz od projektu"
-                          onClick={() => assignInvoice.mutate({ invoiceId: inv.id, projectId: null })}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            title="Pobierz PDF"
+                            disabled={downloadingId === inv.id}
+                            onClick={() => handleDownloadPdf(inv)}
+                          >
+                            {downloadingId === inv.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            title="Odłącz od projektu"
+                            onClick={() => assignInvoice.mutate({ invoiceId: inv.id, projectId: null })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
