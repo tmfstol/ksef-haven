@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       );
 
       if (!targetUser) {
-        // Create user with password set by admin
+        // Create new user with password
         const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
           email,
           password,
@@ -70,6 +70,13 @@ Deno.serve(async (req) => {
         });
         if (createError) throw new Error(`Nie udało się utworzyć konta: ${createError.message}`);
         targetUser = createData.user;
+      } else {
+        // Update password for existing user
+        const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUser.id, {
+          password,
+          email_confirm: true,
+        });
+        if (updateError) throw new Error(`Nie udało się zaktualizować hasła: ${updateError.message}`);
       }
 
       if (!targetUser) throw new Error("Nie udało się znaleźć/utworzyć użytkownika");
