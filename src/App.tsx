@@ -17,7 +17,7 @@ import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
-import { AiAssistantChat } from "@/components/dashboard/AiAssistantChat";
+import { VoiceAgentWidget } from "@/components/dashboard/VoiceAgentWidget";
 
 const queryClient = new QueryClient();
 
@@ -39,7 +39,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AuthenticatedOverlay() {
   const { user } = useAuth();
   if (!user) return null;
-  return <AiAssistantChat />;
+  return <VoiceAgentWidget />;
 }
 
 const AppRoutes = () => {

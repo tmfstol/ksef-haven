@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.ksef-download]
 verify_jwt = false
+
+[functions.elevenlabs-token]
+verify_jwt = false
+
+[functions.elevenlabs-webhook]
+verify_jwt = false
