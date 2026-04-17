@@ -112,6 +112,9 @@ export function VoiceAgentWidget() {
     },
   });
 
+  // Trzymaj ref do conversation (potrzebne do fallbacku z onError)
+  conversationRef.current = conversation;
+
   // Audio level animation (output volume podczas mówienia agenta)
   useEffect(() => {
     if (conversation.status !== "connected") {
