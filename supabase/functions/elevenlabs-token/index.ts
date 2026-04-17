@@ -52,7 +52,34 @@ serve(async (req) => {
       });
     }
 
-    // 3. Pobierz token konwersacji z ElevenLabs (WebRTC)
+    // 3. Tryb: WebRTC (domyślny) lub WebSocket (?ws=1) — fallback dla iframe/firewall
+    const url = new URL(req.url);
+    const wantWs = url.searchParams.get("ws") === "1";
+
+    if (wantWs) {
+      const wsResp = await fetch(
+        `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${AGENT_ID}`,
+        { headers: { "xi-api-key": ELEVENLABS_API_KEY } },
+      );
+      if (!wsResp.ok) {
+        const errText = await wsResp.text();
+        console.error("ElevenLabs signed-url error:", wsResp.status, errText);
+        return new Response(JSON.stringify({ error: `ElevenLabs API: ${wsResp.status}` }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const wsData = await wsResp.json();
+      return new Response(
+        JSON.stringify({
+          signedUrl: wsData.signed_url,
+          agentId: AGENT_ID,
+          userId: claims.claims.sub,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const resp = await fetch(
       `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${AGENT_ID}`,
       { headers: { "xi-api-key": ELEVENLABS_API_KEY } },

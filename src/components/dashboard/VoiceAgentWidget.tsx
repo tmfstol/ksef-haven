@@ -78,10 +78,38 @@ export function VoiceAgentWidget() {
     setIsStarting(true);
     setError(null);
     try {
-      // Mikrofon
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      // 1. Sprawdź uprawnienia do mikrofonu (proaktywnie)
+      if (navigator.permissions) {
+        try {
+          const status = await navigator.permissions.query({ name: "microphone" as PermissionName });
+          if (status.state === "denied") {
+            throw new Error("Mikrofon jest zablokowany. Włącz go w ustawieniach przeglądarki.");
+          }
+        } catch {
+          // Niektóre przeglądarki nie wspierają query na microphone — zignoruj
+        }
+      }
 
-      // Token z naszej edge function
+      // 2. Poproś o mikrofon (musi być od user gesture — ten callback jest z onClick)
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (mediaErr: any) {
+        if (mediaErr?.name === "NotAllowedError") {
+          throw new Error("Brak zgody na mikrofon. Kliknij ikonę kłódki w pasku adresu i zezwól.");
+        }
+        if (mediaErr?.name === "NotFoundError") {
+          throw new Error("Nie znaleziono mikrofonu. Otwórz aplikację w nowej karcie (nie w podglądzie Lovable) i sprawdź urządzenia audio.");
+        }
+        if (mediaErr?.name === "NotReadableError") {
+          throw new Error("Mikrofon jest używany przez inną aplikację.");
+        }
+        throw mediaErr;
+      }
+      // Zwolnij testowy stream — SDK ElevenLabs samo pobierze swój
+      stream.getTracks().forEach((t) => t.stop());
+
+      // 3. Token z naszej edge function
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Nie jesteś zalogowany");
 
@@ -98,14 +126,40 @@ export function VoiceAgentWidget() {
         throw new Error(json.error || "Nie udało się pobrać tokenu");
       }
 
-      // Start sesji WebRTC z dynamicznymi zmiennymi (user_id przekażemy do webhooka)
-      await conversation.startSession({
-        conversationToken: json.token,
-        connectionType: "webrtc",
-        dynamicVariables: {
-          user_id: json.userId,
-        },
-      } as any);
+      // 4. Start sesji — najpierw WebRTC, fallback na WebSocket przy błędzie PC connection
+      try {
+        await conversation.startSession({
+          conversationToken: json.token,
+          connectionType: "webrtc",
+          dynamicVariables: { user_id: json.userId },
+        } as any);
+      } catch (webrtcErr: any) {
+        const msg = String(webrtcErr?.message || webrtcErr || "");
+        const isPcError = /pc connection|peer connection|ice|webrtc/i.test(msg);
+        if (!isPcError) throw webrtcErr;
+
+        console.warn("WebRTC nie zadziałał, próbuję WebSocket…", msg);
+        toast.message("Przełączam na połączenie zapasowe (WebSocket)…");
+
+        // Pobierz signed URL do WebSocketa
+        const wsResp = await fetch(`${TOKEN_URL}?ws=1`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        });
+        const wsJson = await wsResp.json();
+        if (!wsResp.ok || !wsJson.signedUrl) {
+          throw new Error(wsJson.error || "Nie udało się uzyskać WebSocket URL");
+        }
+        await conversation.startSession({
+          signedUrl: wsJson.signedUrl,
+          connectionType: "websocket",
+          dynamicVariables: { user_id: wsJson.userId ?? json.userId },
+        } as any);
+      }
     } catch (err: any) {
       console.error(err);
       setError(err?.message || "Nie udało się rozpocząć rozmowy");
