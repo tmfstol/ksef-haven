@@ -14,6 +14,16 @@ type TranscriptItem = {
 
 const TOKEN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-token`;
 
+// iOS Safari ma chroniczne problemy z WebRTC + ElevenLabs ("could not establish pc connection").
+// Na tych urządzeniach od razu używamy WebSocket.
+function shouldUseWebSocket(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
+  const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
+  return isIOS || isSafari;
+}
+
 export function VoiceAgentWidget() {
   const [open, setOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
@@ -22,18 +32,64 @@ export function VoiceAgentWidget() {
   const [audioLevel, setAudioLevel] = useState(0);
   const queryClient = useQueryClient();
   const animationRef = useRef<number | null>(null);
+  const fallbackInProgressRef = useRef(false);
+  const sessionParamsRef = useRef<{ token: string; userId?: string; accessToken: string } | null>(null);
+
+  const startWebSocketFallback = useCallback(async () => {
+    if (fallbackInProgressRef.current) return;
+    if (!sessionParamsRef.current) return;
+    fallbackInProgressRef.current = true;
+    try {
+      const { accessToken, userId } = sessionParamsRef.current;
+      toast.message("Przełączam na połączenie zapasowe (WebSocket)…");
+      const wsResp = await fetch(`${TOKEN_URL}?ws=1`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      const wsJson = await wsResp.json();
+      if (!wsResp.ok || !wsJson.signedUrl) {
+        throw new Error(wsJson.error || "Nie udało się uzyskać WebSocket URL");
+      }
+      // @ts-ignore - SDK types
+      await conversationRef.current?.startSession({
+        signedUrl: wsJson.signedUrl,
+        connectionType: "websocket",
+        dynamicVariables: { user_id: wsJson.userId ?? userId },
+      });
+      setError(null);
+    } catch (err: any) {
+      console.error("WebSocket fallback failed:", err);
+      setError(err?.message || "Nie udało się połączyć (WebSocket)");
+    } finally {
+      fallbackInProgressRef.current = false;
+    }
+  }, []);
+
+  const conversationRef = useRef<any>(null);
 
   const conversation = useConversation({
     onConnect: () => {
       setError(null);
+      fallbackInProgressRef.current = false;
       toast.success("Połączono z asystentem głosowym");
     },
     onDisconnect: () => {
       setAudioLevel(0);
     },
-    onError: (err) => {
+    onError: (err: any) => {
       console.error("ElevenLabs error:", err);
-      setError(typeof err === "string" ? err : "Błąd połączenia z agentem");
+      const msg = typeof err === "string" ? err : (err?.message || "Błąd połączenia z agentem");
+      // Auto-fallback gdy WebRTC zawiedzie (typowo na iOS Safari)
+      if (/pc connection|peer connection|ice|webrtc/i.test(msg) && !fallbackInProgressRef.current) {
+        console.warn("WebRTC error wykryty — uruchamiam fallback WebSocket");
+        startWebSocketFallback();
+        return;
+      }
+      setError(msg);
     },
     onMessage: (message: any) => {
       // Transkrypcja użytkownika (finalna)
