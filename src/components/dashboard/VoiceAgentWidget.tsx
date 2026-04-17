@@ -185,21 +185,17 @@ export function VoiceAgentWidget() {
         throw new Error(json.error || "Nie udało się pobrać tokenu");
       }
 
-      // 4. Start sesji — najpierw WebRTC, fallback na WebSocket przy błędzie PC connection
-      try {
-        await conversation.startSession({
-          conversationToken: json.token,
-          connectionType: "webrtc",
-          dynamicVariables: { user_id: json.userId },
-        } as any);
-      } catch (webrtcErr: any) {
-        const msg = String(webrtcErr?.message || webrtcErr || "");
-        const isPcError = /pc connection|peer connection|ice|webrtc/i.test(msg);
-        if (!isPcError) throw webrtcErr;
+      // Zapisz params do refa (potrzebne dla fallbacku z onError)
+      sessionParamsRef.current = {
+        token: json.token,
+        userId: json.userId,
+        accessToken: session.access_token,
+      };
 
-        console.warn("WebRTC nie zadziałał, próbuję WebSocket…", msg);
-        toast.message("Przełączam na połączenie zapasowe (WebSocket)…");
+      // 4. Start sesji — na iOS/Safari od razu WebSocket, w przeciwnym razie WebRTC z fallbackiem
+      const useWs = shouldUseWebSocket();
 
+      if (useWs) {
         // Pobierz signed URL do WebSocketa
         const wsResp = await fetch(`${TOKEN_URL}?ws=1`, {
           method: "POST",
@@ -218,6 +214,21 @@ export function VoiceAgentWidget() {
           connectionType: "websocket",
           dynamicVariables: { user_id: wsJson.userId ?? json.userId },
         } as any);
+      } else {
+        try {
+          await conversation.startSession({
+            conversationToken: json.token,
+            connectionType: "webrtc",
+            dynamicVariables: { user_id: json.userId },
+          } as any);
+        } catch (webrtcErr: any) {
+          const msg = String(webrtcErr?.message || webrtcErr || "");
+          const isPcError = /pc connection|peer connection|ice|webrtc/i.test(msg);
+          if (!isPcError) throw webrtcErr;
+
+          console.warn("WebRTC nie zadziałał, próbuję WebSocket…", msg);
+          await startWebSocketFallback();
+        }
       }
     } catch (err: any) {
       console.error(err);
