@@ -430,5 +430,6 @@ export function AiAssistantChat() {
         </div>
       </div>
     </div>
+    </>
   );
 }
