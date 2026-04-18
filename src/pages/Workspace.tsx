@@ -353,7 +353,11 @@ function WorkspaceInner() {
 
   const disconnect = useMutation({
     mutationFn: () => callProxy(companyId!, "disconnect"),
-    onSuccess: () => { toast.success("Odłączono Google"); qc.invalidateQueries({ queryKey: ["g-status", companyId] }); },
+    onSuccess: () => {
+      toast.success("Odłączono Google");
+      qc.invalidateQueries({ queryKey: ["g-status", companyId] });
+      qc.invalidateQueries({ queryKey: ["g-cred-direct", companyId] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
