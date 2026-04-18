@@ -59,6 +59,8 @@ serve(async (req) => {
   const driveQuery: string | undefined = parsedBody.query ?? p.query ?? parsedBody.title ?? p.title;
   const docContent: string | undefined = parsedBody.content ?? p.content;
   const sheetData: any = parsedBody.data ?? p.data;
+  const fileId: string | undefined = parsedBody.file_id ?? p.file_id ?? parsedBody.id ?? p.id;
+  const fileName: string | undefined = parsedBody.file_name ?? p.file_name ?? parsedBody.name ?? p.name ?? eventTitle;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -651,9 +653,253 @@ serve(async (req) => {
         return json({ response: `Utworzyłem arkusz "${title}". Link: ${url}` });
       }
 
+      // ============ GOOGLE: OTWÓRZ / CZYTAJ / EDYTUJ ============
+
+      // Helper: znajdź plik na Drive po id albo po nazwie (najnowszy)
+      // Zwraca { id, name, mimeType, webViewLink } albo null
+      // (deklarujemy lokalnie, by mieć dostęp do `auth`)
+
+      case "open_drive_file":
+      case "open_file":
+      case "otworz_plik": {
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) return json({ response: "Nie mam podłączonego konta Google." });
+
+        let target: any = null;
+        if (fileId) {
+          const r = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,webViewLink`,
+            { headers: { Authorization: `Bearer ${auth.token}` } },
+          );
+          target = await r.json();
+          if (!r.ok) return json({ response: `Drive odrzucił żądanie: ${target?.error?.message || r.status}` });
+        } else {
+          const name = (fileName || driveQuery || "").trim();
+          if (!name) return json({ response: "Podaj nazwę pliku, który mam otworzyć." });
+          const safe = name.replace(/'/g, "\\'");
+          const params = new URLSearchParams({
+            pageSize: "1",
+            fields: "files(id,name,mimeType,webViewLink)",
+            orderBy: "modifiedTime desc",
+            q: `name contains '${safe}' and trashed = false`,
+          });
+          const r = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          });
+          const j = await r.json();
+          console.log("Drive find for open:", r.status, j?.files?.length ?? 0);
+          if (!r.ok) return json({ response: `Drive odrzucił żądanie: ${j?.error?.message || r.status}` });
+          target = j.files?.[0] ?? null;
+          if (!target) return json({ response: `Nie znalazłem pliku "${name}".` });
+        }
+
+        const url = target.webViewLink || `https://drive.google.com/file/d/${target.id}/view`;
+        await broadcastToCompany(company.id, "open_drive_file", {
+          file_id: target.id,
+          name: target.name,
+          mime_type: target.mimeType,
+          url,
+        });
+        return json({ response: `Otwieram plik "${target.name}" na Twoim ekranie. Link: ${url}` });
+      }
+
+      case "read_drive_file":
+      case "read_file":
+      case "przeczytaj_plik": {
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) return json({ response: "Nie mam podłączonego konta Google." });
+
+        // znajdź plik
+        let meta: any = null;
+        if (fileId) {
+          const r = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,webViewLink`,
+            { headers: { Authorization: `Bearer ${auth.token}` } },
+          );
+          meta = await r.json();
+          if (!r.ok) return json({ response: `Drive: ${meta?.error?.message || r.status}` });
+        } else {
+          const name = (fileName || driveQuery || "").trim();
+          if (!name) return json({ response: "Podaj nazwę pliku do przeczytania." });
+          const safe = name.replace(/'/g, "\\'");
+          const params = new URLSearchParams({
+            pageSize: "1",
+            fields: "files(id,name,mimeType,webViewLink)",
+            orderBy: "modifiedTime desc",
+            q: `name contains '${safe}' and trashed = false`,
+          });
+          const r = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          });
+          const j = await r.json();
+          if (!r.ok) return json({ response: `Drive: ${j?.error?.message || r.status}` });
+          meta = j.files?.[0];
+          if (!meta) return json({ response: `Nie znalazłem pliku "${name}".` });
+        }
+
+        // wybierz strategię
+        let text = "";
+        const mt: string = meta.mimeType || "";
+        if (mt === "application/vnd.google-apps.document") {
+          const r = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${meta.id}/export?mimeType=text/plain`,
+            { headers: { Authorization: `Bearer ${auth.token}` } },
+          );
+          text = await r.text();
+          console.log("Docs export:", r.status, "len", text.length);
+        } else if (mt === "application/vnd.google-apps.spreadsheet") {
+          const r = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${meta.id}/values/A1:Z50`,
+            { headers: { Authorization: `Bearer ${auth.token}` } },
+          );
+          const j = await r.json();
+          console.log("Sheets values:", r.status, "rows", j?.values?.length ?? 0);
+          if (!r.ok) return json({ response: `Sheets: ${j?.error?.message || r.status}` });
+          const values: string[][] = j.values ?? [];
+          text = values.map((row) => row.join(" | ")).join("\n");
+        } else if (mt.startsWith("text/") || mt === "application/json") {
+          const r = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${meta.id}?alt=media`,
+            { headers: { Authorization: `Bearer ${auth.token}` } },
+          );
+          text = await r.text();
+        } else {
+          await broadcastToCompany(company.id, "open_drive_file", {
+            file_id: meta.id, name: meta.name, mime_type: mt, url: meta.webViewLink,
+          });
+          return json({
+            response: `Plik "${meta.name}" jest typu ${mt} — nie umiem go przeczytać głosowo, ale otworzyłem go na Twoim ekranie. Link: ${meta.webViewLink}`,
+          });
+        }
+
+        const trimmed = text.replace(/\s+\n/g, "\n").trim().slice(0, 1500);
+        await broadcastToCompany(company.id, "google_file_read", {
+          file_id: meta.id, name: meta.name, mime_type: mt, url: meta.webViewLink,
+        });
+        if (!trimmed) {
+          return json({ response: `Plik "${meta.name}" jest pusty. Link: ${meta.webViewLink}` });
+        }
+        return json({
+          response: `Treść pliku "${meta.name}":\n\n${trimmed}${text.length > 1500 ? "\n\n(...skrócone)" : ""}\n\nLink: ${meta.webViewLink}`,
+        });
+      }
+
+      case "update_doc":
+      case "edytuj_dokument":
+      case "dopisz_do_dokumentu": {
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) return json({ response: "Nie mam podłączonego konta Google." });
+
+        const content = (docContent ?? "").toString();
+        if (!content.trim()) return json({ response: "Podaj treść do dopisania." });
+
+        // znajdź doc
+        let docId = fileId;
+        let docName = fileName;
+        if (!docId) {
+          const name = (fileName || driveQuery || "").trim();
+          if (!name) return json({ response: "Podaj nazwę dokumentu do edycji." });
+          const safe = name.replace(/'/g, "\\'");
+          const params = new URLSearchParams({
+            pageSize: "1",
+            fields: "files(id,name,webViewLink)",
+            orderBy: "modifiedTime desc",
+            q: `name contains '${safe}' and mimeType = 'application/vnd.google-apps.document' and trashed = false`,
+          });
+          const r = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          });
+          const j = await r.json();
+          if (!r.ok) return json({ response: `Drive: ${j?.error?.message || r.status}` });
+          const f = j.files?.[0];
+          if (!f) return json({ response: `Nie znalazłem dokumentu "${name}".` });
+          docId = f.id;
+          docName = f.name;
+        }
+
+        // pobierz długość, żeby dopisać na końcu
+        const docResp = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        });
+        const docJson = await docResp.json();
+        if (!docResp.ok) return json({ response: `Docs: ${docJson?.error?.message || docResp.status}` });
+        const body = docJson.body?.content ?? [];
+        let endIndex = 1;
+        for (const el of body) if (el.endIndex && el.endIndex > endIndex) endIndex = el.endIndex;
+        // wstawiamy tuż przed znakiem końcowym
+        const insertAt = Math.max(1, endIndex - 1);
+
+        const upd = await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requests: [{ insertText: { location: { index: insertAt }, text: `\n${content}` } }],
+          }),
+        });
+        const updJson = await upd.json();
+        console.log("Docs update:", upd.status);
+        if (!upd.ok) return json({ response: `Docs odrzucił edycję: ${updJson?.error?.message || upd.status}` });
+
+        const url = `https://docs.google.com/document/d/${docId}/edit`;
+        await broadcastToCompany(company.id, "google_doc_updated", { id: docId, name: docName, url });
+        return json({ response: `Dopisałem do dokumentu "${docName ?? docId}". Link: ${url}` });
+      }
+
+      case "update_sheet":
+      case "edytuj_arkusz":
+      case "dopisz_do_arkusza": {
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) return json({ response: "Nie mam podłączonego konta Google." });
+
+        const rows: any[][] = Array.isArray(sheetData)
+          ? sheetData.map((r: any) => (Array.isArray(r) ? r : [String(r)]))
+          : [];
+        if (!rows.length) return json({ response: "Podaj dane do dopisania (lista wierszy)." });
+
+        // znajdź arkusz
+        let sheetId = fileId;
+        let sheetName = fileName;
+        if (!sheetId) {
+          const name = (fileName || driveQuery || "").trim();
+          if (!name) return json({ response: "Podaj nazwę arkusza do edycji." });
+          const safe = name.replace(/'/g, "\\'");
+          const params = new URLSearchParams({
+            pageSize: "1",
+            fields: "files(id,name,webViewLink)",
+            orderBy: "modifiedTime desc",
+            q: `name contains '${safe}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`,
+          });
+          const r = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          });
+          const j = await r.json();
+          if (!r.ok) return json({ response: `Drive: ${j?.error?.message || r.status}` });
+          const f = j.files?.[0];
+          if (!f) return json({ response: `Nie znalazłem arkusza "${name}".` });
+          sheetId = f.id;
+          sheetName = f.name;
+        }
+
+        const upd = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:append?valueInputOption=USER_ENTERED`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ values: rows }),
+          },
+        );
+        const updJson = await upd.json();
+        console.log("Sheets append update:", upd.status);
+        if (!upd.ok) return json({ response: `Sheets odrzucił edycję: ${updJson?.error?.message || upd.status}` });
+
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+        await broadcastToCompany(company.id, "google_sheet_updated", { id: sheetId, name: sheetName, url, rows: rows.length });
+        return json({ response: `Dopisałem ${rows.length} ${rows.length === 1 ? "wiersz" : "wiersze"} do arkusza "${sheetName ?? sheetId}". Link: ${url}` });
+      }
+
       default:
         return json({
-          response: `Nie znam akcji "${action}". Dostępne: get_summary, get_invoices, get_unpaid, get_clients, get_projects, send_to_portal, assign_to_project, get_download_link, add_calendar_event, search_drive, create_doc, create_sheet.`,
+          response: `Nie znam akcji "${action}". Dostępne: get_summary, get_invoices, get_unpaid, get_clients, get_projects, send_to_portal, assign_to_project, get_download_link, add_calendar_event, search_drive, open_drive_file, read_drive_file, create_doc, update_doc, create_sheet, update_sheet.`,
         });
     }
   } catch (err) {
