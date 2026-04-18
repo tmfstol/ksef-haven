@@ -127,7 +127,7 @@ serve(async (req) => {
       case "ostatnie_faktury": {
         let q = admin
           .from("invoices")
-          .select("vendor, gross_amount, date, payment_status, ksef_number")
+          .select("id, vendor, gross_amount, date, payment_status, ksef_number, category, bookkeeper_note")
           .eq("company_id", company.id)
           .order("date", { ascending: false })
           .limit(limit);
@@ -135,9 +135,26 @@ serve(async (req) => {
         const { data, error } = await q;
         if (error) throw error;
         if (!data?.length) return json({ response: "Nie znalazłem żadnych faktur." });
-        const lines = data.map((i, idx) =>
-          `${idx + 1}. ${i.vendor} — ${fmtPLN(Number(i.gross_amount))} z dnia ${i.date}, status: ${i.payment_status}`,
-        );
+
+        // Pobierz pierwszą pozycję każdej faktury jako opis (fallback)
+        const ids = data.map((i) => i.id);
+        const { data: items } = await admin
+          .from("invoice_items")
+          .select("invoice_id, name, ordinal")
+          .in("invoice_id", ids)
+          .order("ordinal", { ascending: true });
+        const firstItemByInvoice = new Map<string, string>();
+        for (const it of items ?? []) {
+          if (!firstItemByInvoice.has(it.invoice_id) && it.name) {
+            firstItemByInvoice.set(it.invoice_id, it.name);
+          }
+        }
+
+        const lines = data.map((i, idx) => {
+          const desc = i.bookkeeper_note || i.category || firstItemByInvoice.get(i.id) || null;
+          const descPart = desc ? `. Opis: ${desc}` : "";
+          return `${idx + 1}. ${i.vendor} — ${fmtPLN(Number(i.gross_amount))} z dnia ${i.date}, status: ${i.payment_status}${descPart}`;
+        });
         return json({ response: `Oto ${data.length} faktur:\n${lines.join("\n")}` });
       }
 
