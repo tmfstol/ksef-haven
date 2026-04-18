@@ -9,18 +9,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type, x-webhook-secret",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-elevenlabs-signature",
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // 1. Walidacja shared secret
+    // 1. Parsuj input od agenta NAJPIERW (żeby zalogować nawet gdy secret nie pasuje)
+    const body = await req.json().catch(() => ({}));
+    console.log("Otrzymano żądanie od Haviego:", JSON.stringify(body));
+
+    // 2. Walidacja shared secret (opcjonalna — tylko jeśli ustawiony)
     const expectedSecret = Deno.env.get("ELEVENLABS_WEBHOOK_SECRET");
     if (expectedSecret) {
       const provided = req.headers.get("X-Webhook-Secret") ?? req.headers.get("x-webhook-secret");
       if (provided !== expectedSecret) {
+        console.warn("Nieprawidłowy webhook secret");
         return new Response(JSON.stringify({ error: "Forbidden" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -28,9 +34,6 @@ serve(async (req) => {
       }
     }
 
-    // 2. Parsuj input od agenta
-    // ElevenLabs wysyła parametry zdefiniowane w tool schema, np. { query: "...", user_id: "..." }
-    const body = await req.json();
     const query: string = body.query ?? body.question ?? body.message ?? "";
     const userId: string | undefined = body.user_id ?? body.userId;
 
