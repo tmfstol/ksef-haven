@@ -7,6 +7,7 @@ import { Users, UserPlus, Trash2, Loader2, Crown, Calculator, ShoppingCart, Buil
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import ModulePermissionsPanel from "@/components/settings/ModulePermissionsPanel";
 
 interface TeamMember {
   user_id: string;
@@ -268,6 +269,7 @@ export default function TeamManagement() {
           ))}
         </div>
       )}
+      <ModulePermissionsPanel members={members.map(m => ({ user_id: m.user_id, email: m.email, display_name: m.display_name, role: m.role }))} />
     </motion.div>
   );
 }

@@ -14,6 +14,7 @@ import Projects from "./pages/Projects";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import CommandCenter from "./pages/CommandCenter";
+import Workspace from "./pages/Workspace";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
@@ -74,6 +75,7 @@ const AppRoutes = () => {
         <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
         <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
         <Route path="/command-center" element={<ProtectedRoute><CommandCenter /></ProtectedRoute>} />
+        <Route path="/workspace" element={<ProtectedRoute><Workspace /></ProtectedRoute>} />
         <Route path="/onboarding" element={<ProtectedRoute><Settings isOnboarding /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

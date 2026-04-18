@@ -514,6 +514,53 @@ export type Database = {
           },
         ]
       }
+      google_workspace_credentials: {
+        Row: {
+          access_token: string | null
+          company_id: string
+          connected_by: string
+          connected_email: string
+          created_at: string
+          id: string
+          refresh_token: string
+          scopes: string[]
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          company_id: string
+          connected_by: string
+          connected_email: string
+          created_at?: string
+          id?: string
+          refresh_token: string
+          scopes?: string[]
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          company_id?: string
+          connected_by?: string
+          connected_email?: string
+          created_at?: string
+          id?: string
+          refresh_token?: string
+          scopes?: string[]
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_workspace_credentials_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           created_at: string
@@ -682,6 +729,44 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_permissions: {
+        Row: {
+          company_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          module: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          module: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          module?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_permissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -911,6 +996,10 @@ export type Database = {
       get_user_company_role: {
         Args: { _company_id: string; _user_id: string }
         Returns: string
+      }
+      has_module_permission: {
+        Args: { _company_id: string; _module: string; _user_id: string }
+        Returns: boolean
       }
       sync_contacts_from_invoices: {
         Args: { _company_id: string }
