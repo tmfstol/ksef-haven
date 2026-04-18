@@ -59,6 +59,8 @@ serve(async (req) => {
   const driveQuery: string | undefined = parsedBody.query ?? p.query ?? parsedBody.title ?? p.title;
   const docContent: string | undefined = parsedBody.content ?? p.content;
   const sheetData: any = parsedBody.data ?? p.data;
+  const fileId: string | undefined = parsedBody.file_id ?? p.file_id ?? parsedBody.id ?? p.id;
+  const fileName: string | undefined = parsedBody.file_name ?? p.file_name ?? parsedBody.name ?? p.name ?? eventTitle;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
