@@ -273,16 +273,28 @@ export function AiAssistantChat() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 flex items-center gap-2 rounded-full bg-primary px-4 sm:px-5 py-2.5 sm:py-3 text-primary-foreground shadow-lg hover:bg-primary/90 transition-all hover:scale-105"
+        aria-label="Otwórz asystenta Havi"
+        className="group fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 flex items-center justify-center h-14 w-14 sm:h-auto sm:w-auto sm:gap-2 sm:px-5 sm:py-3 rounded-full bg-gradient-to-br from-primary via-primary to-primary/80 text-primary-foreground shadow-xl shadow-primary/30 hover:shadow-2xl hover:shadow-primary/40 transition-all hover:scale-105 active:scale-95"
       >
-        <Bot className="h-5 w-5" />
-        <span className="text-sm font-medium">AI Agent</span>
+        <span className="absolute inset-0 rounded-full bg-primary/40 animate-ping opacity-60 group-hover:opacity-0" />
+        <span className="relative flex items-center gap-2">
+          <Bot className="h-6 w-6 sm:h-5 sm:w-5" />
+          <span className="hidden sm:inline text-sm font-semibold">Havi AI</span>
+        </span>
       </button>
     );
   }
 
   return (
-    <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 w-[calc(100vw-24px)] sm:w-[420px] h-[60vh] sm:h-[600px] max-h-[calc(100dvh-100px)] flex flex-col rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
+    <>
+      {/* Mobile backdrop */}
+      <div
+        className="sm:hidden fixed inset-0 z-40 bg-background/60 backdrop-blur-sm animate-in fade-in"
+        onClick={() => { setOpen(false); stopSpeaking(); }}
+      />
+      <div className="fixed z-50 flex flex-col overflow-hidden bg-background shadow-2xl
+        inset-x-3 bottom-[88px] top-16 rounded-3xl border border-border
+        sm:inset-auto sm:bottom-6 sm:right-6 sm:top-auto sm:w-[420px] sm:h-[600px] sm:max-h-[calc(100dvh-100px)] sm:rounded-2xl animate-in slide-in-from-bottom-4 fade-in duration-200">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
         <div className="flex items-center gap-2">
@@ -418,5 +430,6 @@ export function AiAssistantChat() {
         </div>
       </div>
     </div>
+    </>
   );
 }
