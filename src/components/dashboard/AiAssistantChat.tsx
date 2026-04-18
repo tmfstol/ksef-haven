@@ -275,13 +275,38 @@ export function AiAssistantChat() {
       <button
         onClick={() => setOpen(true)}
         aria-label="Otwórz asystenta Havi"
-        className="group fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 flex items-center justify-center h-14 w-14 sm:h-auto sm:w-auto sm:gap-2 sm:px-5 sm:py-3 rounded-full bg-gradient-to-br from-primary via-primary to-primary/80 text-primary-foreground shadow-xl shadow-primary/30 hover:shadow-2xl hover:shadow-primary/40 transition-all hover:scale-105 active:scale-95"
+        className="group fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 h-16 w-16 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+        style={{ WebkitTapHighlightColor: "transparent" }}
       >
-        <span className="absolute inset-0 rounded-full bg-primary/40 animate-ping opacity-60 group-hover:opacity-0" />
-        <span className="relative flex items-center gap-2">
-          <Bot className="h-6 w-6 sm:h-5 sm:w-5" />
-          <span className="hidden sm:inline text-sm font-semibold">Havi AI</span>
+        <span
+          className="absolute inset-0 rounded-full blur-xl opacity-70 group-hover:opacity-100 transition-opacity"
+          style={{ background: "radial-gradient(circle at 30% 30%, hsl(var(--primary) / 0.7), hsl(var(--primary) / 0.15) 60%, transparent 75%)" }}
+        />
+        <span
+          className="absolute inset-1 rounded-full opacity-60 animate-ping"
+          style={{ background: "radial-gradient(circle, hsl(var(--primary) / 0.5), transparent 70%)" }}
+        />
+        <span
+          className="relative h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md ring-1 ring-white/20 shadow-[0_8px_32px_-4px_hsl(var(--primary)/0.6)]"
+          style={{ background: "radial-gradient(circle at 30% 25%, hsl(var(--primary) / 0.95), hsl(var(--primary) / 0.55) 55%, hsl(var(--primary) / 0.35))" }}
+        >
+          <span className="absolute top-1.5 left-2 h-3 w-5 rounded-full bg-white/40 blur-[2px]" />
+          <span className="relative flex items-end justify-center gap-[3px] h-5">
+            {[0, 1, 2, 3].map((i) => (
+              <span
+                key={i}
+                className="w-[3px] rounded-full bg-primary-foreground"
+                style={{ animation: `havi-orb-wave 1.1s ease-in-out ${i * 0.13}s infinite`, height: "100%", transformOrigin: "center" }}
+              />
+            ))}
+          </span>
         </span>
+        <style>{`
+          @keyframes havi-orb-wave {
+            0%, 100% { transform: scaleY(0.3); opacity: 0.7; }
+            50% { transform: scaleY(1); opacity: 1; }
+          }
+        `}</style>
       </button>
     );
   }
