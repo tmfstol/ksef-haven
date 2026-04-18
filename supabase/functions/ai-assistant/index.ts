@@ -601,8 +601,11 @@ serve(async (req) => {
       });
     }
 
-    // Load user's companies
-    const { data: companies } = await supabase.from("companies").select("id, name, nip");
+    // Load user's companies (filter by user_id since service role bypasses RLS in voice mode)
+    const { data: companies } = await supabase
+      .from("companies")
+      .select("id, name, nip")
+      .eq("user_id", user.id);
     const companyIds = companies?.map((c: any) => c.id) || [];
     const companiesMap: Record<string, { id: string; name: string; nip: string }> = {};
     companies?.forEach((c: any) => { companiesMap[c.id] = c; });
