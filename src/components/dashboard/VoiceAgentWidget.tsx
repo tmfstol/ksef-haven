@@ -258,7 +258,8 @@ export function VoiceAgentWidget() {
       >
         {/* Outer soft glow — niebieski */}
         <span
-          className="absolute inset-0 rounded-full blur-xl opacity-70 group-hover:opacity-100 transition-opacity"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-full blur-xl opacity-70 group-hover:opacity-100 transition-opacity"
           style={{
             background:
               "radial-gradient(circle at 30% 30%, rgba(59,130,246,0.65), rgba(99,102,241,0.25) 60%, transparent 75%)",
@@ -266,7 +267,8 @@ export function VoiceAgentWidget() {
         />
         {/* Pulsing ring */}
         <span
-          className="absolute inset-1 rounded-full opacity-60 animate-ping"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-1 rounded-full opacity-60 animate-ping"
           style={{
             background: "radial-gradient(circle, rgba(59,130,246,0.5), transparent 70%)",
           }}
