@@ -312,16 +312,44 @@ function WorkspaceInner() {
 
   useEffect(() => {
     const flag = searchParams.get("google");
+    if (!flag) return;
     if (flag === "ok") toast.success("Konto Google podłączone");
     if (flag === "err") toast.error("Nie udało się podłączyć Google");
-    if (flag) qc.invalidateQueries({ queryKey: ["g-status"] });
+    qc.invalidateQueries({ queryKey: ["g-status"] });
+    qc.invalidateQueries({ queryKey: ["g-cred-direct"] });
+    // Clean URL so re-renders don't re-trigger
+    const url = new URL(window.location.href);
+    url.searchParams.delete("google");
+    window.history.replaceState({}, "", url.toString());
   }, [searchParams, qc]);
 
-  const { data: status, isLoading: statusLoading } = useQuery({
+  // Direct DB read — source of truth for UI even if proxy fails
+  const { data: directCred, isLoading: directLoading } = useQuery({
+    queryKey: ["g-cred-direct", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("google_workspace_credentials")
+        .select("connected_email, scopes, updated_at")
+        .eq("company_id", companyId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: proxyStatus, isLoading: proxyLoading } = useQuery({
     queryKey: ["g-status", companyId],
     enabled: !!companyId,
     queryFn: () => callProxy(companyId!, "status"),
+    retry: false,
   });
+
+  // Merge: prefer direct DB read, fallback to proxy
+  const status = directCred
+    ? { connected: true, connected_email: directCred.connected_email }
+    : proxyStatus;
+  const statusLoading = directLoading || proxyLoading;
 
   const disconnect = useMutation({
     mutationFn: () => callProxy(companyId!, "disconnect"),
