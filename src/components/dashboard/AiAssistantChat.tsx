@@ -4,6 +4,7 @@ import { Bot, Send, X, Loader2, Trash2, Mic, MicOff, Volume2, VolumeX } from "lu
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
+import { HaviAvatar } from "./HaviAvatar";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -297,17 +298,15 @@ export function AiAssistantChat() {
         sm:inset-auto sm:bottom-6 sm:right-6 sm:top-auto sm:w-[420px] sm:h-[600px] sm:max-h-[calc(100dvh-100px)] sm:rounded-2xl animate-in slide-in-from-bottom-4 fade-in duration-200">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
-        <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSpeaking ? "bg-green-500/20 animate-pulse" : isListening ? "bg-red-500/20 animate-pulse" : "bg-primary/10"}`}>
-            <Bot className={`h-4 w-4 ${isSpeaking ? "text-green-500" : isListening ? "text-red-500" : "text-primary"}`} />
-          </div>
+        <div className="flex items-center gap-3">
+          <HaviAvatar isSpeaking={isSpeaking} isListening={isListening} size="md" />
           <div>
-            <p className="text-sm font-semibold text-foreground">
-              Asystent Facturo
-              {isListening && <span className="text-red-500 ml-1 text-xs">● Słucham...</span>}
-              {isSpeaking && <span className="text-green-500 ml-1 text-xs">● Mówię...</span>}
+            <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              Havi
+              {isListening && <span className="text-destructive text-xs font-normal">● Słucham...</span>}
+              {isSpeaking && <span className="text-emerald-500 text-xs font-normal">● Mówię...</span>}
             </p>
-            <p className="text-xs text-muted-foreground">Agent AI · głosowy</p>
+            <p className="text-xs text-muted-foreground">Asystent głosowy Facturo</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
