@@ -52,6 +52,14 @@ serve(async (req) => {
   const clientName: string | undefined = parsedBody.client_name ?? p.client_name;
   const limit: number = Math.min(Number(parsedBody.limit ?? p.limit ?? 5), 20);
 
+  // Google action params
+  const eventTitle: string | undefined = parsedBody.title ?? p.title;
+  const eventStart: string | undefined = parsedBody.start_time ?? p.start_time;
+  const eventDuration: number = Number(parsedBody.duration ?? p.duration ?? 60); // minutes
+  const driveQuery: string | undefined = parsedBody.query ?? p.query ?? parsedBody.title ?? p.title;
+  const docContent: string | undefined = parsedBody.content ?? p.content;
+  const sheetData: any = parsedBody.data ?? p.data;
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceKey) {
