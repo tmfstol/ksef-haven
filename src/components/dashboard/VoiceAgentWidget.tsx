@@ -329,8 +329,11 @@ export function VoiceAgentWidget() {
 
       {/* Orb */}
       <div className="relative flex-1 flex flex-col items-center justify-center px-6">
-        <div
-          className="relative w-40 h-40 rounded-full transition-transform duration-150 ease-out"
+        <button
+          onClick={isConnected ? stop : start}
+          disabled={isStarting}
+          aria-label={isConnected ? "Zakończ rozmowę" : "Rozpocznij rozmowę"}
+          className="relative w-40 h-40 rounded-full transition-transform duration-150 ease-out hover:scale-[1.03] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 focus-visible:ring-offset-background"
           style={{
             transform: `scale(${orbScale})`,
             background: `radial-gradient(circle at 30% 30%, hsl(var(--primary)), hsl(var(--primary) / 0.4))`,
@@ -344,16 +347,23 @@ export function VoiceAgentWidget() {
             {isStarting ? (
               <Loader2 className="h-10 w-10 text-white animate-spin" />
             ) : isConnected ? (
-              <Volume2 className="h-10 w-10 text-white drop-shadow-lg" />
+              isSpeaking ? (
+                <Volume2 className="h-10 w-10 text-white drop-shadow-lg" />
+              ) : (
+                <MicOff className="h-10 w-10 text-white drop-shadow-lg" />
+              )
             ) : (
-              <Mic className="h-10 w-10 text-white drop-shadow-lg" />
+              <span className="relative flex items-center justify-center">
+                <MessageCircle className="h-12 w-12 text-white drop-shadow-lg" strokeWidth={1.8} fill="rgba(255,255,255,0.12)" />
+                <Sparkles className="absolute -top-1 -right-2 h-4 w-4 text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.9)]" strokeWidth={2.5} />
+              </span>
             )}
           </div>
           {/* Pulse ring when speaking */}
           {isSpeaking && (
             <div className="absolute inset-0 rounded-full animate-ping bg-primary/30" />
           )}
-        </div>
+        </button>
 
         {/* Status text */}
         <p className="mt-8 text-sm text-center text-muted-foreground max-w-xs">
@@ -362,8 +372,8 @@ export function VoiceAgentWidget() {
               <AlertCircle className="h-4 w-4" /> {error}
             </span>
           ) : isStarting ? "Łączę..."
-            : isConnected ? (isSpeaking ? "Asystent mówi" : "Mów do mnie po polsku")
-            : "Kliknij mikrofon i zacznij mówić"}
+            : isConnected ? (isSpeaking ? "Asystent mówi" : "Mów do mnie po polsku — kliknij aby zakończyć")
+            : "Kliknij aby zacząć rozmowę"}
         </p>
 
         {/* Last transcript line */}
@@ -382,31 +392,6 @@ export function VoiceAgentWidget() {
               </div>
             ))}
           </div>
-        )}
-      </div>
-
-      {/* Controls */}
-      <div className="relative border-t border-border/40 p-4 flex items-center justify-center gap-3">
-        {!isConnected ? (
-          <Button
-            onClick={start}
-            disabled={isStarting}
-            size="lg"
-            className="rounded-full px-8 shadow-lg"
-          >
-            {isStarting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mic className="h-4 w-4 mr-2" />}
-            {isStarting ? "Łączenie..." : "Rozpocznij rozmowę"}
-          </Button>
-        ) : (
-          <Button
-            onClick={stop}
-            variant="destructive"
-            size="lg"
-            className="rounded-full px-8 shadow-lg"
-          >
-            <MicOff className="h-4 w-4 mr-2" />
-            Zakończ rozmowę
-          </Button>
         )}
       </div>
     </div>
