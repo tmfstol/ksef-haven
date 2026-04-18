@@ -252,10 +252,17 @@ export function VoiceAgentWidget() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 flex items-center gap-2 rounded-full bg-primary px-4 sm:px-5 py-2.5 sm:py-3 text-primary-foreground shadow-lg hover:bg-primary/90 transition-all hover:scale-105"
+        aria-label="Otwórz Haviego"
+        className="group fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 flex items-center justify-center h-14 w-14 sm:h-auto sm:w-auto sm:gap-2.5 sm:pl-2 sm:pr-5 sm:py-2 rounded-full bg-gradient-to-br from-primary via-primary to-primary/80 text-primary-foreground shadow-xl shadow-primary/30 hover:shadow-2xl hover:shadow-primary/40 transition-all hover:scale-105 active:scale-95"
       >
-        <Bot className="h-5 w-5" />
-        <span className="text-sm font-medium">Asystent głosowy</span>
+        <span className="absolute inset-0 rounded-full bg-primary/40 animate-ping opacity-50 group-hover:opacity-0" />
+        <span className="relative flex items-center gap-2.5">
+          <span className="hidden sm:flex items-center justify-center h-9 w-9 rounded-full bg-primary-foreground/15 backdrop-blur-sm">
+            <Bot className="h-5 w-5" />
+          </span>
+          <Bot className="sm:hidden h-6 w-6" />
+          <span className="hidden sm:inline text-sm font-semibold">Havi AI</span>
+        </span>
       </button>
     );
   }
