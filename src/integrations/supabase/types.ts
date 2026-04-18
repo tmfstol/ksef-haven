@@ -514,6 +514,50 @@ export type Database = {
           },
         ]
       }
+      google_activity_log: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          external_id: string | null
+          id: string
+          metadata: Json | null
+          resource_type: string
+          title: string
+          url: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          external_id?: string | null
+          id?: string
+          metadata?: Json | null
+          resource_type: string
+          title: string
+          url?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          external_id?: string | null
+          id?: string
+          metadata?: Json | null
+          resource_type?: string
+          title?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_activity_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_workspace_credentials: {
         Row: {
           access_token: string | null
