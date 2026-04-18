@@ -30,10 +30,10 @@ async function callProxy(companyId: string, action: string, params: any = {}) {
 }
 
 function iconFor(type: string) {
-  if (type === "sheet") return <FileSpreadsheet className="h-4 w-4 text-emerald-500" />;
-  if (type === "doc") return <FileText className="h-4 w-4 text-blue-500" />;
-  if (type === "calendar_event") return <CalendarIcon className="h-4 w-4 text-purple-500" />;
-  return <FolderOpen className="h-4 w-4 text-amber-500" />;
+  if (type === "sheet") return <FileSpreadsheet className="h-4 w-4 text-primary" />;
+  if (type === "doc") return <FileText className="h-4 w-4 text-primary" />;
+  if (type === "calendar_event") return <CalendarIcon className="h-4 w-4 text-primary" />;
+  return <FolderOpen className="h-4 w-4 text-muted-foreground" />;
 }
 
 function labelFor(type: string) {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { HaviAvatar } from "./HaviAvatar";
+import { useHaviGoogleTools } from "@/hooks/useHaviGoogleTools";
 
 type TranscriptItem = {
   id: string;
@@ -71,8 +72,15 @@ export function VoiceAgentWidget() {
   }, []);
 
   const conversationRef = useRef<any>(null);
+  const googleTools = useHaviGoogleTools();
 
   const conversation = useConversation({
+    clientTools: {
+      create_sheet: googleTools.create_sheet,
+      search_files: googleTools.search_files,
+      create_doc: googleTools.create_doc,
+      add_event: googleTools.add_event,
+    },
     onConnect: () => {
       setError(null);
       fallbackInProgressRef.current = false;
