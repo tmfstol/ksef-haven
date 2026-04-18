@@ -222,6 +222,73 @@ const TOOLS = [
       },
     },
   },
+  // ===== GOOGLE WORKSPACE TOOLS =====
+  {
+    type: "function",
+    function: {
+      name: "google_calendar_list",
+      description: "Lista nadchodzących wydarzeń z Google Calendar firmy.",
+      parameters: { type: "object", properties: { company_name: { type: "string" }, max: { type: "number" } } },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "google_calendar_create",
+      description: "Tworzy wydarzenie w Google Calendar (opcjonalnie z linkiem Meet).",
+      parameters: {
+        type: "object",
+        properties: {
+          company_name: { type: "string" },
+          summary: { type: "string", description: "Tytuł spotkania" },
+          start: { type: "string", description: "ISO 8601 datetime, np. 2026-04-20T10:00:00" },
+          end: { type: "string", description: "ISO 8601 datetime końca" },
+          attendees: { type: "array", items: { type: "string" }, description: "Lista emaili" },
+          with_meet: { type: "boolean", description: "Dołącz link Google Meet" },
+        },
+        required: ["summary", "start", "end"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "google_drive_list",
+      description: "Lista ostatnich plików na Google Drive firmy.",
+      parameters: { type: "object", properties: { company_name: { type: "string" }, query: { type: "string" } } },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "google_sheets_create",
+      description: "Tworzy nowy arkusz Google Sheets.",
+      parameters: { type: "object", properties: { company_name: { type: "string" }, title: { type: "string" } }, required: ["title"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "google_gmail_send",
+      description: "Wysyła e-mail z firmowego konta Gmail.",
+      parameters: {
+        type: "object",
+        properties: {
+          company_name: { type: "string" },
+          to: { type: "string" }, subject: { type: "string" }, body: { type: "string" },
+        },
+        required: ["to", "subject", "body"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "google_meet_create",
+      description: "Tworzy natychmiastowe spotkanie Google Meet i zwraca link.",
+      parameters: { type: "object", properties: { company_name: { type: "string" }, summary: { type: "string" } } },
+    },
+  },
 ];
 
 async function executeTool(
@@ -528,6 +595,60 @@ async function executeTool(
           results.push(`📄 **${inv.vendor}** (${inv.gross_amount} PLN, ${inv.date}) — PDF nie został jeszcze wygenerowany. Wejdź w Faktury i kliknij "Pobierz PDF" przy tej fakturze, aby go utworzyć.`);
         }
         return results.join("\n\n");
+      }
+
+      // ===== GOOGLE WORKSPACE =====
+      case "google_calendar_list":
+      case "google_calendar_create":
+      case "google_drive_list":
+      case "google_sheets_create":
+      case "google_gmail_send":
+      case "google_meet_create": {
+        const ids = findCompanyIds(args.company_name as string);
+        const cid = ids[0];
+        if (!cid) return "Brak firmy.";
+        const map: Record<string, { action: string; build: () => any }> = {
+          google_calendar_list: { action: "calendar_list", build: () => ({ maxResults: args.max || 10 }) },
+          google_calendar_create: { action: "calendar_create", build: () => ({
+            summary: args.summary, start: args.start, end: args.end,
+            attendees: args.attendees, withMeet: args.with_meet !== false,
+          })},
+          google_drive_list: { action: "drive_list", build: () => ({ q: args.query ? `name contains '${args.query}' and trashed=false` : "trashed=false" }) },
+          google_sheets_create: { action: "sheets_create", build: () => ({ title: args.title }) },
+          google_gmail_send: { action: "gmail_send", build: () => ({ to: args.to, subject: args.subject, body: args.body }) },
+          google_meet_create: { action: "meet_create", build: () => ({ summary: args.summary || "Instant Meet" }) },
+        };
+        const cfg = map[toolName];
+        const proxyUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/google-api-proxy`;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (userAuthHeader) headers["Authorization"] = userAuthHeader;
+        else headers["Authorization"] = `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
+        const r = await fetch(proxyUrl, {
+          method: "POST", headers,
+          body: JSON.stringify({ companyId: cid, action: cfg.action, params: cfg.build() }),
+        });
+        const j = await r.json();
+        if (!j.success) return `Błąd Google: ${j.error}`;
+        // Compact summaries for voice
+        if (toolName === "google_calendar_list") {
+          const items = (j.data?.items || []).slice(0, 10).map((e: any) => ({
+            tytul: e.summary, start: e.start?.dateTime || e.start?.date, meet: e.hangoutLink || null,
+          }));
+          return JSON.stringify(items);
+        }
+        if (toolName === "google_calendar_create" || toolName === "google_meet_create") {
+          return `Utworzono: ${j.data?.summary || "spotkanie"}. ${j.data?.hangoutLink ? `Meet: ${j.data.hangoutLink}` : ""} ${j.data?.htmlLink ? `Link: ${j.data.htmlLink}` : ""}`;
+        }
+        if (toolName === "google_drive_list") {
+          return JSON.stringify((j.data?.files || []).slice(0, 15).map((f: any) => ({ nazwa: f.name, link: f.webViewLink })));
+        }
+        if (toolName === "google_sheets_create") {
+          return `Arkusz utworzony: ${j.data?.spreadsheetUrl}`;
+        }
+        if (toolName === "google_gmail_send") {
+          return `E-mail wysłany do ${args.to}.`;
+        }
+        return JSON.stringify(j.data);
       }
 
       default:
