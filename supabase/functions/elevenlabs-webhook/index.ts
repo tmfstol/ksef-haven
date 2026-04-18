@@ -52,6 +52,14 @@ serve(async (req) => {
   const clientName: string | undefined = parsedBody.client_name ?? p.client_name;
   const limit: number = Math.min(Number(parsedBody.limit ?? p.limit ?? 5), 20);
 
+  // Google action params
+  const eventTitle: string | undefined = parsedBody.title ?? p.title;
+  const eventStart: string | undefined = parsedBody.start_time ?? p.start_time;
+  const eventDuration: number = Number(parsedBody.duration ?? p.duration ?? 60); // minutes
+  const driveQuery: string | undefined = parsedBody.query ?? p.query ?? parsedBody.title ?? p.title;
+  const docContent: string | undefined = parsedBody.content ?? p.content;
+  const sheetData: any = parsedBody.data ?? p.data;
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceKey) {
@@ -112,6 +120,100 @@ serve(async (req) => {
     } finally {
       try { await admin.removeChannel(channel); } catch (_) { /* noop */ }
     }
+  };
+
+  // ---- Helper: Google access token (refresh on demand) ----
+  const getGoogleAccessToken = async (companyId: string): Promise<{ token: string; email: string } | null> => {
+    const { data: cred, error } = await admin
+      .from("google_workspace_credentials")
+      .select("id, refresh_token, access_token, token_expires_at, connected_email")
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (error) {
+      console.error("DB error reading google_workspace_credentials:", error);
+      return null;
+    }
+    if (!cred?.refresh_token) {
+      console.warn("Brak refresh_token dla company", companyId);
+      return null;
+    }
+
+    const expiresAt = cred.token_expires_at ? new Date(cred.token_expires_at).getTime() : 0;
+    const fresh = cred.access_token && expiresAt > Date.now() + 60_000;
+    if (fresh) {
+      console.log("Google: używam cached access_token");
+      return { token: cred.access_token!, email: cred.connected_email };
+    }
+
+    const clientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID");
+    const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET");
+    if (!clientId || !clientSecret) {
+      console.error("Brak GOOGLE_OAUTH_CLIENT_ID / SECRET");
+      return null;
+    }
+
+    console.log("Google: odświeżam access_token przez refresh_token");
+    const resp = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: cred.refresh_token,
+        grant_type: "refresh_token",
+      }),
+    });
+    const tokenJson = await resp.json();
+    if (!resp.ok || !tokenJson.access_token) {
+      console.error("Google token refresh FAIL:", resp.status, tokenJson);
+      return null;
+    }
+    console.log("Google token refresh OK, expires_in =", tokenJson.expires_in);
+
+    const newExpiresAt = new Date(Date.now() + (tokenJson.expires_in ?? 3600) * 1000).toISOString();
+    await admin
+      .from("google_workspace_credentials")
+      .update({ access_token: tokenJson.access_token, token_expires_at: newExpiresAt })
+      .eq("id", cred.id);
+
+    return { token: tokenJson.access_token, email: cred.connected_email };
+  };
+
+  const logGoogleActivity = async (
+    companyId: string,
+    resourceType: string,
+    title: string,
+    url: string | null,
+    externalId: string | null,
+    metadata: Record<string, unknown> = {},
+  ) => {
+    try {
+      const { data: comp } = await admin.from("companies").select("user_id").eq("id", companyId).maybeSingle();
+      await admin.from("google_activity_log").insert({
+        company_id: companyId,
+        resource_type: resourceType,
+        title,
+        url,
+        external_id: externalId,
+        created_by: comp?.user_id ?? "00000000-0000-0000-0000-000000000000",
+        metadata,
+      });
+    } catch (err) {
+      console.error("Activity log insert error:", err);
+    }
+  };
+
+  // Parsuje proste opisy czasu po polsku — fallback gdy Havi nie poda ISO
+  const parseStartTime = (raw?: string): Date => {
+    if (raw) {
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) return d;
+    }
+    // domyślnie: jutro 12:00 lokalnie (Europe/Warsaw ~ UTC+1/2; używamy serwerowego TZ)
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(12, 0, 0, 0);
+    return d;
   };
 
   try {
@@ -370,9 +472,188 @@ serve(async (req) => {
         });
       }
 
+      // ============ GOOGLE WORKSPACE ============
+
+      case "add_calendar_event":
+      case "dodaj_spotkanie": {
+        const title = eventTitle?.trim() || "Spotkanie";
+        const start = parseStartTime(eventStart);
+        const end = new Date(start.getTime() + (eventDuration || 60) * 60_000);
+        console.log(`Calendar: tworzę event "${title}" ${start.toISOString()} → ${end.toISOString()}`);
+
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) {
+          return json({ response: "Nie mam podłączonego konta Google. Wejdź w Workspace i połącz się z Google." });
+        }
+
+        const body = {
+          summary: title,
+          start: { dateTime: start.toISOString(), timeZone: "Europe/Warsaw" },
+          end: { dateTime: end.toISOString(), timeZone: "Europe/Warsaw" },
+          conferenceData: {
+            createRequest: { requestId: `havi-${Date.now()}`, conferenceSolutionKey: { type: "hangoutsMeet" } },
+          },
+        };
+
+        const calResp = await fetch(
+          "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1",
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
+        const calJson = await calResp.json();
+        console.log("Google Calendar API response:", calResp.status, JSON.stringify(calJson).slice(0, 500));
+
+        if (!calResp.ok) {
+          const msg = calJson?.error?.message || `HTTP ${calResp.status}`;
+          return json({ response: `Google Calendar odrzucił żądanie: ${msg}` });
+        }
+
+        const eventUrl: string = calJson.htmlLink ?? "";
+        const meetUrl: string | undefined = calJson.hangoutLink;
+        await logGoogleActivity(company.id, "calendar_event", title, eventUrl, calJson.id, {
+          start: start.toISOString(),
+          meet: meetUrl,
+        });
+        await broadcastToCompany(company.id, "google_event_created", { title, url: eventUrl, meet: meetUrl });
+
+        const when = start.toLocaleString("pl-PL", { dateStyle: "long", timeStyle: "short" });
+        return json({
+          response: `Utworzyłem spotkanie "${title}" na ${when}${meetUrl ? `. Link Meet: ${meetUrl}` : ""}.`,
+        });
+      }
+
+      case "search_drive":
+      case "search_files":
+      case "szukaj_na_dysku": {
+        const q = (driveQuery || "").trim();
+        console.log(`Drive: szukam "${q || "(ostatnie pliki)"}"`);
+
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) {
+          return json({ response: "Nie mam podłączonego konta Google. Wejdź w Workspace i połącz się z Google." });
+        }
+
+        const params = new URLSearchParams({
+          pageSize: String(Math.min(limit || 10, 20)),
+          fields: "files(id,name,mimeType,webViewLink,modifiedTime)",
+          orderBy: "modifiedTime desc",
+        });
+        if (q && q.toLowerCase() !== "wszystkie pliki") {
+          const safe = q.replace(/'/g, "\\'");
+          params.set("q", `(name contains '${safe}' or fullText contains '${safe}') and trashed = false`);
+        } else {
+          params.set("q", "trashed = false");
+        }
+
+        const driveResp = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        });
+        const driveJson = await driveResp.json();
+        console.log("Google Drive API response:", driveResp.status, `files=${driveJson?.files?.length ?? 0}`);
+
+        if (!driveResp.ok) {
+          const msg = driveJson?.error?.message || `HTTP ${driveResp.status}`;
+          return json({ response: `Google Drive odrzucił żądanie: ${msg}` });
+        }
+
+        const files = driveJson.files ?? [];
+        if (!files.length) {
+          return json({ response: q ? `Nie znalazłem plików pasujących do "${q}".` : "Nie znalazłem żadnych plików." });
+        }
+
+        await broadcastToCompany(company.id, "google_drive_search", { query: q, count: files.length });
+
+        const lines = files.slice(0, 5).map((f: any, idx: number) =>
+          `${idx + 1}. ${f.name}${f.webViewLink ? ` — ${f.webViewLink}` : ""}`,
+        );
+        return json({
+          response: `Znalazłem ${files.length} ${files.length === 1 ? "plik" : "plików"}${q ? ` dla "${q}"` : ""}:\n${lines.join("\n")}`,
+        });
+      }
+
+      case "create_doc":
+      case "utworz_dokument": {
+        const title = eventTitle?.trim() || "Nowy dokument";
+        const content = (docContent ?? "").toString();
+        console.log(`Docs: tworzę dokument "${title}" (content len ${content.length})`);
+
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) return json({ response: "Nie mam podłączonego konta Google." });
+
+        const createResp = await fetch("https://docs.googleapis.com/v1/documents", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+        const created = await createResp.json();
+        console.log("Google Docs create:", createResp.status, created?.documentId);
+        if (!createResp.ok) {
+          return json({ response: `Google Docs odrzucił żądanie: ${created?.error?.message || createResp.status}` });
+        }
+
+        if (content) {
+          const upd = await fetch(`https://docs.googleapis.com/v1/documents/${created.documentId}:batchUpdate`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requests: [{ insertText: { location: { index: 1 }, text: content } }],
+            }),
+          });
+          console.log("Google Docs batchUpdate:", upd.status);
+        }
+
+        const url = `https://docs.google.com/document/d/${created.documentId}/edit`;
+        await logGoogleActivity(company.id, "doc", title, url, created.documentId, {});
+        await broadcastToCompany(company.id, "google_doc_created", { title, url });
+        return json({ response: `Utworzyłem dokument "${title}". Link: ${url}` });
+      }
+
+      case "create_sheet":
+      case "utworz_arkusz": {
+        const title = eventTitle?.trim() || "Nowy arkusz";
+        console.log(`Sheets: tworzę arkusz "${title}"`);
+
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) return json({ response: "Nie mam podłączonego konta Google." });
+
+        const createResp = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ properties: { title } }),
+        });
+        const created = await createResp.json();
+        console.log("Google Sheets create:", createResp.status, created?.spreadsheetId);
+        if (!createResp.ok) {
+          return json({ response: `Google Sheets odrzucił żądanie: ${created?.error?.message || createResp.status}` });
+        }
+
+        const rows: any[][] = Array.isArray(sheetData)
+          ? sheetData.map((r: any) => (Array.isArray(r) ? r : [String(r)]))
+          : [];
+        if (rows.length) {
+          const upd = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${created.spreadsheetId}/values/A1:append?valueInputOption=USER_ENTERED`,
+            {
+              method: "POST",
+              headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ values: rows }),
+            },
+          );
+          console.log("Google Sheets append:", upd.status);
+        }
+
+        const url = `https://docs.google.com/spreadsheets/d/${created.spreadsheetId}/edit`;
+        await logGoogleActivity(company.id, "sheet", title, url, created.spreadsheetId, { rows: rows.length });
+        await broadcastToCompany(company.id, "google_sheet_created", { title, url });
+        return json({ response: `Utworzyłem arkusz "${title}". Link: ${url}` });
+      }
+
       default:
         return json({
-          response: `Nie znam akcji "${action}". Dostępne: get_summary, get_invoices, get_unpaid, get_clients, get_projects, send_to_portal, assign_to_project, get_download_link.`,
+          response: `Nie znam akcji "${action}". Dostępne: get_summary, get_invoices, get_unpaid, get_clients, get_projects, send_to_portal, assign_to_project, get_download_link, add_calendar_event, search_drive, create_doc, create_sheet.`,
         });
     }
   } catch (err) {
