@@ -1,11 +1,11 @@
-import { Home, Receipt, FolderOpen, Settings, FilePlus } from "lucide-react";
+import { Home, Receipt, Settings, FilePlus, LayoutGrid } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const navItems = [
   { icon: Home, label: "Faktury", path: "/dashboard" },
   { icon: FilePlus, label: "Nowa", path: "/invoices/new" },
+  { icon: LayoutGrid, label: "Workspace", path: "/workspace" },
   { icon: Receipt, label: "Wydatki", path: "/expenses" },
-  { icon: FolderOpen, label: "Projekty", path: "/projects" },
   { icon: Settings, label: "Ustawienia", path: "/settings" },
 ];
 
