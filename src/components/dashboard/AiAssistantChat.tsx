@@ -280,33 +280,25 @@ export function AiAssistantChat() {
       >
         <span
           className="absolute inset-0 rounded-full blur-xl opacity-70 group-hover:opacity-100 transition-opacity"
-          style={{ background: "radial-gradient(circle at 30% 30%, hsl(var(--primary) / 0.7), hsl(var(--primary) / 0.15) 60%, transparent 75%)" }}
+          style={{ background: "radial-gradient(circle at 30% 30%, rgba(236,72,153,0.65), rgba(168,85,247,0.25) 60%, transparent 75%)" }}
         />
         <span
           className="absolute inset-1 rounded-full opacity-60 animate-ping"
-          style={{ background: "radial-gradient(circle, hsl(var(--primary) / 0.5), transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, rgba(236,72,153,0.5), transparent 70%)" }}
         />
         <span
-          className="relative h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md ring-1 ring-white/20 shadow-[0_8px_32px_-4px_hsl(var(--primary)/0.6)]"
-          style={{ background: "radial-gradient(circle at 30% 25%, hsl(var(--primary) / 0.95), hsl(var(--primary) / 0.55) 55%, hsl(var(--primary) / 0.35))" }}
+          className="relative h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md ring-1 ring-white/30 shadow-[0_8px_32px_-4px_rgba(236,72,153,0.55)]"
+          style={{ background: "radial-gradient(circle at 30% 25%, #f9a8d4, #ec4899 45%, #a855f7 90%)" }}
         >
-          <span className="absolute top-1.5 left-2 h-3 w-5 rounded-full bg-white/40 blur-[2px]" />
-          <span className="relative flex items-end justify-center gap-[3px] h-5">
-            {[0, 1, 2, 3].map((i) => (
-              <span
-                key={i}
-                className="w-[3px] rounded-full bg-primary-foreground"
-                style={{ animation: `havi-orb-wave 1.1s ease-in-out ${i * 0.13}s infinite`, height: "100%", transformOrigin: "center" }}
-              />
-            ))}
+          <span className="absolute top-1.5 left-2 h-3 w-5 rounded-full bg-white/60 blur-[2px]" />
+          <span className="absolute bottom-2 right-3 h-1.5 w-1.5 rounded-full bg-white/40 blur-[1px]" />
+          <span
+            className="relative text-2xl font-semibold text-white tracking-tight"
+            style={{ fontFamily: "'Playfair Display', 'Georgia', serif", textShadow: "0 1px 2px rgba(0,0,0,0.15)" }}
+          >
+            H
           </span>
         </span>
-        <style>{`
-          @keyframes havi-orb-wave {
-            0%, 100% { transform: scaleY(0.3); opacity: 0.7; }
-            50% { transform: scaleY(1); opacity: 1; }
-          }
-        `}</style>
       </button>
     );
   }
