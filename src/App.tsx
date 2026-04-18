@@ -19,6 +19,8 @@ import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { VoiceAgentWidget } from "@/components/dashboard/VoiceAgentWidget";
+import { useCompanies } from "@/hooks/useCompanies";
+import { useHaviRealtime } from "@/hooks/useHaviRealtime";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +41,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AuthenticatedOverlay() {
   const { user } = useAuth();
+  const { data: companies } = useCompanies();
+  // Aktywna firma = pierwsza z is_active=true (taki sam wybór jak w webhooku Haviego)
+  const activeCompanyId = companies?.find((c) => c.is_active)?.id ?? companies?.[0]?.id ?? null;
+  useHaviRealtime(user ? activeCompanyId : null);
   if (!user) return null;
   return <VoiceAgentWidget />;
 }
