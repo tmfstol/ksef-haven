@@ -59,6 +59,31 @@ async function googleFetch(token: string, url: string, init: RequestInit = {}) {
   return { ok: res.ok, status: res.status, body };
 }
 
+async function logActivity(
+  admin: any,
+  companyId: string,
+  userId: string,
+  resourceType: string,
+  title: string,
+  url?: string | null,
+  externalId?: string | null,
+  metadata?: any
+) {
+  try {
+    await admin.from("google_activity_log").insert({
+      company_id: companyId,
+      created_by: userId,
+      resource_type: resourceType,
+      title,
+      url: url || null,
+      external_id: externalId || null,
+      metadata: metadata || null,
+    });
+  } catch (e) {
+    console.warn("logActivity failed", e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -87,12 +112,14 @@ Deno.serve(async (req) => {
 
     // Permission gate per service
     const moduleByAction: Record<string, string> = {
-      calendar_list: "calendar", calendar_create: "calendar", calendar_delete: "calendar",
-      drive_list: "drive", drive_upload: "drive", drive_delete: "drive",
-      sheets_list: "sheets", sheets_create: "sheets", sheets_append: "sheets",
+      calendar_list: "calendar", calendar_create: "calendar", calendar_delete: "calendar", calendar_add_event: "calendar",
+      drive_list: "drive", drive_upload: "drive", drive_delete: "drive", drive_search: "drive",
+      sheets_list: "sheets", sheets_create: "sheets", sheets_append: "sheets", sheets_create_with_data: "sheets",
+      docs_create: "drive",
       gmail_list: "gmail", gmail_send: "gmail",
       meet_create: "meet",
-      status: "workspace",
+      activity_log_list: "workspace", activity_log_delete: "workspace",
+      status: "workspace", disconnect: "workspace",
     };
     const requiredModule = moduleByAction[action] || "workspace";
 
@@ -115,6 +142,32 @@ Deno.serve(async (req) => {
     if (action === "disconnect") {
       await admin.from("google_workspace_credentials").delete().eq("company_id", companyId);
       return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // --- Activity log endpoints (no Google call needed) ---
+    if (action === "activity_log_list") {
+      const { data, error } = await admin
+        .from("google_activity_log")
+        .select("*")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
+        .limit(params.limit || 50);
+      if (error) throw error;
+      return new Response(JSON.stringify({ success: true, data: { items: data } }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "activity_log_delete") {
+      const { error } = await admin
+        .from("google_activity_log")
+        .delete()
+        .eq("id", params.id)
+        .eq("company_id", companyId);
+      if (error) throw error;
+      return new Response(JSON.stringify({ success: true, data: { id: params.id } }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -153,6 +206,39 @@ Deno.serve(async (req) => {
           { method: "POST", body: JSON.stringify(body) }
         );
         result = r.body;
+        if (r.ok && result?.id) {
+          await logActivity(admin, companyId, userId, "calendar_event", result.summary || "Wydarzenie",
+            result.htmlLink, result.id, { start: result.start, end: result.end, hangoutLink: result.hangoutLink });
+        }
+        break;
+      }
+      case "calendar_add_event": {
+        // Higher-level helper for the agent — accepts duration in minutes
+        const startISO = params.start_time || params.start;
+        if (!startISO) throw new Error("start_time wymagane");
+        const startDate = new Date(startISO);
+        const durationMin = Number(params.duration_minutes || params.duration || 60);
+        const endDate = new Date(startDate.getTime() + durationMin * 60_000);
+        const body: any = {
+          summary: params.title || params.summary || "Spotkanie",
+          description: params.description,
+          start: { dateTime: startDate.toISOString(), timeZone: params.timeZone || "Europe/Warsaw" },
+          end: { dateTime: endDate.toISOString(), timeZone: params.timeZone || "Europe/Warsaw" },
+          attendees: params.attendees?.map((email: string) => ({ email })) || [],
+          conferenceData: params.with_meet !== false ? {
+            createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } },
+          } : undefined,
+        };
+        const r = await googleFetch(
+          accessToken,
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all`,
+          { method: "POST", body: JSON.stringify(body) }
+        );
+        result = r.body;
+        if (r.ok && result?.id) {
+          await logActivity(admin, companyId, userId, "calendar_event", result.summary || "Wydarzenie",
+            result.htmlLink, result.id, { start: result.start, end: result.end, hangoutLink: result.hangoutLink });
+        }
         break;
       }
       case "calendar_delete": {
@@ -185,6 +271,10 @@ Deno.serve(async (req) => {
           }
         );
         result = r.body;
+        if (r.ok && result?.id) {
+          await logActivity(admin, companyId, userId, "calendar_event", result.summary || "Meet",
+            result.hangoutLink || result.htmlLink, result.id, { hangoutLink: result.hangoutLink });
+        }
         break;
       }
 
@@ -194,13 +284,27 @@ Deno.serve(async (req) => {
         const pageSize = params.pageSize || 30;
         const r = await googleFetch(
           accessToken,
-          `https://www.googleapis.com/drive/v3/files?pageSize=${pageSize}&q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,webViewLink,iconLink,size)`
+          `https://www.googleapis.com/drive/v3/files?pageSize=${pageSize}&q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,webViewLink,iconLink,size)&orderBy=modifiedTime desc`
+        );
+        result = r.body;
+        break;
+      }
+      case "drive_search": {
+        // Agent-friendly full text search for invoices/docs.
+        const query = String(params.query || "").trim();
+        if (!query) throw new Error("query wymagane");
+        // Escape single quotes for Drive query
+        const safe = query.replace(/'/g, "\\'");
+        const q = `(name contains '${safe}' or fullText contains '${safe}') and trashed=false`;
+        const pageSize = params.pageSize || 20;
+        const r = await googleFetch(
+          accessToken,
+          `https://www.googleapis.com/drive/v3/files?pageSize=${pageSize}&q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,webViewLink,iconLink,size)&orderBy=modifiedTime desc`
         );
         result = r.body;
         break;
       }
       case "drive_upload": {
-        // params: { name, mimeType, contentBase64 }
         const metadata = { name: params.name, mimeType: params.mimeType || "application/octet-stream" };
         const boundary = "lov-" + crypto.randomUUID();
         const bin = Uint8Array.from(atob(params.contentBase64), (c) => c.charCodeAt(0));
@@ -211,12 +315,16 @@ Deno.serve(async (req) => {
         const tail = enc.encode(`\r\n--${boundary}--`);
         const body = new Uint8Array(head.length + bin.length + tail.length);
         body.set(head, 0); body.set(bin, head.length); body.set(tail, head.length + bin.length);
-        const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink", {
           method: "POST",
           headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": `multipart/related; boundary=${boundary}` },
           body,
         });
         result = await res.json();
+        if (res.ok && result?.id) {
+          await logActivity(admin, companyId, userId, "drive_file", result.name || metadata.name,
+            result.webViewLink, result.id);
+        }
         break;
       }
       case "drive_delete": {
@@ -229,7 +337,7 @@ Deno.serve(async (req) => {
       case "sheets_list": {
         const r = await googleFetch(
           accessToken,
-          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false")}&fields=files(id,name,modifiedTime,webViewLink)&pageSize=30`
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false")}&fields=files(id,name,modifiedTime,webViewLink)&pageSize=30&orderBy=modifiedTime desc`
         );
         result = r.body;
         break;
@@ -240,6 +348,47 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ properties: { title: params.title || "Nowy arkusz" } }),
         });
         result = r.body;
+        if (r.ok && result?.spreadsheetId) {
+          await logActivity(admin, companyId, userId, "sheet", result.properties?.title || params.title || "Arkusz",
+            result.spreadsheetUrl, result.spreadsheetId);
+        }
+        break;
+      }
+      case "sheets_create_with_data": {
+        // Agent-friendly: create sheet + populate in one go.
+        // params: { title, data: string[][] | { headers: string[], rows: string[][] } }
+        const title = params.title || `Arkusz ${new Date().toLocaleDateString("pl-PL")}`;
+        const createRes = await googleFetch(accessToken, `https://sheets.googleapis.com/v4/spreadsheets`, {
+          method: "POST",
+          body: JSON.stringify({ properties: { title } }),
+        });
+        if (!createRes.ok) {
+          result = createRes.body;
+          break;
+        }
+        const sheet = createRes.body;
+        let values: any[][] = [];
+        if (Array.isArray(params.data)) {
+          values = params.data;
+        } else if (params.data && typeof params.data === "object") {
+          if (Array.isArray(params.data.headers)) values.push(params.data.headers);
+          if (Array.isArray(params.data.rows)) values.push(...params.data.rows);
+        }
+        if (values.length > 0) {
+          await googleFetch(
+            accessToken,
+            `https://sheets.googleapis.com/v4/spreadsheets/${sheet.spreadsheetId}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+            { method: "POST", body: JSON.stringify({ values }) }
+          );
+        }
+        result = {
+          spreadsheetId: sheet.spreadsheetId,
+          spreadsheetUrl: sheet.spreadsheetUrl,
+          title,
+          rowsInserted: values.length,
+        };
+        await logActivity(admin, companyId, userId, "sheet", title, sheet.spreadsheetUrl, sheet.spreadsheetId,
+          { rows: values.length });
         break;
       }
       case "sheets_append": {
@@ -250,6 +399,39 @@ Deno.serve(async (req) => {
           { method: "POST", body: JSON.stringify({ values: params.values || [] }) }
         );
         result = r.body;
+        break;
+      }
+
+      // ---- DOCS ----
+      case "docs_create": {
+        // Create a Doc and populate with content (plain text)
+        const title = params.title || "Nowy dokument";
+        const createRes = await googleFetch(accessToken, `https://docs.googleapis.com/v1/documents`, {
+          method: "POST",
+          body: JSON.stringify({ title }),
+        });
+        if (!createRes.ok) {
+          result = createRes.body;
+          break;
+        }
+        const doc = createRes.body;
+        const content = String(params.content || "").trim();
+        if (content) {
+          await googleFetch(
+            accessToken,
+            `https://docs.googleapis.com/v1/documents/${doc.documentId}:batchUpdate`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                requests: [{ insertText: { location: { index: 1 }, text: content } }],
+              }),
+            }
+          );
+        }
+        const url = `https://docs.google.com/document/d/${doc.documentId}/edit`;
+        result = { documentId: doc.documentId, url, title };
+        await logActivity(admin, companyId, userId, "doc", title, url, doc.documentId,
+          { length: content.length });
         break;
       }
 

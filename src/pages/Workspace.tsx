@@ -12,8 +12,9 @@ import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { RequireModule } from "@/components/auth/RequireModule";
 import {
   ArrowLeft, Calendar, FolderOpen, FileSpreadsheet, Mail, Video,
-  Loader2, Plus, ExternalLink, Link2, Unlink, RefreshCw, Trash2, Send, Inbox,
+  Loader2, Plus, ExternalLink, Link2, Unlink, RefreshCw, Trash2, Send, Inbox, Sparkles,
 } from "lucide-react";
+import { GoogleActivityPanel } from "@/components/workspace/GoogleActivityPanel";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
@@ -395,14 +396,16 @@ function WorkspaceInner() {
         ) : !status?.connected ? (
           <ConnectCard companyId={companyId} onConnected={() => qc.invalidateQueries({ queryKey: ["g-status"] })} />
         ) : (
-          <Tabs defaultValue="calendar" className="space-y-4">
-            <TabsList className="rounded-xl bg-secondary/40">
+          <Tabs defaultValue="havi" className="space-y-4">
+            <TabsList className="rounded-xl bg-secondary/40 flex-wrap h-auto">
+              <TabsTrigger value="havi" className="rounded-lg gap-2"><Sparkles className="h-4 w-4" />Aktywne narzędzia</TabsTrigger>
               <TabsTrigger value="calendar" className="rounded-lg gap-2"><Calendar className="h-4 w-4" />Kalendarz</TabsTrigger>
               <TabsTrigger value="drive" className="rounded-lg gap-2"><FolderOpen className="h-4 w-4" />Dysk</TabsTrigger>
               <TabsTrigger value="sheets" className="rounded-lg gap-2"><FileSpreadsheet className="h-4 w-4" />Arkusze</TabsTrigger>
               <TabsTrigger value="gmail" className="rounded-lg gap-2"><Mail className="h-4 w-4" />Gmail</TabsTrigger>
               <TabsTrigger value="meet" className="rounded-lg gap-2"><Video className="h-4 w-4" />Meet</TabsTrigger>
             </TabsList>
+            <TabsContent value="havi"><GoogleActivityPanel companyId={companyId} /></TabsContent>
             <TabsContent value="calendar"><CalendarTab companyId={companyId} /></TabsContent>
             <TabsContent value="drive"><DriveTab companyId={companyId} /></TabsContent>
             <TabsContent value="sheets"><SheetsTab companyId={companyId} /></TabsContent>
