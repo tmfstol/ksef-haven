@@ -472,9 +472,188 @@ serve(async (req) => {
         });
       }
 
+      // ============ GOOGLE WORKSPACE ============
+
+      case "add_calendar_event":
+      case "dodaj_spotkanie": {
+        const title = eventTitle?.trim() || "Spotkanie";
+        const start = parseStartTime(eventStart);
+        const end = new Date(start.getTime() + (eventDuration || 60) * 60_000);
+        console.log(`Calendar: tworzę event "${title}" ${start.toISOString()} → ${end.toISOString()}`);
+
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) {
+          return json({ response: "Nie mam podłączonego konta Google. Wejdź w Workspace i połącz się z Google." });
+        }
+
+        const body = {
+          summary: title,
+          start: { dateTime: start.toISOString(), timeZone: "Europe/Warsaw" },
+          end: { dateTime: end.toISOString(), timeZone: "Europe/Warsaw" },
+          conferenceData: {
+            createRequest: { requestId: `havi-${Date.now()}`, conferenceSolutionKey: { type: "hangoutsMeet" } },
+          },
+        };
+
+        const calResp = await fetch(
+          "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1",
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
+        const calJson = await calResp.json();
+        console.log("Google Calendar API response:", calResp.status, JSON.stringify(calJson).slice(0, 500));
+
+        if (!calResp.ok) {
+          const msg = calJson?.error?.message || `HTTP ${calResp.status}`;
+          return json({ response: `Google Calendar odrzucił żądanie: ${msg}` });
+        }
+
+        const eventUrl: string = calJson.htmlLink ?? "";
+        const meetUrl: string | undefined = calJson.hangoutLink;
+        await logGoogleActivity(company.id, "calendar_event", title, eventUrl, calJson.id, {
+          start: start.toISOString(),
+          meet: meetUrl,
+        });
+        await broadcastToCompany(company.id, "google_event_created", { title, url: eventUrl, meet: meetUrl });
+
+        const when = start.toLocaleString("pl-PL", { dateStyle: "long", timeStyle: "short" });
+        return json({
+          response: `Utworzyłem spotkanie "${title}" na ${when}${meetUrl ? `. Link Meet: ${meetUrl}` : ""}.`,
+        });
+      }
+
+      case "search_drive":
+      case "search_files":
+      case "szukaj_na_dysku": {
+        const q = (driveQuery || "").trim();
+        console.log(`Drive: szukam "${q || "(ostatnie pliki)"}"`);
+
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) {
+          return json({ response: "Nie mam podłączonego konta Google. Wejdź w Workspace i połącz się z Google." });
+        }
+
+        const params = new URLSearchParams({
+          pageSize: String(Math.min(limit || 10, 20)),
+          fields: "files(id,name,mimeType,webViewLink,modifiedTime)",
+          orderBy: "modifiedTime desc",
+        });
+        if (q && q.toLowerCase() !== "wszystkie pliki") {
+          const safe = q.replace(/'/g, "\\'");
+          params.set("q", `(name contains '${safe}' or fullText contains '${safe}') and trashed = false`);
+        } else {
+          params.set("q", "trashed = false");
+        }
+
+        const driveResp = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        });
+        const driveJson = await driveResp.json();
+        console.log("Google Drive API response:", driveResp.status, `files=${driveJson?.files?.length ?? 0}`);
+
+        if (!driveResp.ok) {
+          const msg = driveJson?.error?.message || `HTTP ${driveResp.status}`;
+          return json({ response: `Google Drive odrzucił żądanie: ${msg}` });
+        }
+
+        const files = driveJson.files ?? [];
+        if (!files.length) {
+          return json({ response: q ? `Nie znalazłem plików pasujących do "${q}".` : "Nie znalazłem żadnych plików." });
+        }
+
+        await broadcastToCompany(company.id, "google_drive_search", { query: q, count: files.length });
+
+        const lines = files.slice(0, 5).map((f: any, idx: number) =>
+          `${idx + 1}. ${f.name}${f.webViewLink ? ` — ${f.webViewLink}` : ""}`,
+        );
+        return json({
+          response: `Znalazłem ${files.length} ${files.length === 1 ? "plik" : "plików"}${q ? ` dla "${q}"` : ""}:\n${lines.join("\n")}`,
+        });
+      }
+
+      case "create_doc":
+      case "utworz_dokument": {
+        const title = eventTitle?.trim() || "Nowy dokument";
+        const content = (docContent ?? "").toString();
+        console.log(`Docs: tworzę dokument "${title}" (content len ${content.length})`);
+
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) return json({ response: "Nie mam podłączonego konta Google." });
+
+        const createResp = await fetch("https://docs.googleapis.com/v1/documents", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+        const created = await createResp.json();
+        console.log("Google Docs create:", createResp.status, created?.documentId);
+        if (!createResp.ok) {
+          return json({ response: `Google Docs odrzucił żądanie: ${created?.error?.message || createResp.status}` });
+        }
+
+        if (content) {
+          const upd = await fetch(`https://docs.googleapis.com/v1/documents/${created.documentId}:batchUpdate`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requests: [{ insertText: { location: { index: 1 }, text: content } }],
+            }),
+          });
+          console.log("Google Docs batchUpdate:", upd.status);
+        }
+
+        const url = `https://docs.google.com/document/d/${created.documentId}/edit`;
+        await logGoogleActivity(company.id, "doc", title, url, created.documentId, {});
+        await broadcastToCompany(company.id, "google_doc_created", { title, url });
+        return json({ response: `Utworzyłem dokument "${title}". Link: ${url}` });
+      }
+
+      case "create_sheet":
+      case "utworz_arkusz": {
+        const title = eventTitle?.trim() || "Nowy arkusz";
+        console.log(`Sheets: tworzę arkusz "${title}"`);
+
+        const auth = await getGoogleAccessToken(company.id);
+        if (!auth) return json({ response: "Nie mam podłączonego konta Google." });
+
+        const createResp = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ properties: { title } }),
+        });
+        const created = await createResp.json();
+        console.log("Google Sheets create:", createResp.status, created?.spreadsheetId);
+        if (!createResp.ok) {
+          return json({ response: `Google Sheets odrzucił żądanie: ${created?.error?.message || createResp.status}` });
+        }
+
+        const rows: any[][] = Array.isArray(sheetData)
+          ? sheetData.map((r: any) => (Array.isArray(r) ? r : [String(r)]))
+          : [];
+        if (rows.length) {
+          const upd = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${created.spreadsheetId}/values/A1:append?valueInputOption=USER_ENTERED`,
+            {
+              method: "POST",
+              headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ values: rows }),
+            },
+          );
+          console.log("Google Sheets append:", upd.status);
+        }
+
+        const url = `https://docs.google.com/spreadsheets/d/${created.spreadsheetId}/edit`;
+        await logGoogleActivity(company.id, "sheet", title, url, created.spreadsheetId, { rows: rows.length });
+        await broadcastToCompany(company.id, "google_sheet_created", { title, url });
+        return json({ response: `Utworzyłem arkusz "${title}". Link: ${url}` });
+      }
+
       default:
         return json({
-          response: `Nie znam akcji "${action}". Dostępne: get_summary, get_invoices, get_unpaid, get_clients, get_projects, send_to_portal, assign_to_project, get_download_link.`,
+          response: `Nie znam akcji "${action}". Dostępne: get_summary, get_invoices, get_unpaid, get_clients, get_projects, send_to_portal, assign_to_project, get_download_link, add_calendar_event, search_drive, create_doc, create_sheet.`,
         });
     }
   } catch (err) {
