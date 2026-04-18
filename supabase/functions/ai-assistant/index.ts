@@ -548,28 +548,52 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const voiceUserId = req.headers.get("X-Voice-User-Id");
+    const voiceMode = req.headers.get("X-Voice-Mode") === "true";
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    let user: { id: string } | null = null;
+    let supabase: ReturnType<typeof createClient>;
+
+    if (voiceMode && voiceUserId) {
+      // Voice agent mode: use service role + impersonate user via header
+      const adminClient = createClient(supabaseUrl, SERVICE_ROLE_KEY);
+      const { data: userData, error: userErr } = await adminClient.auth.admin.getUserById(voiceUserId);
+      if (userErr || !userData?.user) {
+        return new Response(JSON.stringify({ error: "Voice user not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      user = { id: userData.user.id };
+      // Use service role client (bypasses RLS) — we filter manually by company_id
+      supabase = adminClient;
+    } else {
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      supabase = createClient(supabaseUrl, ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const { data: { user: u }, error: authError } = await supabase.auth.getUser();
+      if (authError || !u) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      user = { id: u.id };
     }
 
-    const { messages } = await req.json();
+    const body = await req.json();
+    const { messages } = body;
+    const nonStream = body.non_stream === true || voiceMode;
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "Messages array required" }), {
         status: 400,
