@@ -282,15 +282,12 @@ export function VoiceAgentWidget() {
           {/* Specular highlights */}
           <span className="absolute top-1.5 left-2 h-3 w-5 rounded-full bg-white/60 blur-[2px]" />
           <span className="absolute bottom-2 right-3 h-1.5 w-1.5 rounded-full bg-white/40 blur-[1px]" />
-          {/* Mikrofon */}
-          <Mic className="relative h-6 w-6 text-white" strokeWidth={2.2} />
+          {/* Chat bubble z iskierką */}
+          <span className="relative flex items-center justify-center">
+            <MessageCircle className="h-7 w-7 text-white" strokeWidth={2} fill="rgba(255,255,255,0.15)" />
+            <Sparkles className="absolute -top-1 -right-1.5 h-3 w-3 text-white drop-shadow-[0_0_4px_rgba(255,255,255,0.8)]" strokeWidth={2.5} />
+          </span>
         </span>
-        <style>{`
-          @keyframes havi-orb-wave {
-            0%, 100% { transform: scaleY(0.3); opacity: 0.7; }
-            50% { transform: scaleY(1); opacity: 1; }
-          }
-        `}</style>
       </button>
     );
   }
