@@ -122,6 +122,100 @@ serve(async (req) => {
     }
   };
 
+  // ---- Helper: Google access token (refresh on demand) ----
+  const getGoogleAccessToken = async (companyId: string): Promise<{ token: string; email: string } | null> => {
+    const { data: cred, error } = await admin
+      .from("google_workspace_credentials")
+      .select("id, refresh_token, access_token, token_expires_at, connected_email")
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (error) {
+      console.error("DB error reading google_workspace_credentials:", error);
+      return null;
+    }
+    if (!cred?.refresh_token) {
+      console.warn("Brak refresh_token dla company", companyId);
+      return null;
+    }
+
+    const expiresAt = cred.token_expires_at ? new Date(cred.token_expires_at).getTime() : 0;
+    const fresh = cred.access_token && expiresAt > Date.now() + 60_000;
+    if (fresh) {
+      console.log("Google: używam cached access_token");
+      return { token: cred.access_token!, email: cred.connected_email };
+    }
+
+    const clientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID");
+    const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET");
+    if (!clientId || !clientSecret) {
+      console.error("Brak GOOGLE_OAUTH_CLIENT_ID / SECRET");
+      return null;
+    }
+
+    console.log("Google: odświeżam access_token przez refresh_token");
+    const resp = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: cred.refresh_token,
+        grant_type: "refresh_token",
+      }),
+    });
+    const tokenJson = await resp.json();
+    if (!resp.ok || !tokenJson.access_token) {
+      console.error("Google token refresh FAIL:", resp.status, tokenJson);
+      return null;
+    }
+    console.log("Google token refresh OK, expires_in =", tokenJson.expires_in);
+
+    const newExpiresAt = new Date(Date.now() + (tokenJson.expires_in ?? 3600) * 1000).toISOString();
+    await admin
+      .from("google_workspace_credentials")
+      .update({ access_token: tokenJson.access_token, token_expires_at: newExpiresAt })
+      .eq("id", cred.id);
+
+    return { token: tokenJson.access_token, email: cred.connected_email };
+  };
+
+  const logGoogleActivity = async (
+    companyId: string,
+    resourceType: string,
+    title: string,
+    url: string | null,
+    externalId: string | null,
+    metadata: Record<string, unknown> = {},
+  ) => {
+    try {
+      const { data: comp } = await admin.from("companies").select("user_id").eq("id", companyId).maybeSingle();
+      await admin.from("google_activity_log").insert({
+        company_id: companyId,
+        resource_type: resourceType,
+        title,
+        url,
+        external_id: externalId,
+        created_by: comp?.user_id ?? "00000000-0000-0000-0000-000000000000",
+        metadata,
+      });
+    } catch (err) {
+      console.error("Activity log insert error:", err);
+    }
+  };
+
+  // Parsuje proste opisy czasu po polsku — fallback gdy Havi nie poda ISO
+  const parseStartTime = (raw?: string): Date => {
+    if (raw) {
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) return d;
+    }
+    // domyślnie: jutro 12:00 lokalnie (Europe/Warsaw ~ UTC+1/2; używamy serwerowego TZ)
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(12, 0, 0, 0);
+    return d;
+  };
+
   try {
     const company = await getActiveCompany();
     if (!company) {
