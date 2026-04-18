@@ -668,7 +668,7 @@ serve(async (req) => {
           const args = typeof tc.function.arguments === "string"
             ? JSON.parse(tc.function.arguments)
             : tc.function.arguments;
-          const result = await executeTool(supabase, tc.function.name, args, companyIds, companiesMap, authHeader!);
+          const result = await executeTool(supabase, tc.function.name, args, companyIds, companiesMap, authHeader || "");
           currentMessages.push({
             role: "tool",
             tool_call_id: tc.id,
@@ -678,9 +678,13 @@ serve(async (req) => {
         continue; // Next round
       }
 
-      // Final answer — stream it
+      // Final answer
       if (choice.finish_reason === "stop" || msg.content) {
-        // Re-request with streaming for the final answer
+        if (nonStream) {
+          return new Response(JSON.stringify({ content: msg.content || "" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         const streamResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -693,7 +697,6 @@ serve(async (req) => {
             stream: true,
           }),
         });
-
         return new Response(streamResp.body, {
           headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
         });
