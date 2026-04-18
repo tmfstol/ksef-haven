@@ -1,3 +1,5 @@
+import { Mic } from "lucide-react";
+
 interface HaviAvatarProps {
   isSpeaking?: boolean;
   isListening?: boolean;
@@ -5,30 +7,29 @@ interface HaviAvatarProps {
 }
 
 const sizeMap = {
-  sm: { wrap: "h-8 w-8", text: "text-sm", bar: "w-[2px]" },
-  md: { wrap: "h-10 w-10", text: "text-base", bar: "w-[2.5px]" },
-  lg: { wrap: "h-14 w-14", text: "text-xl", bar: "w-[3px]" },
+  sm: { wrap: "h-8 w-8", icon: "h-4 w-4", bar: "w-[2px]" },
+  md: { wrap: "h-10 w-10", icon: "h-5 w-5", bar: "w-[2.5px]" },
+  lg: { wrap: "h-14 w-14", icon: "h-7 w-7", bar: "w-[3px]" },
 };
 
 export function HaviAvatar({ isSpeaking, isListening, size = "md" }: HaviAvatarProps) {
   const s = sizeMap[size];
   const active = isSpeaking || isListening;
 
-  // Havi = kobiecy głos → paleta różowo-fioletowa zamiast męskiej niebieskiej
-  const baseGradient = "from-pink-400/30 via-fuchsia-400/20 to-purple-500/30";
+  // Niebieska paleta — spójna z primary aplikacji
   const stateGradient = isListening
-    ? "from-rose-500/40 via-pink-500/30 to-fuchsia-500/40"
+    ? "from-blue-400/40 via-blue-500/30 to-indigo-600/40"
     : isSpeaking
-    ? "from-fuchsia-400/40 via-purple-400/30 to-violet-500/40"
-    : baseGradient;
+    ? "from-sky-400/40 via-blue-500/30 to-indigo-500/40"
+    : "from-blue-400/30 via-blue-500/20 to-indigo-500/30";
 
   const ringColor = isListening
-    ? "ring-rose-400/50"
+    ? "ring-blue-400/50"
     : isSpeaking
-    ? "ring-fuchsia-400/50"
-    : "ring-pink-300/30";
+    ? "ring-sky-400/50"
+    : "ring-blue-300/30";
 
-  const barColor = isListening ? "bg-rose-500" : isSpeaking ? "bg-fuchsia-500" : "bg-pink-400";
+  const barColor = isListening ? "bg-blue-500" : isSpeaking ? "bg-sky-500" : "bg-blue-400";
 
   return (
     <div
@@ -55,12 +56,7 @@ export function HaviAvatar({ isSpeaking, isListening, size = "md" }: HaviAvatarP
           ))}
         </div>
       ) : (
-        <span
-          className={`relative ${s.text} font-semibold bg-gradient-to-br from-pink-500 via-fuchsia-500 to-purple-600 bg-clip-text text-transparent tracking-tight`}
-          style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-        >
-          H
-        </span>
+        <Mic className={`${s.icon} text-blue-600 relative z-10`} strokeWidth={2.2} />
       )}
 
       {/* Specular highlight */}
