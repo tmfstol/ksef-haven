@@ -288,14 +288,10 @@ export function VoiceAgentWidget() {
 
       {/* Header */}
       <div className="relative flex items-center justify-between px-4 py-3 border-b border-border/40">
-        <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-            isSpeaking ? "bg-primary/30" : isConnected ? "bg-primary/15" : "bg-muted"
-          }`}>
-            <Bot className={`h-4 w-4 ${isConnected ? "text-primary" : "text-muted-foreground"}`} />
-          </div>
+        <div className="flex items-center gap-3">
+          <HaviAvatar isSpeaking={isSpeaking} isListening={isConnected && !isSpeaking} size="md" />
           <div>
-            <p className="text-sm font-semibold text-foreground">Asystent głosowy</p>
+            <p className="text-sm font-semibold text-foreground">Havi</p>
             <p className="text-xs text-muted-foreground">
               {isConnected ? (isSpeaking ? "● Mówię..." : "● Słucham...") : "Gotowy do rozmowy"}
             </p>
