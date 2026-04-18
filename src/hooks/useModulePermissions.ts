@@ -38,10 +38,10 @@ function getActiveCompanyId(companies: any[] | undefined): string | null {
 
 export function useMyModulePermissions() {
   const { user } = useAuth();
-  const { data: companies } = useCompanies();
+  const { data: companies, isLoading: companiesLoading } = useCompanies();
   const companyId = getActiveCompanyId(companies);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["my-module-permissions", user?.id, companyId],
     enabled: !!user?.id && !!companyId,
     queryFn: async (): Promise<Record<string, boolean>> => {
@@ -61,10 +61,28 @@ export function useMyModulePermissions() {
       return map;
     },
   });
+
+  return {
+    ...query,
+    isLoading: companiesLoading || (!!user?.id && !!companyId && query.isLoading),
+    isPending: companiesLoading || query.isPending,
+  };
 }
 
 export function useHasModule(module: ModuleKey): { allowed: boolean; loading: boolean } {
+  const { user } = useAuth();
+  const { data: companies, isLoading: companiesLoading } = useCompanies();
   const { data, isLoading } = useMyModulePermissions();
-  if (isLoading) return { allowed: false, loading: true };
+
+  // Still resolving auth or companies
+  if (!user || companiesLoading || isLoading) {
+    return { allowed: false, loading: true };
+  }
+
+  // Owner shortcut at the consumer level too — never block owner
+  const companyId = getActiveCompanyId(companies);
+  const owned = companies?.find((c) => c.id === companyId)?.user_id === user.id;
+  if (owned) return { allowed: true, loading: false };
+
   return { allowed: !!data?.[module], loading: false };
 }
