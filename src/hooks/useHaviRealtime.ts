@@ -53,6 +53,40 @@ export function useHaviRealtime(companyId?: string | null) {
         });
         queryClient.invalidateQueries({ queryKey: ["invoices"] });
       })
+      .on("broadcast", { event: "open_drive_file" }, ({ payload }) => {
+        const url = payload?.url as string | undefined;
+        const name = (payload?.name as string) || "plik";
+        if (!url) return;
+        const win = window.open(url, "_blank", "noopener,noreferrer");
+        if (!win) {
+          toast.info(`Havi otwiera „${name}"`, {
+            description: "Kliknij, aby otworzyć plik Google",
+            action: { label: "Otwórz", onClick: () => window.open(url, "_blank", "noopener,noreferrer") },
+            duration: 15000,
+          });
+        } else {
+          toast.success(`Havi otworzył „${name}"`);
+        }
+      })
+      .on("broadcast", { event: "google_doc_updated" }, ({ payload }) => {
+        toast.success(`Havi edytował dokument „${payload?.name ?? ""}"`, {
+          action: payload?.url
+            ? { label: "Otwórz", onClick: () => window.open(payload.url as string, "_blank", "noopener,noreferrer") }
+            : undefined,
+        });
+        queryClient.invalidateQueries({ queryKey: ["g-activity"] });
+      })
+      .on("broadcast", { event: "google_sheet_updated" }, ({ payload }) => {
+        toast.success(`Havi dopisał ${payload?.rows ?? ""} wiersze do „${payload?.name ?? ""}"`, {
+          action: payload?.url
+            ? { label: "Otwórz", onClick: () => window.open(payload.url as string, "_blank", "noopener,noreferrer") }
+            : undefined,
+        });
+        queryClient.invalidateQueries({ queryKey: ["g-activity"] });
+      })
+      .on("broadcast", { event: "google_file_read" }, ({ payload }) => {
+        toast.info(`Havi czyta „${payload?.name ?? "plik"}"`);
+      })
       .subscribe();
 
     return () => {
