@@ -26,7 +26,18 @@ const bottomItems = [
 export function AppSidebar() {
   const location = useLocation();
   const { signOut } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("sidebar:collapsed") === "1";
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("sidebar:collapsed", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  };
 
   return (
     <aside
@@ -110,7 +121,7 @@ export function AppSidebar() {
 
       {/* Collapse toggle */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={toggleCollapsed}
         className="absolute -right-3 top-20 h-6 w-6 rounded-full bg-card border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors z-10"
       >
         {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
