@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Users, Search, TrendingUp, TrendingDown, Building2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { ContactInvoicesRow } from "@/components/contacts/ContactInvoicesRow";
 
 interface Contact {
   id: string;
@@ -218,43 +219,9 @@ export default function Contacts() {
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {filtered.map((c) => {
-                  const r = RELIABILITY[c.payment_reliability] || RELIABILITY.unknown;
-                  const total = Number(c.total_revenue) + Number(c.total_cost);
-                  const isRevenue = Number(c.total_revenue) >= Number(c.total_cost);
-                  return (
-                    <div key={c.id} className="flex items-center gap-4 p-4 hover:bg-secondary/30 transition-colors">
-                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
-                        {c.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{c.name}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
-                          {c.nip && <span>NIP: {c.nip}</span>}
-                          {c.city && <><span>·</span><span>{c.city}</span></>}
-                          <span>·</span>
-                          <span>{c.invoice_count} faktur</span>
-                          {c.last_invoice_date && (
-                            <><span>·</span><span>Ostatnia: {new Date(c.last_invoice_date).toLocaleDateString("pl-PL")}</span></>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0 space-y-1">
-                        <div className="flex items-center gap-1.5 justify-end">
-                          {isRevenue ? (
-                            <TrendingUp className="h-3.5 w-3.5 text-accent" />
-                          ) : (
-                            <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-                          )}
-                          <span className="text-sm font-bold text-foreground">{fmtPln(total)}</span>
-                        </div>
-                        <Badge variant="outline" className={`text-[10px] px-2 py-0 border-0 ${r.color}`}>
-                          {r.label}
-                        </Badge>
-                      </div>
-                    </div>
-                  );
-                })}
+                {filtered.map((c) => (
+                  <ContactInvoicesRow key={c.id} contact={c} companyId={activeCompanyId!} />
+                ))}
               </div>
             )}
           </CardContent>
