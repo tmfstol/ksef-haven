@@ -19,6 +19,14 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
   const editId = searchParams.get("company");
 
   const { data: companies, isLoading } = useCompanies();
+
+  // Jeśli onboarding, ale firmy już istnieją → przekieruj do Centrum
+  useEffect(() => {
+    if (isOnboarding && !isLoading && companies && companies.length > 0) {
+      navigate("/command-center", { replace: true });
+    }
+  }, [isOnboarding, isLoading, companies, navigate]);
+
   const addMutation = useAddCompany();
   const updateMutation = useUpdateCompany();
   const deleteMutation = useDeleteCompany();
