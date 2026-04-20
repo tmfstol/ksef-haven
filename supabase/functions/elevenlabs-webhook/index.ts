@@ -52,6 +52,18 @@ serve(async (req) => {
   const clientName: string | undefined = parsedBody.client_name ?? p.client_name;
   const limit: number = Math.min(Number(parsedBody.limit ?? p.limit ?? 5), 20);
 
+  // Normalizacja typu faktury (przychodowa/kosztowa) — Havi może podać różne warianty
+  const rawType: string | undefined =
+    parsedBody.invoice_type ?? p.invoice_type ?? parsedBody.type ?? p.type;
+  const normalizeType = (t?: string): "przychodowa" | "kosztowa" | undefined => {
+    if (!t) return undefined;
+    const s = t.toLowerCase();
+    if (s.includes("przychod") || s.includes("sprzeda") || s.includes("revenue") || s.includes("income") || s.includes("sales")) return "przychodowa";
+    if (s.includes("koszt") || s.includes("zakup") || s.includes("cost") || s.includes("expense") || s.includes("purchase")) return "kosztowa";
+    return undefined;
+  };
+  const invoiceType = normalizeType(rawType);
+
   // Google action params
   const eventTitle: string | undefined = parsedBody.title ?? p.title;
   const eventStart: string | undefined = parsedBody.start_time ?? p.start_time;
