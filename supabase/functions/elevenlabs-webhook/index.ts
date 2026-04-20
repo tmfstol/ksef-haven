@@ -648,12 +648,62 @@ serve(async (req) => {
       }
 
       case "create_sheet":
-      case "utworz_arkusz": {
+      case "utworz_arkusz":
+      case "create_invoices_sheet":
+      case "arkusz_faktur": {
         const title = eventTitle?.trim() || "Nowy arkusz";
-        console.log(`Sheets: tworzę arkusz "${title}"`);
+        console.log(`Sheets: tworzę arkusz "${title}" (action=${action})`);
 
         const auth = await getGoogleAccessToken(company.id);
         if (!auth) return json({ response: "Nie mam podłączonego konta Google." });
+
+        // 1) Zbuduj wiersze
+        let rows: any[][] = Array.isArray(sheetData)
+          ? sheetData.map((r: any) => (Array.isArray(r) ? r : [String(r)]))
+          : [];
+
+        // 2) Auto-wypełnianie fakturami gdy nie podano data lub action = create_invoices_sheet
+        const titleLower = title.toLowerCase();
+        const looksLikeInvoiceSheet =
+          action === "create_invoices_sheet" ||
+          action === "arkusz_faktur" ||
+          titleLower.includes("faktur") ||
+          titleLower.includes("sprzeda") ||
+          titleLower.includes("przychod") ||
+          titleLower.includes("koszt") ||
+          titleLower.includes("zakup");
+
+        if (rows.length === 0 && looksLikeInvoiceSheet) {
+          console.log("Sheets: autopilot — wczytuję faktury do arkusza");
+          let q = admin
+            .from("invoices")
+            .select("date, ksef_number, vendor, nip, invoice_type, gross_amount, payment_status, payment_due_date, category")
+            .eq("company_id", company.id)
+            .order("date", { ascending: false })
+            .limit(500);
+
+          if (invoiceType) q = q.eq("invoice_type", invoiceType);
+          if (clientName) q = q.ilike("vendor", `%${clientName}%`);
+
+          const { data: invoices, error: invErr } = await q;
+          if (invErr) console.error("Sheets autopilot — błąd faktur:", invErr);
+
+          rows = [
+            ["Data", "Numer KSeF", "Kontrahent", "NIP", "Typ", "Kwota brutto (PLN)", "Status płatności", "Termin płatności", "Kategoria"],
+            ...(invoices ?? []).map((i: any) => [
+              i.date ?? "",
+              i.ksef_number ?? "",
+              i.vendor ?? "",
+              i.nip ?? "",
+              i.invoice_type ?? "",
+              Number(i.gross_amount ?? 0).toFixed(2),
+              i.payment_status ?? "",
+              i.payment_due_date ?? "",
+              i.category ?? "",
+            ]),
+          ];
+          console.log(`Sheets autopilot — przygotowano ${rows.length - 1} faktur`);
+        }
 
         const createResp = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
           method: "POST",
@@ -666,9 +716,6 @@ serve(async (req) => {
           return json({ response: `Google Sheets odrzucił żądanie: ${created?.error?.message || createResp.status}` });
         }
 
-        const rows: any[][] = Array.isArray(sheetData)
-          ? sheetData.map((r: any) => (Array.isArray(r) ? r : [String(r)]))
-          : [];
         if (rows.length) {
           const upd = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${created.spreadsheetId}/values/A1:append?valueInputOption=USER_ENTERED`,
@@ -678,13 +725,15 @@ serve(async (req) => {
               body: JSON.stringify({ values: rows }),
             },
           );
-          console.log("Google Sheets append:", upd.status);
+          const updJson = await upd.json().catch(() => ({}));
+          console.log("Google Sheets append:", upd.status, JSON.stringify(updJson).slice(0, 200));
         }
 
         const url = `https://docs.google.com/spreadsheets/d/${created.spreadsheetId}/edit`;
-        await logGoogleActivity(company.id, "sheet", title, url, created.spreadsheetId, { rows: rows.length });
-        await broadcastToCompany(company.id, "google_sheet_created", { title, url });
-        return json({ response: `Utworzyłem arkusz "${title}". Link: ${url}` });
+        await logGoogleActivity(company.id, "sheet", title, url, created.spreadsheetId, { rows: Math.max(0, rows.length - 1) });
+        await broadcastToCompany(company.id, "google_sheet_created", { title, url, rows: rows.length });
+        const dataInfo = rows.length > 1 ? ` Wpisałem ${rows.length - 1} pozycji.` : "";
+        return json({ response: `Utworzyłem arkusz "${title}".${dataInfo} Link: ${url}` });
       }
 
       // ============ GOOGLE: OTWÓRZ / CZYTAJ / EDYTUJ ============
