@@ -52,6 +52,18 @@ serve(async (req) => {
   const clientName: string | undefined = parsedBody.client_name ?? p.client_name;
   const limit: number = Math.min(Number(parsedBody.limit ?? p.limit ?? 5), 20);
 
+  // Normalizacja typu faktury (przychodowa/kosztowa) — Havi może podać różne warianty
+  const rawType: string | undefined =
+    parsedBody.invoice_type ?? p.invoice_type ?? parsedBody.type ?? p.type;
+  const normalizeType = (t?: string): "przychodowa" | "kosztowa" | undefined => {
+    if (!t) return undefined;
+    const s = t.toLowerCase();
+    if (s.includes("przychod") || s.includes("sprzeda") || s.includes("revenue") || s.includes("income") || s.includes("sales")) return "przychodowa";
+    if (s.includes("koszt") || s.includes("zakup") || s.includes("cost") || s.includes("expense") || s.includes("purchase")) return "kosztowa";
+    return undefined;
+  };
+  const invoiceType = normalizeType(rawType);
+
   // Google action params
   const eventTitle: string | undefined = parsedBody.title ?? p.title;
   const eventStart: string | undefined = parsedBody.start_time ?? p.start_time;
@@ -228,17 +240,33 @@ serve(async (req) => {
       // ============ ODCZYT ============
       case "get_invoices":
       case "list_invoices":
-      case "ostatnie_faktury": {
+      case "ostatnie_faktury":
+      case "get_revenue_invoices":
+      case "faktury_przychodowe":
+      case "get_cost_invoices":
+      case "faktury_kosztowe": {
+        // Wymuszony typ na podstawie aliasu akcji
+        const forcedType: "przychodowa" | "kosztowa" | undefined =
+          action === "get_revenue_invoices" || action === "faktury_przychodowe"
+            ? "przychodowa"
+            : action === "get_cost_invoices" || action === "faktury_kosztowe"
+            ? "kosztowa"
+            : invoiceType;
+
         let q = admin
           .from("invoices")
-          .select("id, vendor, gross_amount, date, payment_status, ksef_number, category, bookkeeper_note")
+          .select("id, vendor, gross_amount, date, payment_status, ksef_number, category, bookkeeper_note, invoice_type")
           .eq("company_id", company.id)
           .order("date", { ascending: false })
           .limit(limit);
+        if (forcedType) q = q.eq("invoice_type", forcedType);
         if (clientName) q = q.ilike("vendor", `%${clientName}%`);
         const { data, error } = await q;
         if (error) throw error;
-        if (!data?.length) return json({ response: "Nie znalazłem żadnych faktur." });
+        const typeLabel = forcedType === "przychodowa" ? "przychodowych" : forcedType === "kosztowa" ? "kosztowych" : "";
+        if (!data?.length) {
+          return json({ response: `Nie znalazłem żadnych faktur${typeLabel ? " " + typeLabel : ""}.` });
+        }
 
         // Pobierz pierwszą pozycję każdej faktury jako opis (fallback)
         const ids = data.map((i) => i.id);
@@ -257,20 +285,26 @@ serve(async (req) => {
         const lines = data.map((i, idx) => {
           const desc = i.bookkeeper_note || i.category || firstItemByInvoice.get(i.id) || null;
           const descPart = desc ? `. Opis: ${desc}` : "";
-          return `${idx + 1}. ${i.vendor} — ${fmtPLN(Number(i.gross_amount))} z dnia ${i.date}, status: ${i.payment_status}${descPart}`;
+          const typePart = !forcedType ? ` [${i.invoice_type}]` : "";
+          return `${idx + 1}. ${i.vendor}${typePart} — ${fmtPLN(Number(i.gross_amount))} z dnia ${i.date}, status: ${i.payment_status}${descPart}`;
         });
-        return json({ response: `Oto ${data.length} faktur:\n${lines.join("\n")}` });
+        const header = forcedType
+          ? `Oto ${data.length} faktur ${typeLabel}:`
+          : `Oto ${data.length} faktur:`;
+        return json({ response: `${header}\n${lines.join("\n")}` });
       }
 
       case "get_unpaid":
       case "nieoplacone_faktury": {
-        const { data, error } = await admin
+        let q = admin
           .from("invoices")
-          .select("vendor, gross_amount, payment_due_date")
+          .select("vendor, gross_amount, payment_due_date, invoice_type")
           .eq("company_id", company.id)
           .eq("payment_status", "unpaid")
           .order("payment_due_date", { ascending: true })
           .limit(limit);
+        if (invoiceType) q = q.eq("invoice_type", invoiceType);
+        const { data, error } = await q;
         if (error) throw error;
         if (!data?.length) return json({ response: "Wszystkie faktury są opłacone." });
         const total = data.reduce((s, i) => s + Number(i.gross_amount ?? 0), 0);
