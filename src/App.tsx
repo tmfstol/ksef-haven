@@ -11,6 +11,7 @@ import Settings from "./pages/Settings";
 import CreateInvoice from "./pages/CreateInvoice";
 import Expenses from "./pages/Expenses";
 import Projects from "./pages/Projects";
+import Contacts from "./pages/Contacts";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import CommandCenter from "./pages/CommandCenter";
@@ -74,6 +75,7 @@ const AppRoutes = () => {
         <Route path="/invoices/new" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
         <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
         <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+        <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
         <Route path="/command-center" element={<ProtectedRoute><CommandCenter /></ProtectedRoute>} />
         <Route path="/workspace" element={<ProtectedRoute><Workspace /></ProtectedRoute>} />
         <Route path="/onboarding" element={<ProtectedRoute><Settings isOnboarding /></ProtectedRoute>} />
