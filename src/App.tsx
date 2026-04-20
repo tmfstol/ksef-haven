@@ -20,10 +20,13 @@ import Workspace from "./pages/Workspace";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import { Loader2 } from "lucide-react";
 import { VoiceAgentWidget } from "@/components/dashboard/VoiceAgentWidget";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useHaviRealtime } from "@/hooks/useHaviRealtime";
+import { LegalAcceptanceGate } from "@/components/legal/LegalAcceptanceGate";
 
 const queryClient = new QueryClient();
 
@@ -49,7 +52,12 @@ function AuthenticatedOverlay() {
   const activeCompanyId = companies?.find((c) => c.is_active)?.id ?? companies?.[0]?.id ?? null;
   useHaviRealtime(user ? activeCompanyId : null);
   if (!user) return null;
-  return <VoiceAgentWidget />;
+  return (
+    <>
+      <LegalAcceptanceGate />
+      <VoiceAgentWidget />
+    </>
+  );
 }
 
 const AppRoutes = () => {
@@ -71,6 +79,8 @@ const AppRoutes = () => {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/invoices/new" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
