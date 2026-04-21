@@ -169,6 +169,7 @@ Zwróć odpowiedź w formacie JSON z polami:
     let coverImageUrl = null;
     if (image_prompt) {
       try {
+        console.log("Generating cover image with prompt:", image_prompt.slice(0, 100));
         const imgResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -185,27 +186,31 @@ Zwróć odpowiedź w formacie JSON z polami:
         if (imgResponse.ok) {
           const imgData = await imgResponse.json();
           const base64 = imgData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+          console.log("Image generated:", base64 ? `yes (${base64.length} chars)` : "no");
           if (base64) {
-            // Upload to storage
-            const imageBytes = Uint8Array.from(atob(base64.split(",")[1] || base64), c => c.charCodeAt(0));
-            const imagePath = `blog/${slug}.png`;
+            const b64clean = base64.includes(",") ? base64.split(",")[1] : base64;
+            const imageBytes = Uint8Array.from(atob(b64clean), c => c.charCodeAt(0));
+            const imagePath = `${slug}.png`;
             const { error: uploadError } = await supabase.storage
-              .from("invoice-uploads")
+              .from("blog-images")
               .upload(imagePath, imageBytes, { contentType: "image/png", upsert: true });
             
             if (!uploadError) {
-              const { data: urlData } = supabase.storage.from("invoice-uploads").getPublicUrl(imagePath);
+              const { data: urlData } = supabase.storage.from("blog-images").getPublicUrl(imagePath);
               coverImageUrl = urlData.publicUrl;
+              console.log("Cover image URL:", coverImageUrl);
             } else {
               console.error("Image upload error:", uploadError);
             }
+          } else {
+            console.error("No image in AI response. Full response:", JSON.stringify(imgData).slice(0, 500));
           }
         } else {
-          console.error("Image gen error:", imgResponse.status);
+          const errText = await imgResponse.text();
+          console.error("Image gen error:", imgResponse.status, errText.slice(0, 300));
         }
       } catch (imgErr) {
         console.error("Image generation failed:", imgErr);
-        // Continue without image
       }
     }
 
