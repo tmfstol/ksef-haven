@@ -60,7 +60,7 @@ export function useSync(companyId?: string | null) {
       toast.success("Synchronizacja zakończona", {
         description: newCount > 0
           ? `Pobrano ${newCount} nowych faktur z KSeF.`
-          : "Brak nowych faktur do pobrania.",
+          : "Brak nowych faktur w wybranym zakresie. Aby pobrać starsze, kliknij ikonę kalendarza i wybierz większy zakres dat.",
       });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
