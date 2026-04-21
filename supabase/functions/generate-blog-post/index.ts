@@ -144,9 +144,22 @@ Zwróć odpowiedź w formacie JSON z polami:
     try {
       parsed = JSON.parse(rawContent);
     } catch {
-      const match = rawContent.match(/```json?\s*([\s\S]*?)```/);
-      if (match) parsed = JSON.parse(match[1]);
-      else throw new Error("Could not parse AI response");
+      // Try to extract JSON from markdown code fence
+      const fence = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (fence) {
+        try { parsed = JSON.parse(fence[1].trim()); } catch {}
+      }
+      // Try to extract first {...} block
+      if (!parsed) {
+        const obj = rawContent.match(/\{[\s\S]*\}/);
+        if (obj) {
+          try { parsed = JSON.parse(obj[0]); } catch {}
+        }
+      }
+      if (!parsed) {
+        console.error("Raw AI response:", rawContent.slice(0, 500));
+        throw new Error("Could not parse AI response");
+      }
     }
 
     const { title, excerpt, content, image_prompt } = parsed;
