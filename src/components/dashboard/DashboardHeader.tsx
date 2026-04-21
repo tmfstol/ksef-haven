@@ -202,42 +202,86 @@ export function DashboardHeader({
             <CalendarIcon className="h-4 w-4" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-4" align="end">
+        <PopoverContent className="w-[320px] p-4" align="end">
           <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground">Zakres dat do synchronizacji</p>
+            <p className="text-xs font-medium text-muted-foreground">Szybki zakres synchronizacji</p>
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Od</p>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-full justify-start text-left text-xs rounded-lg", !syncDateFrom && "text-muted-foreground")}>
-                      {syncDateFrom ? format(syncDateFrom, "dd.MM.yyyy") : "Domyślnie"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={syncDateFrom} onSelect={setSyncDateFrom} locale={pl} className={cn("p-3 pointer-events-auto")} />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Do</p>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-full justify-start text-left text-xs rounded-lg", !syncDateTo && "text-muted-foreground")}>
-                      {syncDateTo ? format(syncDateTo, "dd.MM.yyyy") : "Dzisiaj"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={syncDateTo} onSelect={setSyncDateTo} locale={pl} className={cn("p-3 pointer-events-auto")} />
-                  </PopoverContent>
-                </Popover>
-              </div>
+              {[
+                { label: "Ostatnie 3 mies.", months: 3 },
+                { label: "Ostatnie 6 mies.", months: 6 },
+                { label: "Ostatni rok", months: 12 },
+                { label: "Ostatnie 2 lata", months: 24 },
+              ].map((preset) => (
+                <Button
+                  key={preset.months}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs rounded-lg"
+                  onClick={() => {
+                    const from = new Date();
+                    from.setMonth(from.getMonth() - preset.months);
+                    const to = new Date();
+                    setSyncDateFrom(from);
+                    setSyncDateTo(to);
+                    setShowDatePicker(false);
+                    onSync({
+                      dateFrom: from.toISOString().split("T")[0],
+                      dateTo: to.toISOString().split("T")[0],
+                    });
+                  }}
+                >
+                  {preset.label}
+                </Button>
+              ))}
             </div>
-            {(syncDateFrom || syncDateTo) && (
-              <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setSyncDateFrom(undefined); setSyncDateTo(undefined); }}>
-                Wyczyść (domyślnie 3 miesiące)
-              </Button>
-            )}
+            <div className="border-t border-border/50 pt-3">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Albo wybierz dokładnie</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Od</p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn("w-full justify-start text-left text-xs rounded-lg", !syncDateFrom && "text-muted-foreground")}>
+                        {syncDateFrom ? format(syncDateFrom, "dd.MM.yyyy") : "Domyślnie"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={syncDateFrom} onSelect={setSyncDateFrom} locale={pl} className={cn("p-3 pointer-events-auto")} />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Do</p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn("w-full justify-start text-left text-xs rounded-lg", !syncDateTo && "text-muted-foreground")}>
+                        {syncDateTo ? format(syncDateTo, "dd.MM.yyyy") : "Dzisiaj"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={syncDateTo} onSelect={setSyncDateTo} locale={pl} className={cn("p-3 pointer-events-auto")} />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              {(syncDateFrom || syncDateTo) && (
+                <Button
+                  size="sm"
+                  className="w-full text-xs mt-2 rounded-lg"
+                  onClick={() => {
+                    setShowDatePicker(false);
+                    handleSync();
+                  }}
+                >
+                  Synchronizuj wybrany zakres
+                </Button>
+              )}
+              {(syncDateFrom || syncDateTo) && (
+                <Button variant="ghost" size="sm" className="w-full text-xs mt-1" onClick={() => { setSyncDateFrom(undefined); setSyncDateTo(undefined); }}>
+                  Wyczyść (domyślnie 3 miesiące)
+                </Button>
+              )}
+            </div>
           </div>
         </PopoverContent>
       </Popover>
