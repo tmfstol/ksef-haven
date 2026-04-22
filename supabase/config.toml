@@ -3,6 +3,9 @@ project_id = "pcuizcypuczvqkaectfu"
 [functions.ksef-sync]
 verify_jwt = false
 
+[functions.ksef-cron-sync]
+verify_jwt = false
+
 [functions.ksef-download]
 verify_jwt = false
 
