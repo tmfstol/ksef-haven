@@ -96,7 +96,7 @@ export function DashboardHeader({
             )}
             <Button size="sm" onClick={handleSync} disabled={isSyncing} className="rounded-xl h-8 px-3 gap-1.5 text-xs">
               {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              Sync
+              Pobierz
             </Button>
           </div>
         </div>
@@ -192,7 +192,7 @@ export function DashboardHeader({
       {onSyncAll && (
         <Button variant="outline" onClick={handleSyncAll} disabled={isSyncingAll} className="rounded-xl px-4 gap-2">
           {isSyncingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-          Sync. wszystkich
+          Pobierz wszystkie
         </Button>
       )}
 
@@ -273,7 +273,7 @@ export function DashboardHeader({
                     handleSync();
                   }}
                 >
-                  Synchronizuj wybrany zakres
+                  Pobierz wybrany zakres
                 </Button>
               )}
               {(syncDateFrom || syncDateTo) && (
@@ -288,7 +288,7 @@ export function DashboardHeader({
 
       <Button onClick={handleSync} disabled={isSyncing} className="rounded-xl px-5 gap-2 shadow-sm">
         {isSyncing ? <Loader2 className="h-4 w-4 animate-spin-slow" /> : <RefreshCw className="h-4 w-4" />}
-        {isSyncing ? "Synchronizuję..." : "Synchronizuj z KSeF"}
+        {isSyncing ? "Pobieranie..." : "Pobierz z KSeF"}
       </Button>
     </header>
   );
