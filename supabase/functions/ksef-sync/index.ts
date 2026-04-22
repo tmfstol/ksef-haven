@@ -490,7 +490,7 @@ function parseInvoiceXml(xml: string) {
 }
 
 // Main sync for single company
-export async function syncCompany(
+async function syncCompany(
   supabase: ReturnType<typeof createClient>,
   company: { id: string; nip: string; ksef_token: string },
   ksefEnv: string,
