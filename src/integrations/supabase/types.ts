@@ -594,6 +594,65 @@ export type Database = {
           },
         ]
       }
+      employee_hours: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          employee_id: string | null
+          employee_name_raw: string | null
+          hours: number
+          id: string
+          project_id: string | null
+          raw_data: Json | null
+          scan_id: string | null
+          status: string
+          updated_at: string
+          work_date: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          employee_id?: string | null
+          employee_name_raw?: string | null
+          hours?: number
+          id?: string
+          project_id?: string | null
+          raw_data?: Json | null
+          scan_id?: string | null
+          status?: string
+          updated_at?: string
+          work_date: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          employee_id?: string | null
+          employee_name_raw?: string | null
+          hours?: number
+          id?: string
+          project_id?: string | null
+          raw_data?: Json | null
+          scan_id?: string | null
+          status?: string
+          updated_at?: string
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_hours_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "timesheet_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           active: boolean
@@ -1613,6 +1672,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      timesheet_scans: {
+        Row: {
+          ai_response: Json | null
+          company_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          image_path: string
+          notes: string | null
+          rows_assigned: number
+          rows_count: number
+          status: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          ai_response?: Json | null
+          company_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          image_path: string
+          notes?: string | null
+          rows_assigned?: number
+          rows_count?: number
+          status?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          ai_response?: Json | null
+          company_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          image_path?: string
+          notes?: string | null
+          rows_assigned?: number
+          rows_count?: number
+          status?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
