@@ -19,6 +19,7 @@ const fadeUp = {
 
 const Blog = () => {
   const [generating, setGenerating] = useState(false);
+  const [fillingImages, setFillingImages] = useState(false);
   const { user } = useAuth();
 
   // Check if user is admin (owns a company)
@@ -77,6 +78,32 @@ const Blog = () => {
     }
   };
 
+  const fillMissingImages = async () => {
+    setFillingImages(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-blog-image`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ all_missing: true }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Błąd generowania okładek");
+      toast.success(`Wygenerowano ${result.updated}/${result.total} okładek`);
+      refetch();
+    } catch (e: any) {
+      toast.error(e.message || "Nieznany błąd");
+    } finally {
+      setFillingImages(false);
+    }
+  };
+
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric" });
 
@@ -88,7 +115,11 @@ const Blog = () => {
 
       {/* Admin generate button */}
       {isAdmin && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 flex justify-end">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 flex justify-end gap-2">
+          <Button onClick={fillMissingImages} disabled={fillingImages} size="sm" variant="outline" className="gap-2">
+            {fillingImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+            {fillingImages ? "Generuję okładki..." : "Uzupełnij okładki"}
+          </Button>
           <Button onClick={generatePost} disabled={generating} size="sm" className="gap-2">
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             {generating ? "Generuję..." : "Generuj artykuł"}

@@ -177,7 +177,7 @@ Zwróć odpowiedź w formacie JSON z polami:
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3.1-flash-image-preview",
+            model: "google/gemini-2.5-flash-image-preview",
             messages: [{ role: "user", content: `Create a professional blog cover image: ${image_prompt}. Modern flat design, vibrant colors, no text overlay, 16:9 aspect ratio.` }],
             modalities: ["image", "text"],
           }),
