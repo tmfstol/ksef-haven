@@ -97,7 +97,7 @@ const Expenses = () => {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-6">
+      <main className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6 pb-24 lg:pb-6">
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="rounded-xl border border-border/50 bg-card/50 p-4">

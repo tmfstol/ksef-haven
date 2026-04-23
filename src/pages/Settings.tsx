@@ -184,7 +184,7 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto p-4 md:p-6 flex flex-col md:flex-row gap-4 md:gap-6">
+      <main className="max-w-4xl mx-auto p-4 md:p-6 pb-24 lg:pb-6 flex flex-col md:flex-row gap-4 md:gap-6">
         {/* Company list (not shown in onboarding if no companies) */}
         {(!isOnboarding || (companies && companies.length > 0)) && (
           <motion.div

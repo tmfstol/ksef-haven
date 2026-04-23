@@ -149,7 +149,7 @@ const Projects = () => {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-6">
+      <main className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6 pb-24 lg:pb-6">
         {selectedProject ? (
           <ProjectDetail project={selectedProject} companyId={activeCompanyId!} />
         ) : isLoading ? (
