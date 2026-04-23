@@ -1,7 +1,7 @@
 import { useLocation, Link } from "react-router-dom";
 import { 
   LayoutDashboard, FileText, Users, BarChart3, Settings, 
-  LogOut, ChevronLeft, ChevronRight, Zap, Receipt, FolderOpen, LayoutGrid
+  LogOut, ChevronLeft, ChevronRight, Zap, Receipt, FolderOpen, LayoutGrid, CalendarRange
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +11,7 @@ import logoFacturo from "@/assets/logo-facturo.png";
 
 const navItems = [
   { label: "Pulse", icon: LayoutDashboard, path: "/command-center" },
+  { label: "Harmonogram", icon: CalendarRange, path: "/schedule" },
   { label: "Faktury", icon: FileText, path: "/dashboard" },
   { label: "Kontrahenci", icon: Users, path: "/contacts" },
   { label: "Wydatki", icon: Receipt, path: "/expenses" },
