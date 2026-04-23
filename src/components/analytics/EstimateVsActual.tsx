@@ -63,7 +63,7 @@ export function EstimateVsActual({ companyId }: Props) {
     queryKey: ["estimate-vs-actual", companyId],
     enabled: !!companyId,
     queryFn: async () => {
-      const [projectsRes, estimatesRes, costsRes] = await Promise.all([
+      const [projectsRes, estimatesRes, invoicesRes, projectCostsRes] = await Promise.all([
         supabase
           .from("projects")
           .select("id, name, status, budget")
@@ -72,6 +72,14 @@ export function EstimateVsActual({ companyId }: Props) {
           .from("estimates")
           .select("id, project_id, suma_material, suma_robocizna, marza_material, marza_robocizna, status")
           .eq("company_id", companyId),
+        // Faktury kosztowe przypisane do projektu (główne źródło)
+        supabase
+          .from("invoices")
+          .select("id, project_id, gross_amount, invoice_type")
+          .eq("company_id", companyId)
+          .eq("invoice_type", "kosztowa")
+          .not("project_id", "is", null),
+        // Manualne wpisy kosztów z project_costs (uzupełnienie)
         supabase
           .from("project_costs")
           .select("project_id, net_amount, gross_amount, invoice_id")
@@ -80,12 +88,14 @@ export function EstimateVsActual({ companyId }: Props) {
 
       if (projectsRes.error) throw projectsRes.error;
       if (estimatesRes.error) throw estimatesRes.error;
-      if (costsRes.error) throw costsRes.error;
+      if (invoicesRes.error) throw invoicesRes.error;
+      if (projectCostsRes.error) throw projectCostsRes.error;
 
       return {
         projects: projectsRes.data || [],
         estimates: estimatesRes.data || [],
-        costs: costsRes.data || [],
+        invoices: invoicesRes.data || [],
+        projectCosts: projectCostsRes.data || [],
       };
     },
   });
@@ -95,7 +105,8 @@ export function EstimateVsActual({ companyId }: Props) {
 
     return data.projects.map((p: any) => {
       const projectEstimates = data.estimates.filter((e: any) => e.project_id === p.id);
-      const projectCosts = data.costs.filter((c: any) => c.project_id === p.id);
+      const projectInvoices = data.invoices.filter((i: any) => i.project_id === p.id);
+      const projectManualCosts = data.projectCosts.filter((c: any) => c.project_id === p.id);
 
       const estimateMaterial = projectEstimates.reduce((s: number, e: any) => s + Number(e.suma_material || 0), 0);
       const estimateLabor = projectEstimates.reduce((s: number, e: any) => s + Number(e.suma_robocizna || 0), 0);
@@ -112,8 +123,17 @@ export function EstimateVsActual({ companyId }: Props) {
         estimateMaterial * (1 + avgMarzaMat / 100) +
         estimateLabor * (1 + avgMarzaRob / 100);
 
-      const actualCosts = projectCosts.reduce((s: number, c: any) => s + Number(c.net_amount || 0), 0);
-      const uniqueInvoices = new Set(projectCosts.map((c: any) => c.invoice_id));
+      // Koszty rzeczywiste = faktury kosztowe (brutto) + manualne wpisy z project_costs (gross)
+      const invoiceCosts = projectInvoices.reduce((s: number, i: any) => s + Number(i.gross_amount || 0), 0);
+      const manualCosts = projectManualCosts.reduce((s: number, c: any) => s + Number(c.gross_amount || 0), 0);
+      const actualCosts = invoiceCosts + manualCosts;
+
+      // Liczba unikalnych dokumentów (faktury + manualne)
+      const invoiceIds = new Set([
+        ...projectInvoices.map((i: any) => i.id),
+        ...projectManualCosts.map((c: any) => c.invoice_id).filter(Boolean),
+      ]);
+      const uniqueInvoices = invoiceIds;
 
       const variance = estimateTotal - actualCosts;
       const variancePct = estimateTotal > 0 ? (actualCosts / estimateTotal) * 100 - 100 : 0;
@@ -260,7 +280,7 @@ export function EstimateVsActual({ companyId }: Props) {
               <Receipt className="h-4 w-4 text-violet-500" />
             </div>
             <div className="text-lg font-bold text-foreground tabular-nums">{fmt(totals.actualCosts)}</div>
-            <div className="text-xs text-muted-foreground mt-1">z faktur KSeF</div>
+            <div className="text-xs text-muted-foreground mt-1">faktury kosztowe (brutto)</div>
           </CardContent>
         </Card>
 
