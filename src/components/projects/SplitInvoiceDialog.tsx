@@ -27,6 +27,7 @@ interface Allocation {
   uid: string; // local id
   project_id: string;
   amount: string; // gross amount (string for input)
+  qty: string; // quantity assigned (string for input)
   invoice_item_id: string | null;
   item_name: string | null;
 }
@@ -59,6 +60,7 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
         ...r,
         gross_amount: Number(r.gross_amount),
         net_amount: Number(r.net_amount),
+        quantity: Number(r.quantity) || 0,
       }));
     },
   });
@@ -69,12 +71,19 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
   // Lines to render: real invoice_items, or one synthetic "whole invoice" line
   const lines = useMemo(() => {
     if (items && items.length > 0) {
-      return items.map((it: any) => ({
-        key: it.id as string,
-        invoice_item_id: it.id as string,
-        name: it.name as string,
-        gross: Number(it.gross_amount) || 0,
-      }));
+      return items.map((it: any) => {
+        const qty = Number(it.quantity) || 0;
+        const gross = Number(it.gross_amount) || 0;
+        return {
+          key: it.id as string,
+          invoice_item_id: it.id as string,
+          name: it.name as string,
+          gross,
+          quantity: qty,
+          unit: (it.unit as string) || "szt.",
+          unit_gross: qty > 0 ? gross / qty : 0,
+        };
+      });
     }
     return [
       {
@@ -82,6 +91,9 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
         invoice_item_id: null as string | null,
         name: `Cała faktura — ${invoice.vendor}`,
         gross: Number(invoice.gross_amount) || 0,
+        quantity: 0,
+        unit: "",
+        unit_gross: 0,
       },
     ];
   }, [items, invoice]);
