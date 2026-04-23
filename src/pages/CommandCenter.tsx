@@ -10,8 +10,8 @@ import { UpcomingPayments } from "@/components/command-center/UpcomingPayments";
 import { SmartInbox } from "@/components/command-center/SmartInbox";
 import { ContactsList } from "@/components/command-center/ContactsList";
 import { ProjectBudgets } from "@/components/command-center/ProjectBudgets";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Building2 } from "lucide-react";
+import { PulseHero } from "@/components/command-center/PulseHero";
+import { Loader2 } from "lucide-react";
 
 const CommandCenter = () => {
   const navigate = useNavigate();
@@ -53,36 +53,20 @@ const CommandCenter = () => {
   return (
     <AppLayout>
       <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
-        {/* Page header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">Pulse</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Centrum dowodzenia Twoją firmą</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {companies && companies.length > 1 ? (
-              <Select value={activeCompanyId || ""} onValueChange={setActiveCompanyId}>
-                <SelectTrigger className="w-[200px] h-9 rounded-xl text-sm">
-                  <SelectValue placeholder="Wybierz firmę" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : activeCompany ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-lg">
-                <Building2 className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">{activeCompany.name}</span>
-                <span className="text-xs text-muted-foreground">NIP: {activeCompany.nip}</span>
-              </div>
-            ) : null}
-          </div>
-        </div>
+        {/* WOW hero */}
+        <PulseHero
+          companies={companies}
+          activeCompany={activeCompany}
+          activeCompanyId={activeCompanyId}
+          onChangeCompany={setActiveCompanyId}
+          profit={kpis.profit}
+          prevProfit={kpis.prevProfit}
+          revenue={kpis.revenue}
+          costs={kpis.costs}
+        />
 
         {isLoading ? (
-          <div className="flex items-center justify-center h-[60vh]">
+          <div className="flex items-center justify-center h-[40vh]">
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
           </div>
         ) : (
