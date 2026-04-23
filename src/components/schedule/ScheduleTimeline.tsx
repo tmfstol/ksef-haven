@@ -52,9 +52,14 @@ export function ScheduleTimeline({
   onCopyAssignment,
   pasteMode,
 }: Props) {
-  const COL_WIDTH = Math.round(BASE_COL_WIDTH * (zoom ?? 1));
-  const ROW_HEIGHT = Math.round(BASE_ROW_HEIGHT * (zoom ?? 1));
-  const SIDEBAR_WIDTH = Math.round(BASE_SIDEBAR_WIDTH * Math.min(zoom ?? 1, 1.25));
+  const { COL_WIDTH, ROW_HEIGHT, SIDEBAR_WIDTH } = useMemo(() => {
+    const z = zoom ?? 1;
+    return {
+      COL_WIDTH: Math.round(BASE_COL_WIDTH * z),
+      ROW_HEIGHT: Math.round(BASE_ROW_HEIGHT * z),
+      SIDEBAR_WIDTH: Math.round(BASE_SIDEBAR_WIDTH * Math.min(z, 1.25)),
+    };
+  }, [zoom]);
 
   const days = useMemo(
     () => Array.from({ length: daysCount }, (_, i) => addDays(startDate, i)),
