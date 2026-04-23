@@ -101,6 +101,8 @@ export function useSaveInvoiceCostSplit() {
         item_name: a.item_name ?? null,
         net_amount: a.net_amount,
         gross_amount: a.gross_amount,
+        quantity: a.quantity ?? null,
+        unit: a.unit ?? null,
         note: a.note ?? null,
       }));
 
