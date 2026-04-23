@@ -11,6 +11,8 @@ export interface ProjectCost {
   item_name: string | null;
   net_amount: number;
   gross_amount: number;
+  quantity: number | null;
+  unit: string | null;
   note: string | null;
   created_at: string;
   updated_at: string;
@@ -22,6 +24,8 @@ export interface ProjectCostInput {
   project_id: string;
   net_amount: number;
   gross_amount: number;
+  quantity?: number | null;
+  unit?: string | null;
   note?: string | null;
 }
 
