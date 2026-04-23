@@ -367,7 +367,7 @@ function WorkspaceInner() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
+    <div className="min-h-screen bg-background pb-24 lg:pb-8">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-6">
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">

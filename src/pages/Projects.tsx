@@ -10,7 +10,7 @@ import { useInvoices } from "@/hooks/useInvoices";
 import { useProjectCostsByProject } from "@/hooks/useProjectCosts";
 
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsTabletOrBelow } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +32,7 @@ const PROJECT_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "
 
 const Projects = () => {
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  const isMobile = useIsTabletOrBelow();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const { data: projects, isLoading } = useProjects(activeCompanyId);
@@ -149,7 +149,7 @@ const Projects = () => {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-6">
+      <main className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6 pb-24 lg:pb-6">
         {selectedProject ? (
           <ProjectDetail project={selectedProject} companyId={activeCompanyId!} />
         ) : isLoading ? (
@@ -163,7 +163,7 @@ const Projects = () => {
             <p className="text-sm text-muted-foreground mt-1">Utwórz pierwszy folder inwestycji.</p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {projects.map((p) => (
               <div
                 key={p.id}
@@ -215,10 +215,11 @@ const Projects = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    className="h-9 w-9 text-muted-foreground hover:text-destructive"
                     onClick={(e) => { e.stopPropagation(); deleteProject.mutate(p.id); }}
+                    aria-label="Usuń projekt"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

@@ -152,66 +152,70 @@ const Timesheets = () => {
                   </p>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Wierszy</TableHead>
-                      <TableHead className="text-right">Zapisanych</TableHead>
-                      <TableHead>Notatka / błąd</TableHead>
-                      <TableHead className="w-[160px] text-right">Akcje</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {scans.map((s) => {
-                      const meta = STATUS_META[s.status] ?? STATUS_META.pending;
-                      const rowsCount =
-                        s.rows_count || ((s.ai_response as any)?.rows?.length ?? 0);
-                      return (
-                        <TableRow key={s.id}>
-                          <TableCell className="font-mono text-xs">
-                            {format(parseISO(s.created_at), "d MMM yyyy HH:mm", { locale: pl })}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={meta.variant}>{meta.label}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{rowsCount}</TableCell>
-                          <TableCell className="text-right">
-                            <span
-                              className={
-                                s.rows_assigned > 0 ? "text-emerald-600 font-medium" : ""
-                              }
-                            >
-                              {s.rows_assigned}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground max-w-[300px] truncate">
-                            {s.error_message || s.notes || "—"}
-                          </TableCell>
-                          <TableCell className="text-right space-x-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setVerifyScan(s)}
-                            >
-                              <Eye className="h-4 w-4" />
-                              Otwórz
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="text-muted-foreground hover:text-destructive"
-                              onClick={() => setScanToDelete(s)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Wierszy</TableHead>
+                        <TableHead className="text-right">Zapisanych</TableHead>
+                        <TableHead>Notatka / błąd</TableHead>
+                        <TableHead className="w-[160px] text-right">Akcje</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {scans.map((s) => {
+                        const meta = STATUS_META[s.status] ?? STATUS_META.pending;
+                        const rowsCount =
+                          s.rows_count || ((s.ai_response as any)?.rows?.length ?? 0);
+                        return (
+                          <TableRow key={s.id}>
+                            <TableCell className="font-mono text-xs whitespace-nowrap">
+                              {format(parseISO(s.created_at), "d MMM yyyy HH:mm", { locale: pl })}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={meta.variant}>{meta.label}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">{rowsCount}</TableCell>
+                            <TableCell className="text-right">
+                              <span
+                                className={
+                                  s.rows_assigned > 0 ? "text-emerald-600 font-medium" : ""
+                                }
+                              >
+                                {s.rows_assigned}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground max-w-[300px] truncate">
+                              {s.error_message || s.notes || "—"}
+                            </TableCell>
+                            <TableCell className="text-right space-x-1 whitespace-nowrap">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="min-h-[40px]"
+                                onClick={() => setVerifyScan(s)}
+                              >
+                                <Eye className="h-4 w-4" />
+                                Otwórz
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="min-h-[40px] min-w-[40px] text-muted-foreground hover:text-destructive"
+                                onClick={() => setScanToDelete(s)}
+                                aria-label="Usuń skan"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </Card>
           </TabsContent>
@@ -227,58 +231,60 @@ const Timesheets = () => {
                   Brak zapisanych godzin.
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Pracownik</TableHead>
-                      <TableHead>Projekt</TableHead>
-                      <TableHead>Opis</TableHead>
-                      <TableHead className="text-right">Godziny</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {hours.map((h) => (
-                      <TableRow key={h.id}>
-                        <TableCell className="font-mono text-xs">
-                          {format(parseISO(h.work_date), "d MMM yyyy", { locale: pl })}
-                        </TableCell>
-                        <TableCell>
-                          {h.employees ? (
-                            <span className="inline-flex items-center gap-2">
-                              <span
-                                className="h-2 w-2 rounded-full"
-                                style={{ backgroundColor: h.employees.color }}
-                              />
-                              {h.employees.name}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground italic">
-                              {h.employee_name_raw || "—"}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {h.projects ? (
-                            <span className="inline-flex items-center gap-2">
-                              <span
-                                className="h-2 w-2 rounded-full"
-                                style={{ backgroundColor: h.projects.color }}
-                              />
-                              {h.projects.name}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
-                          {h.description || "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">{h.hours}h</TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Pracownik</TableHead>
+                        <TableHead>Projekt</TableHead>
+                        <TableHead>Opis</TableHead>
+                        <TableHead className="text-right">Godziny</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {hours.map((h) => (
+                        <TableRow key={h.id}>
+                          <TableCell className="font-mono text-xs whitespace-nowrap">
+                            {format(parseISO(h.work_date), "d MMM yyyy", { locale: pl })}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {h.employees ? (
+                              <span className="inline-flex items-center gap-2">
+                                <span
+                                  className="h-2 w-2 rounded-full"
+                                  style={{ backgroundColor: h.employees.color }}
+                                />
+                                {h.employees.name}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground italic">
+                                {h.employee_name_raw || "—"}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {h.projects ? (
+                              <span className="inline-flex items-center gap-2">
+                                <span
+                                  className="h-2 w-2 rounded-full"
+                                  style={{ backgroundColor: h.projects.color }}
+                                />
+                                {h.projects.name}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
+                            {h.description || "—"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">{h.hours}h</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </Card>
           </TabsContent>
