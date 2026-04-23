@@ -6,32 +6,65 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const TOPICS = [
-  "Zmiany w przepisach KSeF na 2026 rok i ich wpływ na przedsiębiorców",
-  "Automatyzacja księgowości z wykorzystaniem sztucznej inteligencji",
-  "Najczęstsze błędy w rozliczeniach VAT i jak ich unikać",
-  "Jak przygotować firmę na obowiązkowy KSeF",
-  "Cyfrowa transformacja biur rachunkowych",
-  "OCR i automatyczne przetwarzanie faktur — poradnik praktyczny",
-  "JPK-V7M — najważniejsze wskazówki dla przedsiębiorców",
-  "Split payment — kiedy jest obowiązkowy i jak go stosować",
-  "Faktura korygująca w KSeF — krok po kroku",
-  "Zaliczki i faktury zaliczkowe — zasady rozliczania",
-  "Elektroniczny obieg dokumentów w firmie",
-  "Bezpieczeństwo danych finansowych w chmurze",
-  "Integracja systemów ERP z KSeF",
-  "Nowe obowiązki podatkowe dla e-commerce w 2026",
-  "Jak wybrać program do fakturowania — kompletny poradnik",
-];
+// Tematy pogrupowane po kategoriach — losujemy najpierw kategorię, potem temat
+const TOPICS_BY_CATEGORY: Record<string, string[]> = {
+  "KSeF": [
+    "Zmiany w przepisach KSeF na 2026 rok i ich wpływ na przedsiębiorców",
+    "Jak przygotować firmę na obowiązkowy KSeF",
+    "Faktura korygująca w KSeF — krok po kroku",
+    "Integracja systemów ERP z KSeF",
+    "KSeF dla mikroprzedsiębiorców — co musisz wiedzieć",
+    "Najczęstsze błędy przy wysyłce faktur do KSeF i jak ich unikać",
+  ],
+  "Podatki i księgowość": [
+    "Najczęstsze błędy w rozliczeniach VAT i jak ich unikać",
+    "JPK-V7M — najważniejsze wskazówki dla przedsiębiorców",
+    "Split payment — kiedy jest obowiązkowy i jak go stosować",
+    "Zaliczki i faktury zaliczkowe — zasady rozliczania",
+    "Ryczałt vs podatek liniowy — która forma opłaca się w 2026",
+    "Estoński CIT w praktyce — kiedy się opłaca",
+    "Nowe obowiązki podatkowe dla e-commerce w 2026",
+    "Ulga na badania i rozwój — jak z niej skorzystać w MŚP",
+  ],
+  "Kosztorysowanie i budowlanka": [
+    "Jak prawidłowo wycenić kosztorys budowlany — marże materiał vs robocizna",
+    "Norma Pro vs nowoczesne aplikacje do kosztorysowania — porównanie",
+    "Etapowanie kosztorysu — jak rozbić projekt na etapy i nie pogubić się w pieniądzach",
+    "Branże w kosztorysie: budowlanka, instalacje, meble — czym się różnią",
+    "Jak zbudować własny katalog cen materiałów i robocizny w firmie budowlanej",
+    "Oferta dla klienta vs kosztorys wewnętrzny — dlaczego potrzebujesz obu",
+    "Rentowność projektu budowlanego — jak liczyć i kontrolować marżę",
+  ],
+  "Zarządzanie projektami i pracownikami": [
+    "Karty pracy w branży budowlanej — od papieru do automatyzacji",
+    "Harmonogram pracowników i pojazdów — jak go ułożyć żeby nie tracić godzin",
+    "Rentowność projektu — jak łączyć koszty faktur, robociznę i przychody",
+    "Delegowanie zadań w małej firmie — role i uprawnienia w systemie",
+    "Jak rozliczać godziny pracowników i przypisywać je do projektów",
+    "Zarządzanie wieloma budowami jednocześnie — checklist dla brygadzisty",
+  ],
+  "Automatyzacja i AI w firmie": [
+    "Automatyzacja księgowości z wykorzystaniem sztucznej inteligencji",
+    "OCR i automatyczne przetwarzanie faktur — poradnik praktyczny",
+    "Cyfrowa transformacja biur rachunkowych",
+    "Skanowanie odręcznych kart pracy przez AI — jak to działa",
+    "Agent głosowy w firmie — kiedy ma sens i jak go wdrożyć",
+    "Elektroniczny obieg dokumentów w firmie",
+    "Bezpieczeństwo danych finansowych w chmurze",
+    "Jak wybrać program do fakturowania — kompletny poradnik",
+  ],
+};
 
-const CATEGORIES = ["KSeF", "AI", "Poradnik", "VAT", "Technologia"];
-const GRADIENTS = [
-  "from-violet-600 to-fuchsia-600",
-  "from-cyan-500 to-blue-600",
-  "from-orange-500 to-rose-500",
-  "from-emerald-500 to-teal-600",
-  "from-indigo-500 to-purple-600",
-];
+const CATEGORIES = Object.keys(TOPICS_BY_CATEGORY);
+
+// Gradient per kategoria — spójny look na liście
+const GRADIENT_BY_CATEGORY: Record<string, string> = {
+  "KSeF": "from-violet-600 to-fuchsia-600",
+  "Podatki i księgowość": "from-cyan-500 to-blue-600",
+  "Kosztorysowanie i budowlanka": "from-orange-500 to-rose-500",
+  "Zarządzanie projektami i pracownikami": "from-emerald-500 to-teal-600",
+  "Automatyzacja i AI w firmie": "from-indigo-500 to-purple-600",
+};
 
 function slugify(text: string): string {
   return text
@@ -84,10 +117,11 @@ serve(async (req) => {
       }
     }
 
-    // Pick a random topic
-    const topic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
+    // Pick a random category, then a random topic within that category
     const category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-    const gradient = GRADIENTS[Math.floor(Math.random() * GRADIENTS.length)];
+    const topicsForCat = TOPICS_BY_CATEGORY[category];
+    const topic = topicsForCat[Math.floor(Math.random() * topicsForCat.length)];
+    const gradient = GRADIENT_BY_CATEGORY[category] ?? "from-violet-600 to-fuchsia-600";
 
     const baseSlug = slugify(topic);
     const { data: existing } = await supabase
@@ -120,7 +154,7 @@ Zwróć odpowiedź w formacie JSON z polami:
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: "Jesteś ekspertem od księgowości, podatków i systemów KSeF w Polsce. Piszesz artykuły blogowe. Zawsze odpowiadaj w formacie JSON." },
+          { role: "system", content: `Jesteś ekspertem od księgowości, podatków, KSeF, kosztorysowania budowlanego, zarządzania projektami i automatyzacji w polskich MŚP. Piszesz artykuły blogowe dla kategorii "${category}". Zawsze odpowiadaj w formacie JSON.` },
           { role: "user", content: prompt },
         ],
         response_format: { type: "json_object" },
