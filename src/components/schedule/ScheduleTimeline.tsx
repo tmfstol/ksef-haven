@@ -23,6 +23,8 @@ type Props = {
   onAssignmentResize: (a: Assignment, newStart: string, newEnd: string) => void;
   onAddEmployee: () => void;
   onDeleteEmployee: (e: Employee) => void;
+  onCopyAssignment: (a: Assignment) => void;
+  pasteMode: boolean;
 };
 
 const COL_WIDTH = 56; // px per day
