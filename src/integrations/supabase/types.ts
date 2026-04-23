@@ -1205,6 +1205,10 @@ export type Database = {
         Args: { _company_id: string; _module: string; _user_id: string }
         Returns: boolean
       }
+      is_company_owner: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_company_owner_or_admin: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
