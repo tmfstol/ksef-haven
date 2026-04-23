@@ -5,7 +5,7 @@ import { useExpenses, useExpenseCategories, useDeleteExpense, type Expense } fro
 import { AddExpenseForm } from "@/components/expenses/AddExpenseForm";
 
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsTabletOrBelow } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,7 +16,7 @@ import { format } from "date-fns";
 
 const Expenses = () => {
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  const isMobile = useIsTabletOrBelow();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const { data: expenses, isLoading } = useExpenses(activeCompanyId);

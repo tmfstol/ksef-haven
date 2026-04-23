@@ -12,7 +12,7 @@ import { pl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { Company } from "@/types/company";
 import { useAuth } from "@/hooks/useAuth";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsTabletOrBelow } from "@/hooks/use-mobile";
 
 interface SyncParams {
   dateFrom?: string;
@@ -48,7 +48,7 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const isMobile = useIsMobile();
+  const isMobile = useIsTabletOrBelow();
   const [syncDateFrom, setSyncDateFrom] = useState<Date | undefined>(undefined);
   const [syncDateTo, setSyncDateTo] = useState<Date | undefined>(undefined);
   const [showDatePicker, setShowDatePicker] = useState(false);
