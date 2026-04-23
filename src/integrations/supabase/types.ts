@@ -1186,6 +1186,73 @@ export type Database = {
         }
         Relationships: []
       }
+      project_costs: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          gross_amount: number
+          id: string
+          invoice_id: string
+          invoice_item_id: string | null
+          item_name: string | null
+          net_amount: number
+          note: string | null
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          gross_amount?: number
+          id?: string
+          invoice_id: string
+          invoice_item_id?: string | null
+          item_name?: string | null
+          net_amount?: number
+          note?: string | null
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          gross_amount?: number
+          id?: string
+          invoice_id?: string
+          invoice_item_id?: string | null
+          item_name?: string | null
+          net_amount?: number
+          note?: string | null
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_costs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_costs_invoice_item_id_fkey"
+            columns: ["invoice_item_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_costs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           budget: number | null
