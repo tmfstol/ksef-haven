@@ -1,0 +1,3 @@
+ALTER TABLE public.project_costs
+  ADD COLUMN IF NOT EXISTS quantity NUMERIC,
+  ADD COLUMN IF NOT EXISTS unit TEXT;

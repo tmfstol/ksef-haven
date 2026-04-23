@@ -457,6 +457,7 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
                     <TableHead>Data faktury</TableHead>
                     <TableHead>Kontrahent</TableHead>
                     <TableHead>Pozycja</TableHead>
+                    <TableHead className="text-right">Ilość</TableHead>
                     <TableHead className="text-right">Netto</TableHead>
                     <TableHead className="text-right">Brutto</TableHead>
                   </TableRow>
@@ -477,6 +478,11 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
                         {c.item_name || "—"}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                        {c.quantity != null && Number(c.quantity) > 0
+                          ? `${Number(c.quantity)} ${c.unit || ""}`.trim()
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm text-muted-foreground">
                         {Number(c.net_amount).toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm font-semibold">
@@ -485,7 +491,7 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
                     </TableRow>
                   ))}
                   <TableRow className="bg-muted/30 font-semibold">
-                    <TableCell colSpan={3} className="text-sm">Razem przypisane</TableCell>
+                    <TableCell colSpan={4} className="text-sm">Razem przypisane</TableCell>
                     <TableCell className="text-right font-mono text-sm">
                       {(projectCosts as any[]).reduce((s, c) => s + Number(c.net_amount), 0).toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
                     </TableCell>

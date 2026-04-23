@@ -1199,6 +1199,8 @@ export type Database = {
           net_amount: number
           note: string | null
           project_id: string
+          quantity: number | null
+          unit: string | null
           updated_at: string
         }
         Insert: {
@@ -1213,6 +1215,8 @@ export type Database = {
           net_amount?: number
           note?: string | null
           project_id: string
+          quantity?: number | null
+          unit?: string | null
           updated_at?: string
         }
         Update: {
@@ -1227,6 +1231,8 @@ export type Database = {
           net_amount?: number
           note?: string | null
           project_id?: string
+          quantity?: number | null
+          unit?: string | null
           updated_at?: string
         }
         Relationships: [
