@@ -163,7 +163,7 @@ const Projects = () => {
             <p className="text-sm text-muted-foreground mt-1">Utwórz pierwszy folder inwestycji.</p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {projects.map((p) => (
               <div
                 key={p.id}
@@ -215,10 +215,11 @@ const Projects = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    className="h-9 w-9 text-muted-foreground hover:text-destructive"
                     onClick={(e) => { e.stopPropagation(); deleteProject.mutate(p.id); }}
+                    aria-label="Usuń projekt"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
