@@ -115,36 +115,26 @@ export function TimesheetVerificationDialog({
     setRows((p) => p.map((r) => (r.uid === uid ? { ...r, ...patch } : r)));
   const removeRow = (uid: string) => setRows((p) => p.filter((r) => r.uid !== uid));
 
-  const assignBulkProject = (projectId: string) => {
-    if (!anySelected) {
-      toast.error("Zaznacz wiersze, które chcesz przypisać");
-      return;
-    }
-    setRows((p) =>
-      p.map((r) => (r.selected ? { ...r, description: r.description || "" } : r))
-    );
-    // Przypisanie projektu odbywa się przez perRowProject — bulk ustawia do wszystkich zaznaczonych
-    setRows((p) => p.map((r) => (r.selected ? ({ ...r, _project_id: projectId } as any) : r)));
-  };
-
   // Per-row project mapping przechowujemy w osobnym stanie
   const [perRowProject, setPerRowProject] = useState<Record<string, string>>({});
   useEffect(() => {
     if (!open) setPerRowProject({});
   }, [open]);
 
-  // Synchronizuj bulk → perRowProject
-  useEffect(() => {
+  const assignBulkProject = (projectId: string) => {
+    if (!anySelected) {
+      toast.error("Zaznacz wiersze, które chcesz przypisać");
+      return;
+    }
     setPerRowProject((prev) => {
       const next = { ...prev };
       rows.forEach((r) => {
-        if ((r as any)._project_id) {
-          next[r.uid] = (r as any)._project_id;
-        }
+        if (r.selected) next[r.uid] = projectId;
       });
       return next;
     });
-  }, [rows]);
+    toast.success(`Przypisano ${rows.filter((r) => r.selected).length} wierszy`);
+  };
 
   const handleSave = async () => {
     if (!scan) return;
