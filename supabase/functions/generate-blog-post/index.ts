@@ -154,7 +154,7 @@ Zwróć odpowiedź w formacie JSON z polami:
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: "Jesteś ekspertem od księgowości, podatków i systemów KSeF w Polsce. Piszesz artykuły blogowe. Zawsze odpowiadaj w formacie JSON." },
+          { role: "system", content: `Jesteś ekspertem od księgowości, podatków, KSeF, kosztorysowania budowlanego, zarządzania projektami i automatyzacji w polskich MŚP. Piszesz artykuły blogowe dla kategorii "${category}". Zawsze odpowiadaj w formacie JSON.` },
           { role: "user", content: prompt },
         ],
         response_format: { type: "json_object" },
