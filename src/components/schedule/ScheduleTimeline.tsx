@@ -42,6 +42,7 @@ export function ScheduleTimeline({
   assignments,
   startDate,
   daysCount,
+  zoom = 1,
   onShiftDays,
   onCellClick,
   onAssignmentClick,
@@ -51,6 +52,10 @@ export function ScheduleTimeline({
   onCopyAssignment,
   pasteMode,
 }: Props) {
+  const COL_WIDTH = Math.round(BASE_COL_WIDTH * zoom);
+  const ROW_HEIGHT = Math.round(BASE_ROW_HEIGHT * zoom);
+  const SIDEBAR_WIDTH = Math.round(BASE_SIDEBAR_WIDTH * Math.min(zoom, 1.25));
+
   const days = useMemo(
     () => Array.from({ length: daysCount }, (_, i) => addDays(startDate, i)),
     [startDate, daysCount]
