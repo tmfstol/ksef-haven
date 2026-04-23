@@ -38,29 +38,34 @@ Deno.serve(async (req) => {
 
     const { action, email, role, userId, password } = await req.json();
 
-    // Get ALL companies owned by the caller
-    const { data: callerCompanies, error: compError } = await adminClient
+    // Get all companies where caller is owner OR has admin role
+    const { data: ownedCompanies, error: ownedError } = await adminClient
       .from("companies")
       .select("id, name")
       .eq("user_id", user.id);
 
-    if (compError || !callerCompanies?.length) {
-      throw new Error("Nie znaleziono firm należących do Ciebie");
-    }
+    if (ownedError) throw new Error("Błąd pobierania firm");
 
-    const companyIds = callerCompanies.map((c) => c.id);
-
-    // Verify caller is admin in at least one company
-    const { data: callerRoles } = await adminClient
+    const { data: adminRoles, error: rolesError } = await adminClient
       .from("user_roles")
-      .select("role, company_id")
+      .select("company_id, companies:company_id(id, name)")
       .eq("user_id", user.id)
-      .in("company_id", companyIds)
       .eq("role", "admin");
 
-    if (!callerRoles?.length) {
+    if (rolesError) throw new Error("Błąd pobierania ról");
+
+    const companyMap = new Map<string, { id: string; name: string }>();
+    (ownedCompanies ?? []).forEach((c) => companyMap.set(c.id, c));
+    (adminRoles ?? []).forEach((r: any) => {
+      if (r.companies) companyMap.set(r.companies.id, r.companies);
+    });
+
+    if (companyMap.size === 0) {
       throw new Error("Tylko admin może zarządzać zespołem");
     }
+
+    const callerCompanies = Array.from(companyMap.values());
+    const companyIds = callerCompanies.map((c) => c.id);
 
     if (action === "invite") {
       if (!email || !role || !password) throw new Error("Brak wymaganych danych (email, rola, hasło)");
