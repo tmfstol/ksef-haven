@@ -30,6 +30,7 @@ import { AssignmentDialog } from "@/components/schedule/AssignmentDialog";
 import { EmployeeDialog } from "@/components/schedule/EmployeeDialog";
 import { VehiclesDialog } from "@/components/schedule/VehiclesDialog";
 import { GroupsDialog } from "@/components/schedule/GroupsDialog";
+import { UploadTimesheetButton } from "@/components/timesheets/UploadTimesheetButton";
 import { toast } from "sonner";
 
 type Range = "week" | "twoweeks" | "month";
@@ -190,6 +191,7 @@ const Schedule = () => {
             <Button size="sm" variant="outline" onClick={() => setVehiclesOpen(true)}>
               <Truck className="h-4 w-4" /> Pojazdy
             </Button>
+            <UploadTimesheetButton companyId={companyId} size="sm" />
             {clipboard && (
               <Button size="sm" variant="destructive" onClick={() => setClipboard(null)}>
                 <X className="h-4 w-4" /> Zakończ wklejanie

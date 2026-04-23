@@ -12,6 +12,7 @@ import { InvoiceFilters, applyFilters, type InvoiceFiltersState } from "@/compon
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { InvoiceCard } from "@/components/dashboard/InvoiceCard";
 import { UploadInvoiceModal } from "@/components/dashboard/UploadInvoiceModal";
+import { UploadTimesheetButton } from "@/components/timesheets/UploadTimesheetButton";
 import { Loader2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -166,15 +167,24 @@ const Index = () => {
             <div className="flex-1" />
 
             {activeCompanyId && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-xl gap-1.5 text-xs mb-1"
-                onClick={() => setShowUploadModal(true)}
-              >
-                <Upload className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Dodaj PDF</span>
-              </Button>
+              <>
+                <UploadTimesheetButton
+                  companyId={activeCompanyId}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl gap-1.5 text-xs mb-1"
+                  label="Karta pracy"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl gap-1.5 text-xs mb-1"
+                  onClick={() => setShowUploadModal(true)}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Dodaj PDF</span>
+                </Button>
+              </>
             )}
           </div>
 
