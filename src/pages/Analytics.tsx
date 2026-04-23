@@ -11,6 +11,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
+import { EstimateVsActual } from "@/components/analytics/EstimateVsActual";
 
 interface InvoiceRow {
   id: string;
@@ -261,6 +262,9 @@ const Analytics = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Kosztorys vs Koszty rzeczywiste */}
+            {activeCompanyId && <EstimateVsActual companyId={activeCompanyId} />}
 
             {/* Cashflow chart */}
             <Card className="fintech-card">
