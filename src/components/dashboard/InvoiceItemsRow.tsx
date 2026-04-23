@@ -4,9 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { parseKsefXml } from "@/lib/invoice-pdf";
-import { Loader2, RefreshCcw, FolderOpen, StickyNote, Check, X, Pencil } from "lucide-react";
+import { Loader2, RefreshCcw, FolderOpen, StickyNote, Check, X, Pencil, Split } from "lucide-react";
 import { motion } from "framer-motion";
 import { useProjects, useAssignInvoiceToProject } from "@/hooks/useProjects";
+import { useInvoiceProjectCosts } from "@/hooks/useProjectCosts";
+import { SplitInvoiceDialog } from "@/components/projects/SplitInvoiceDialog";
+import { Badge } from "@/components/ui/badge";
 import type { Invoice } from "@/types/invoice";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -74,9 +77,12 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
   const [fallbackItems, setFallbackItems] = useState<InvoiceItem[] | null>(null);
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(invoice?.bookkeeper_note ?? "");
+  const [splitOpen, setSplitOpen] = useState(false);
 
   const { data: projects } = useProjects(companyId);
   const assignMutation = useAssignInvoiceToProject();
+  const { data: existingSplits } = useInvoiceProjectCosts(invoiceId);
+  const splitCount = existingSplits?.length ?? 0;
 
   const saveNoteMutation = useMutation({
     mutationFn: async (note: string) => {
@@ -246,6 +252,23 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
                 {assignMutation.isPending && (
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 )}
+                {invoice && companyId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5"
+                    onClick={() => setSplitOpen(true)}
+                  >
+                    <Split className="h-3.5 w-3.5" />
+                    Rozdziel na projekty
+                    {splitCount > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                        {splitCount}
+                      </Badge>
+                    )}
+                  </Button>
+                )}
               </div>
             </caption>
             {/* Bookkeeper note */}
@@ -333,6 +356,14 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
               ))}
             </tbody>
           </table>
+        )}
+        {invoice && companyId && (
+          <SplitInvoiceDialog
+            open={splitOpen}
+            onOpenChange={setSplitOpen}
+            invoice={invoice}
+            companyId={companyId}
+          />
         )}
       </td>
     </motion.tr>

@@ -7,6 +7,7 @@ import {
   type Project,
 } from "@/hooks/useProjects";
 import { useInvoices } from "@/hooks/useInvoices";
+import { useProjectCostsByProject } from "@/hooks/useProjectCosts";
 
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -21,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Loader2, Plus, FolderOpen, Trash2, FileText,
-  Receipt, ChevronRight, FolderPlus, Download
+  Receipt, ChevronRight, FolderPlus, Download, Split
 } from "lucide-react";
 import { format } from "date-fns";
 import { downloadInvoicePdf } from "@/lib/invoice-pdf-download";
@@ -235,6 +236,7 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
   const { data: invoices, isLoading: invLoading } = useProjectInvoices(project.id);
   const { data: expenses, isLoading: expLoading } = useProjectExpenses(project.id);
   const { data: allInvoices } = useInvoices(companyId);
+  const { data: projectCosts, isLoading: costsLoading } = useProjectCostsByProject(project.id);
   const assignInvoice = useAssignInvoiceToProject();
   const [assignOpen, setAssignOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -256,11 +258,17 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
     [allInvoices, project.id]
   );
 
+  const splitTotal = useMemo(
+    () => (projectCosts || []).reduce((s: number, c: any) => s + Number(c.gross_amount), 0),
+    [projectCosts]
+  );
+
   const totalCost = useMemo(
     () =>
       (invoices || []).reduce((s, i: any) => s + Number(i.gross_amount), 0) +
-      (expenses || []).reduce((s, e: any) => s + Number(e.amount), 0),
-    [invoices, expenses]
+      (expenses || []).reduce((s, e: any) => s + Number(e.amount), 0) +
+      splitTotal,
+    [invoices, expenses, splitTotal]
   );
 
   return (
@@ -289,11 +297,19 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
         )}
       </div>
 
-      <Tabs defaultValue="expenses">
+      <Tabs defaultValue="costs">
         <div className="flex items-center justify-between mb-4">
           <TabsList>
+            <TabsTrigger value="costs">
+              <Split className="h-3.5 w-3.5 mr-1.5" /> Koszty z faktur
+              {projectCosts && projectCosts.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px]">
+                  {projectCosts.length}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="expenses">Wydatki</TabsTrigger>
-            <TabsTrigger value="invoices">Faktury</TabsTrigger>
+            <TabsTrigger value="invoices">Pełne faktury</TabsTrigger>
           </TabsList>
 
           <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
@@ -416,6 +432,67 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
                       <TableCell className="text-right font-mono text-sm">{Number(exp.amount).toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</TableCell>
                     </TableRow>
                   ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="costs">
+          {costsLoading ? (
+            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : !projectCosts?.length ? (
+            <div className="text-center py-10">
+              <Split className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Brak rozdzielonych kosztów.</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                Otwórz dowolną fakturę i kliknij <span className="font-medium">"Rozdziel na projekty"</span>, aby przypisać tu jej części.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border/50 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data faktury</TableHead>
+                    <TableHead>Kontrahent</TableHead>
+                    <TableHead>Pozycja</TableHead>
+                    <TableHead className="text-right">Netto</TableHead>
+                    <TableHead className="text-right">Brutto</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {projectCosts.map((c: any) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="text-sm">
+                        {c.invoices?.date ? format(new Date(c.invoices.date), "dd.MM.yyyy") : "—"}
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">
+                        {c.invoices?.vendor || "—"}
+                        {c.invoices?.nip && (
+                          <p className="text-xs text-muted-foreground font-normal">NIP: {c.invoices.nip}</p>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground truncate max-w-[280px]">
+                        {c.item_name || "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                        {Number(c.net_amount).toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm font-semibold">
+                        {Number(c.gross_amount).toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/30 font-semibold">
+                    <TableCell colSpan={3} className="text-sm">Razem przypisane</TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {(projectCosts as any[]).reduce((s, c) => s + Number(c.net_amount), 0).toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {splitTotal.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </div>
