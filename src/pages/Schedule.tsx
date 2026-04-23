@@ -4,7 +4,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Loader2, Building2, Users, X } from "lucide-react";
+import { Truck, Loader2, Building2, Users, X, FileDown, ZoomIn, ZoomOut } from "lucide-react";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +31,7 @@ import { EmployeeDialog } from "@/components/schedule/EmployeeDialog";
 import { VehiclesDialog } from "@/components/schedule/VehiclesDialog";
 import { GroupsDialog } from "@/components/schedule/GroupsDialog";
 import { UploadTimesheetButton } from "@/components/timesheets/UploadTimesheetButton";
+import { exportSchedulePdf } from "@/lib/exportSchedulePdf";
 import { toast } from "sonner";
 
 type Range = "week" | "twoweeks" | "month";
@@ -65,9 +66,20 @@ const Schedule = () => {
   }, [user, companyId, companies]);
 
   const [range, setRange] = useState<Range>("twoweeks");
+  const [zoom, setZoom] = useState<number>(1);
   const [startDate, setStartDate] = useState<Date>(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
+
+  const ZOOM_STEPS = [0.85, 1, 1.15, 1.3, 1.5, 1.75];
+  const zoomIn = () => {
+    const idx = ZOOM_STEPS.findIndex((z) => Math.abs(z - zoom) < 0.01);
+    setZoom(ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, idx + 1)] ?? 1);
+  };
+  const zoomOut = () => {
+    const idx = ZOOM_STEPS.findIndex((z) => Math.abs(z - zoom) < 0.01);
+    setZoom(ZOOM_STEPS[Math.max(0, idx - 1)] ?? 1);
+  };
 
   const daysCount = range === "week" ? 7 : range === "twoweeks" ? 14 : 30;
 
