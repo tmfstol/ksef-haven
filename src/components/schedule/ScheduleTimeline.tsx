@@ -47,6 +47,8 @@ export function ScheduleTimeline({
   onAssignmentResize,
   onAddEmployee,
   onDeleteEmployee,
+  onCopyAssignment,
+  pasteMode,
 }: Props) {
   const days = useMemo(
     () => Array.from({ length: daysCount }, (_, i) => addDays(startDate, i)),
@@ -121,7 +123,12 @@ export function ScheduleTimeline({
   const today = new Date();
 
   return (
-    <div className="rounded-2xl border bg-card overflow-hidden shadow-sm">
+    <div className={cn("rounded-2xl border bg-card overflow-hidden shadow-sm", pasteMode && "ring-2 ring-primary")}>
+      {pasteMode && (
+        <div className="px-4 py-2 text-xs bg-primary text-primary-foreground text-center font-medium">
+          🖌️ Tryb wklejania: kliknij komórkę pracownika aby wkleić zadanie. Esc lub kliknij „Zakończ" aby wyjść.
+        </div>
+      )}
       {/* Top toolbar */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">
