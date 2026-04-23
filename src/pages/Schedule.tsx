@@ -204,6 +204,38 @@ const Schedule = () => {
               <Truck className="h-4 w-4" /> Pojazdy
             </Button>
             <UploadTimesheetButton companyId={companyId} size="sm" />
+            <div className="flex items-center gap-1 border rounded-md p-0.5 bg-card">
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={zoomOut} title="Pomniejsz">
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <span className="text-xs w-10 text-center tabular-nums text-muted-foreground">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={zoomIn} title="Powiększ">
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => {
+                if (!employees.length) {
+                  toast.error("Brak pracowników do wyeksportowania");
+                  return;
+                }
+                exportSchedulePdf({
+                  companyName: activeCompany?.name ?? "Firma",
+                  employees,
+                  vehicles,
+                  assignments,
+                  startDate,
+                  daysCount,
+                });
+                toast.success("Pobrano harmonogram PDF");
+              }}
+            >
+              <FileDown className="h-4 w-4" /> Eksport PDF
+            </Button>
             {clipboard && (
               <Button size="sm" variant="destructive" onClick={() => setClipboard(null)}>
                 <X className="h-4 w-4" /> Zakończ wklejanie
@@ -224,6 +256,7 @@ const Schedule = () => {
             assignments={assignments}
             startDate={startDate}
             daysCount={daysCount}
+            zoom={zoom}
             onShiftDays={(d) => setStartDate((prev) => addDays(prev, d))}
             onAddEmployee={() => setEmpDialog({ open: true, initial: null })}
             onDeleteEmployee={(e) => {
