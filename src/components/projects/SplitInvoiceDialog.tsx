@@ -494,9 +494,11 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
             </div>
           </div>
 
-          {(hasEmptyProject || hasZeroAmount || lineOverflow) && (
+          {(hasEmptyProject || hasZeroAmount || lineOverflow || qtyOverflow) && (
             <p className="text-xs text-destructive">
-              {lineOverflow
+              {qtyOverflow
+                ? "Suma ilości w jednej z pozycji przekracza jej dostępną ilość."
+                : lineOverflow
                 ? "Suma przypisana w jednej z pozycji przekracza jej wartość."
                 : hasEmptyProject
                 ? "Każde przypisanie musi mieć wybrany projekt."
