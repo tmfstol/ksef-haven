@@ -169,10 +169,43 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
     return Number.isFinite(n) ? n : 0;
   };
 
+  const formatQty = (n: number) => {
+    const fixed = Number(n.toFixed(4));
+    return String(fixed).replace(".", ",");
+  };
+
+  // When user changes qty, sync amount = qty * unit_gross
+  const handleQtyChange = (line: typeof lines[number], allocUid: string, value: string) => {
+    const qty = parseAmt(value);
+    const newAmount = line.unit_gross > 0 ? qty * line.unit_gross : NaN;
+    updateAllocation(line.key, allocUid, {
+      qty: value,
+      ...(Number.isFinite(newAmount) ? { amount: fmt(newAmount).replace(/\s/g, "") } : {}),
+    });
+  };
+
+  // When user changes amount, sync qty = amount / unit_gross
+  const handleAmountChange = (line: typeof lines[number], allocUid: string, value: string) => {
+    const amount = parseAmt(value);
+    const newQty = line.unit_gross > 0 ? amount / line.unit_gross : NaN;
+    updateAllocation(line.key, allocUid, {
+      amount: value,
+      ...(Number.isFinite(newQty) && line.unit_gross > 0 ? { qty: formatQty(newQty) } : {}),
+    });
+  };
+
   const lineTotals = useMemo(() => {
     const map: Record<string, number> = {};
     for (const ln of lines) {
       map[ln.key] = (allocByLine[ln.key] || []).reduce((s, a) => s + parseAmt(a.amount), 0);
+    }
+    return map;
+  }, [allocByLine, lines]);
+
+  const lineQtyTotals = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const ln of lines) {
+      map[ln.key] = (allocByLine[ln.key] || []).reduce((s, a) => s + parseAmt(a.qty), 0);
     }
     return map;
   }, [allocByLine, lines]);
@@ -198,9 +231,18 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
     () => lines.some((ln) => lineTotals[ln.key] - ln.gross > 0.01),
     [lineTotals, lines]
   );
+  const qtyOverflow = useMemo(
+    () => lines.some((ln) => ln.quantity > 0 && lineQtyTotals[ln.key] - ln.quantity > 0.0001),
+    [lineQtyTotals, lines]
+  );
 
   const canSave =
-    isBalanced && !hasEmptyProject && !hasZeroAmount && !lineOverflow && !saveMutation.isPending;
+    isBalanced &&
+    !hasEmptyProject &&
+    !hasZeroAmount &&
+    !lineOverflow &&
+    !qtyOverflow &&
+    !saveMutation.isPending;
 
   const handleSave = () => {
     if (!canSave) return;
@@ -208,19 +250,14 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
     const allocations: ProjectCostInput[] = [];
     for (const ln of lines) {
       const arr = allocByLine[ln.key] || [];
-      const lineGross = ln.gross;
-      const lineSum = lineTotals[ln.key] || 0;
       for (const a of arr) {
         const gross = parseAmt(a.amount);
-        // Pro-rate net based on the line's net/gross ratio (or invoice ratio for the synthetic whole-line)
+        const qty = parseAmt(a.qty);
         let net = 0;
         if (ln.invoice_item_id && items) {
           const it = items.find((i: any) => i.id === ln.invoice_item_id);
           const ratio = it && Number(it.gross_amount) > 0 ? Number(it.net_amount) / Number(it.gross_amount) : 0;
           net = gross * ratio;
-        } else {
-          // whole invoice — no items → use 0 for net (we don't know it reliably)
-          net = 0;
         }
         allocations.push({
           invoice_item_id: a.invoice_item_id,
@@ -228,10 +265,9 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
           project_id: a.project_id,
           gross_amount: Number(gross.toFixed(2)),
           net_amount: Number(net.toFixed(2)),
+          quantity: qty > 0 ? Number(qty.toFixed(4)) : null,
+          unit: ln.unit || null,
         });
-        // suppress unused warning
-        void lineGross;
-        void lineSum;
       }
     }
 
