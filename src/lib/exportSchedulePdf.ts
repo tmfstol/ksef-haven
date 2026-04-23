@@ -160,7 +160,7 @@ export function exportSchedulePdf({
   let yAfter = (doc as any).lastAutoTable?.finalY ?? 200;
   yAfter += 6;
   if (yAfter > doc.internal.pageSize.getHeight() - 14) {
-    doc.addPage(orientation, "a4");
+    doc.addPage("a4", orientation);
     yAfter = 14;
   }
   doc.setFontSize(9);
