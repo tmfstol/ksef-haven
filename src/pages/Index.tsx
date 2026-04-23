@@ -16,7 +16,7 @@ import { UploadTimesheetButton } from "@/components/timesheets/UploadTimesheetBu
 import { Loader2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsTabletOrBelow } from "@/hooks/use-mobile";
 import type { InvoiceType } from "@/types/invoice";
 
 const EMPTY_FILTERS: InvoiceFiltersState = {
@@ -30,7 +30,7 @@ const EMPTY_FILTERS: InvoiceFiltersState = {
 
 const Index = () => {
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  const isMobile = useIsTabletOrBelow();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const { data: invoices, isLoading, isError, refetch } = useInvoices(activeCompanyId);
