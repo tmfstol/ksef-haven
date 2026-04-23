@@ -117,10 +117,11 @@ serve(async (req) => {
       }
     }
 
-    // Pick a random topic
-    const topic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
+    // Pick a random category, then a random topic within that category
     const category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-    const gradient = GRADIENTS[Math.floor(Math.random() * GRADIENTS.length)];
+    const topicsForCat = TOPICS_BY_CATEGORY[category];
+    const topic = topicsForCat[Math.floor(Math.random() * topicsForCat.length)];
+    const gradient = GRADIENT_BY_CATEGORY[category] ?? "from-violet-600 to-fuchsia-600";
 
     const baseSlug = slugify(topic);
     const { data: existing } = await supabase
