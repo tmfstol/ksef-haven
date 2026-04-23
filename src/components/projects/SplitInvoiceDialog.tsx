@@ -325,18 +325,34 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
               const lineRemaining = ln.gross - sum;
               const lineBalanced = Math.abs(lineRemaining) < 0.01;
               const overflow = lineRemaining < -0.01;
+              const qtySum = lineQtyTotals[ln.key] || 0;
+              const qtyRemaining = ln.quantity > 0 ? ln.quantity - qtySum : 0;
+              const qtyOver = ln.quantity > 0 && qtyRemaining < -0.0001;
+              const hasQtyMode = ln.quantity > 0 && ln.unit_gross > 0;
 
               return (
                 <div key={ln.key} className="rounded-lg border border-border/60 p-3 space-y-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground line-clamp-2">{ln.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Pozycja brutto: <span className="font-mono">{fmt(ln.gross)} zł</span>
+                      <p className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <span>
+                          Brutto: <span className="font-mono">{fmt(ln.gross)} zł</span>
+                        </span>
+                        {hasQtyMode && (
+                          <>
+                            <span>
+                              Ilość: <span className="font-mono">{ln.quantity}</span> {ln.unit}
+                            </span>
+                            <span>
+                              Cena/jm: <span className="font-mono">{fmt(ln.unit_gross)} zł</span>
+                            </span>
+                          </>
+                        )}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-xs text-muted-foreground">Pozostało w pozycji</p>
+                      <p className="text-xs text-muted-foreground">Pozostało</p>
                       <p
                         className={`text-sm font-mono font-semibold ${
                           overflow ? "text-destructive" : lineBalanced ? "text-emerald-600" : "text-foreground"
@@ -344,11 +360,27 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
                       >
                         {fmt(lineRemaining)} zł
                       </p>
+                      {hasQtyMode && (
+                        <p
+                          className={`text-[11px] font-mono ${
+                            qtyOver ? "text-destructive" : Math.abs(qtyRemaining) < 0.0001 ? "text-emerald-600" : "text-muted-foreground"
+                          }`}
+                        >
+                          {Number(qtyRemaining.toFixed(4))} {ln.unit}
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   {allocs.length > 0 && (
                     <div className="space-y-1.5">
+                      {/* Header */}
+                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground/70 px-1">
+                        <span className="flex-1">Projekt</span>
+                        {hasQtyMode && <span className="w-24 text-right">Ilość ({ln.unit})</span>}
+                        <span className="w-32 text-right">Kwota brutto</span>
+                        <span className="w-9" />
+                      </div>
                       {allocs.map((a) => (
                         <div key={a.uid} className="flex items-center gap-2">
                           <Select
@@ -372,12 +404,30 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
                               ))}
                             </SelectContent>
                           </Select>
-                          <div className="relative w-36">
+
+                          {hasQtyMode && (
+                            <div className="relative w-24">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={a.qty}
+                                onChange={(e) => handleQtyChange(ln, a.uid, e.target.value)}
+                                placeholder="0"
+                                className="h-9 pr-8 text-right font-mono"
+                                title={`Ilość w jednostce: ${ln.unit}`}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                                {ln.unit}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="relative w-32">
                             <Input
                               type="text"
                               inputMode="decimal"
                               value={a.amount}
-                              onChange={(e) => updateAllocation(ln.key, a.uid, { amount: e.target.value })}
+                              onChange={(e) => handleAmountChange(ln, a.uid, e.target.value)}
                               placeholder="0,00"
                               className="h-9 pr-9 text-right font-mono"
                             />
@@ -402,7 +452,14 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
                     variant="ghost"
                     size="sm"
                     className="h-7 text-xs"
-                    onClick={() => addAllocation(ln.key, ln, lineRemaining > 0 ? lineRemaining : 0)}
+                    onClick={() =>
+                      addAllocation(
+                        ln.key,
+                        ln,
+                        lineRemaining > 0 ? lineRemaining : 0,
+                        qtyRemaining > 0 ? qtyRemaining : 0
+                      )
+                    }
                   >
                     <Plus className="h-3.5 w-3.5 mr-1" /> Dodaj projekt
                   </Button>
