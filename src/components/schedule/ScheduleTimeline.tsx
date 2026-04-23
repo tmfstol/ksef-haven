@@ -23,6 +23,8 @@ type Props = {
   onAssignmentResize: (a: Assignment, newStart: string, newEnd: string) => void;
   onAddEmployee: () => void;
   onDeleteEmployee: (e: Employee) => void;
+  onCopyAssignment: (a: Assignment) => void;
+  pasteMode: boolean;
 };
 
 const COL_WIDTH = 56; // px per day
@@ -45,6 +47,8 @@ export function ScheduleTimeline({
   onAssignmentResize,
   onAddEmployee,
   onDeleteEmployee,
+  onCopyAssignment,
+  pasteMode,
 }: Props) {
   const days = useMemo(
     () => Array.from({ length: daysCount }, (_, i) => addDays(startDate, i)),
@@ -119,7 +123,12 @@ export function ScheduleTimeline({
   const today = new Date();
 
   return (
-    <div className="rounded-2xl border bg-card overflow-hidden shadow-sm">
+    <div className={cn("rounded-2xl border bg-card overflow-hidden shadow-sm", pasteMode && "ring-2 ring-primary")}>
+      {pasteMode && (
+        <div className="px-4 py-2 text-xs bg-primary text-primary-foreground text-center font-medium">
+          🖌️ Tryb wklejania: kliknij komórkę pracownika aby wkleić zadanie. Esc lub kliknij „Zakończ" aby wyjść.
+        </div>
+      )}
       {/* Top toolbar */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">
@@ -239,7 +248,8 @@ export function ScheduleTimeline({
                         className={cn(
                           "flex-shrink-0 border-r hover:bg-primary/5 transition-colors",
                           isWeekend && "bg-muted/30",
-                          isToday && "bg-primary/5"
+                          isToday && "bg-primary/5",
+                          pasteMode && "cursor-crosshair hover:bg-primary/15"
                         )}
                         style={{ width: COL_WIDTH, height: ROW_HEIGHT }}
                       />
@@ -277,6 +287,12 @@ export function ScheduleTimeline({
                           e.stopPropagation();
                           onAssignmentClick(a);
                         }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onCopyAssignment(a);
+                        }}
+                        title="Klik = edytuj · PPM = kopiuj"
                       >
                         {/* Left resize handle */}
                         <div
