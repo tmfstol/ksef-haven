@@ -63,7 +63,7 @@ export function EstimateVsActual({ companyId }: Props) {
     queryKey: ["estimate-vs-actual", companyId],
     enabled: !!companyId,
     queryFn: async () => {
-      const [projectsRes, estimatesRes, costsRes] = await Promise.all([
+      const [projectsRes, estimatesRes, invoicesRes, projectCostsRes] = await Promise.all([
         supabase
           .from("projects")
           .select("id, name, status, budget")
@@ -72,6 +72,14 @@ export function EstimateVsActual({ companyId }: Props) {
           .from("estimates")
           .select("id, project_id, suma_material, suma_robocizna, marza_material, marza_robocizna, status")
           .eq("company_id", companyId),
+        // Faktury kosztowe przypisane do projektu (główne źródło)
+        supabase
+          .from("invoices")
+          .select("id, project_id, gross_amount, invoice_type")
+          .eq("company_id", companyId)
+          .eq("invoice_type", "kosztowa")
+          .not("project_id", "is", null),
+        // Manualne wpisy kosztów z project_costs (uzupełnienie)
         supabase
           .from("project_costs")
           .select("project_id, net_amount, gross_amount, invoice_id")
@@ -80,12 +88,14 @@ export function EstimateVsActual({ companyId }: Props) {
 
       if (projectsRes.error) throw projectsRes.error;
       if (estimatesRes.error) throw estimatesRes.error;
-      if (costsRes.error) throw costsRes.error;
+      if (invoicesRes.error) throw invoicesRes.error;
+      if (projectCostsRes.error) throw projectCostsRes.error;
 
       return {
         projects: projectsRes.data || [],
         estimates: estimatesRes.data || [],
-        costs: costsRes.data || [],
+        invoices: invoicesRes.data || [],
+        projectCosts: projectCostsRes.data || [],
       };
     },
   });
