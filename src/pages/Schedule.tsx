@@ -4,7 +4,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Loader2, Building2, Users, X } from "lucide-react";
+import { Truck, Loader2, Building2, Users, X, FileDown, ZoomIn, ZoomOut } from "lucide-react";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +31,7 @@ import { EmployeeDialog } from "@/components/schedule/EmployeeDialog";
 import { VehiclesDialog } from "@/components/schedule/VehiclesDialog";
 import { GroupsDialog } from "@/components/schedule/GroupsDialog";
 import { UploadTimesheetButton } from "@/components/timesheets/UploadTimesheetButton";
+import { exportSchedulePdf } from "@/lib/exportSchedulePdf";
 import { toast } from "sonner";
 
 type Range = "week" | "twoweeks" | "month";
@@ -65,9 +66,20 @@ const Schedule = () => {
   }, [user, companyId, companies]);
 
   const [range, setRange] = useState<Range>("twoweeks");
+  const [zoom, setZoom] = useState<number>(1);
   const [startDate, setStartDate] = useState<Date>(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
+
+  const ZOOM_STEPS = [0.85, 1, 1.15, 1.3, 1.5, 1.75];
+  const zoomIn = () => {
+    const idx = ZOOM_STEPS.findIndex((z) => Math.abs(z - zoom) < 0.01);
+    setZoom(ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, idx + 1)] ?? 1);
+  };
+  const zoomOut = () => {
+    const idx = ZOOM_STEPS.findIndex((z) => Math.abs(z - zoom) < 0.01);
+    setZoom(ZOOM_STEPS[Math.max(0, idx - 1)] ?? 1);
+  };
 
   const daysCount = range === "week" ? 7 : range === "twoweeks" ? 14 : 30;
 
@@ -192,6 +204,38 @@ const Schedule = () => {
               <Truck className="h-4 w-4" /> Pojazdy
             </Button>
             <UploadTimesheetButton companyId={companyId} size="sm" />
+            <div className="flex items-center gap-1 border rounded-md p-0.5 bg-card">
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={zoomOut} title="Pomniejsz">
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <span className="text-xs w-10 text-center tabular-nums text-muted-foreground">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={zoomIn} title="Powiększ">
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => {
+                if (!employees.length) {
+                  toast.error("Brak pracowników do wyeksportowania");
+                  return;
+                }
+                exportSchedulePdf({
+                  companyName: activeCompany?.name ?? "Firma",
+                  employees,
+                  vehicles,
+                  assignments,
+                  startDate,
+                  daysCount,
+                });
+                toast.success("Pobrano harmonogram PDF");
+              }}
+            >
+              <FileDown className="h-4 w-4" /> Eksport PDF
+            </Button>
             {clipboard && (
               <Button size="sm" variant="destructive" onClick={() => setClipboard(null)}>
                 <X className="h-4 w-4" /> Zakończ wklejanie
@@ -212,6 +256,7 @@ const Schedule = () => {
             assignments={assignments}
             startDate={startDate}
             daysCount={daysCount}
+            zoom={zoom}
             onShiftDays={(d) => setStartDate((prev) => addDays(prev, d))}
             onAddEmployee={() => setEmpDialog({ open: true, initial: null })}
             onDeleteEmployee={(e) => {

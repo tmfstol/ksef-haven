@@ -17,6 +17,7 @@ type Props = {
   assignments: Assignment[];
   startDate: Date;
   daysCount: number;
+  zoom?: number; // 1 = default, 1.25, 1.5, 1.75, 2
   onShiftDays: (delta: number) => void;
   onCellClick: (employee: Employee, date: Date) => void;
   onAssignmentClick: (a: Assignment) => void;
@@ -27,9 +28,9 @@ type Props = {
   pasteMode: boolean;
 };
 
-const COL_WIDTH = 56; // px per day
-const ROW_HEIGHT = 64;
-const SIDEBAR_WIDTH = 220;
+const BASE_COL_WIDTH = 64; // px per day (was 56)
+const BASE_ROW_HEIGHT = 76; // (was 64)
+const BASE_SIDEBAR_WIDTH = 240; // (was 220)
 
 function fmtDate(d: Date) {
   return format(d, "yyyy-MM-dd");
@@ -41,6 +42,7 @@ export function ScheduleTimeline({
   assignments,
   startDate,
   daysCount,
+  zoom = 1,
   onShiftDays,
   onCellClick,
   onAssignmentClick,
@@ -50,6 +52,10 @@ export function ScheduleTimeline({
   onCopyAssignment,
   pasteMode,
 }: Props) {
+  const COL_WIDTH = Math.round(BASE_COL_WIDTH * zoom);
+  const ROW_HEIGHT = Math.round(BASE_ROW_HEIGHT * zoom);
+  const SIDEBAR_WIDTH = Math.round(BASE_SIDEBAR_WIDTH * Math.min(zoom, 1.25));
+
   const days = useMemo(
     () => Array.from({ length: daysCount }, (_, i) => addDays(startDate, i)),
     [startDate, daysCount]
