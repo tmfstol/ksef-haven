@@ -105,7 +105,8 @@ export function EstimateVsActual({ companyId }: Props) {
 
     return data.projects.map((p: any) => {
       const projectEstimates = data.estimates.filter((e: any) => e.project_id === p.id);
-      const projectCosts = data.costs.filter((c: any) => c.project_id === p.id);
+      const projectInvoices = data.invoices.filter((i: any) => i.project_id === p.id);
+      const projectManualCosts = data.projectCosts.filter((c: any) => c.project_id === p.id);
 
       const estimateMaterial = projectEstimates.reduce((s: number, e: any) => s + Number(e.suma_material || 0), 0);
       const estimateLabor = projectEstimates.reduce((s: number, e: any) => s + Number(e.suma_robocizna || 0), 0);
@@ -122,8 +123,17 @@ export function EstimateVsActual({ companyId }: Props) {
         estimateMaterial * (1 + avgMarzaMat / 100) +
         estimateLabor * (1 + avgMarzaRob / 100);
 
-      const actualCosts = projectCosts.reduce((s: number, c: any) => s + Number(c.net_amount || 0), 0);
-      const uniqueInvoices = new Set(projectCosts.map((c: any) => c.invoice_id));
+      // Koszty rzeczywiste = faktury kosztowe (brutto) + manualne wpisy z project_costs (gross)
+      const invoiceCosts = projectInvoices.reduce((s: number, i: any) => s + Number(i.gross_amount || 0), 0);
+      const manualCosts = projectManualCosts.reduce((s: number, c: any) => s + Number(c.gross_amount || 0), 0);
+      const actualCosts = invoiceCosts + manualCosts;
+
+      // Liczba unikalnych dokumentów (faktury + manualne)
+      const invoiceIds = new Set([
+        ...projectInvoices.map((i: any) => i.id),
+        ...projectManualCosts.map((c: any) => c.invoice_id).filter(Boolean),
+      ]);
+      const uniqueInvoices = invoiceIds;
 
       const variance = estimateTotal - actualCosts;
       const variancePct = estimateTotal > 0 ? (actualCosts / estimateTotal) * 100 - 100 : 0;
