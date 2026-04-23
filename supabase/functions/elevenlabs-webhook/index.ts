@@ -980,9 +980,279 @@ serve(async (req) => {
         return json({ response: `Dopisałem ${rows.length} ${rows.length === 1 ? "wiersz" : "wiersze"} do arkusza "${sheetName ?? sheetId}". Link: ${url}` });
       }
 
+      // ============ KOSZTORYSY ============
+      case "get_estimates":
+      case "lista_kosztorysow":
+      case "kosztorysy": {
+        let q = admin
+          .from("estimates")
+          .select("id, nazwa_kosztorysu, branza, status, suma_material, suma_robocizna, marza_material, marza_robocizna, client_name, project_id, created_at")
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        const estimateName: string | undefined = parsedBody.estimate_name ?? p.estimate_name ?? parsedBody.name ?? p.name;
+        if (estimateName) q = q.ilike("nazwa_kosztorysu", `%${estimateName}%`);
+        if (projectName) {
+          const { data: proj } = await admin
+            .from("projects").select("id").eq("company_id", company.id)
+            .ilike("name", `%${projectName}%`).maybeSingle();
+          if (proj?.id) q = q.eq("project_id", proj.id);
+        }
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data?.length) return json({ response: "Nie znalazłem żadnych kosztorysów." });
+        const lines = data.map((e, idx) => {
+          const mat = Number(e.suma_material || 0);
+          const rob = Number(e.suma_robocizna || 0);
+          const matZMarza = mat * (1 + Number(e.marza_material || 0) / 100);
+          const robZMarza = rob * (1 + Number(e.marza_robocizna || 0) / 100);
+          const total = matZMarza + robZMarza;
+          return `${idx + 1}. ${e.nazwa_kosztorysu} [${e.branza}] (${e.status})${e.client_name ? ` — klient: ${e.client_name}` : ""} — materiały ${fmtPLN(mat)}, robocizna ${fmtPLN(rob)}, dla klienta ${fmtPLN(total)}`;
+        });
+        return json({ response: `Kosztorysy (${data.length}):\n${lines.join("\n")}` });
+      }
+
+      case "get_estimate_details":
+      case "szczegoly_kosztorysu": {
+        const estimateName: string | undefined = parsedBody.estimate_name ?? p.estimate_name ?? parsedBody.name ?? p.name;
+        if (!estimateName) return json({ response: "Podaj nazwę kosztorysu." });
+        const { data: est } = await admin
+          .from("estimates")
+          .select("id, nazwa_kosztorysu, branza, status, suma_material, suma_robocizna, marza_material, marza_robocizna, client_name, notes")
+          .eq("company_id", company.id)
+          .ilike("nazwa_kosztorysu", `%${estimateName}%`)
+          .order("created_at", { ascending: false })
+          .limit(1).maybeSingle();
+        if (!est) return json({ response: `Nie znalazłem kosztorysu "${estimateName}".` });
+        const { data: stages } = await admin
+          .from("estimate_stages").select("id, name, ordinal").eq("estimate_id", est.id).order("ordinal");
+        const { data: items } = await admin
+          .from("estimate_items")
+          .select("nazwa, ilosc, jednostka, cena_mat, cena_rob, stage_id, ordinal")
+          .eq("estimate_id", est.id).order("ordinal").limit(30);
+        const stageMap = new Map((stages || []).map((s) => [s.id, s.name]));
+        const matSum = (items || []).reduce((s, i: any) => s + Number(i.cena_mat || 0) * Number(i.ilosc || 0), 0);
+        const robSum = (items || []).reduce((s, i: any) => s + Number(i.cena_rob || 0) * Number(i.ilosc || 0), 0);
+        const totalKlient = matSum * (1 + Number(est.marza_material || 0) / 100) + robSum * (1 + Number(est.marza_robocizna || 0) / 100);
+        const head = `Kosztorys "${est.nazwa_kosztorysu}" [${est.branza}], status: ${est.status}${est.client_name ? `, klient: ${est.client_name}` : ""}.`;
+        const sums = `Materiały: ${fmtPLN(matSum)}, robocizna: ${fmtPLN(robSum)}. Marża mat ${est.marza_material}%, rob ${est.marza_robocizna}%. Cena dla klienta: ${fmtPLN(totalKlient)}.`;
+        const itemLines = (items || []).slice(0, 10).map((i: any, idx: number) => {
+          const stage = i.stage_id ? ` [${stageMap.get(i.stage_id) || "etap"}]` : "";
+          return `${idx + 1}. ${i.nazwa}${stage} — ${i.ilosc} ${i.jednostka}, mat ${fmtPLN(Number(i.cena_mat))}, rob ${fmtPLN(Number(i.cena_rob))}`;
+        });
+        const stagesPart = stages?.length ? `\nEtapy (${stages.length}): ${stages.map((s) => s.name).join(", ")}.` : "";
+        const itemsPart = itemLines.length ? `\nPozycje (pierwsze ${itemLines.length} z ${items?.length || 0}):\n${itemLines.join("\n")}` : "";
+        return json({ response: `${head} ${sums}${stagesPart}${itemsPart}` });
+      }
+
+      // ============ KARTY PRACY (employee_hours + timesheet_scans) ============
+      case "get_employee_hours":
+      case "godziny_pracownika":
+      case "karty_pracy": {
+        const employeeName: string | undefined = parsedBody.employee_name ?? p.employee_name;
+        const dateFrom: string | undefined = parsedBody.date_from ?? p.date_from;
+        const dateTo: string | undefined = parsedBody.date_to ?? p.date_to;
+        let q = admin
+          .from("employee_hours")
+          .select("id, work_date, hours, description, employee_id, project_id, status, employee_name_raw")
+          .eq("company_id", company.id)
+          .order("work_date", { ascending: false })
+          .limit(limit);
+        if (dateFrom) q = q.gte("work_date", dateFrom);
+        if (dateTo) q = q.lte("work_date", dateTo);
+        if (employeeName) {
+          const { data: emp } = await admin
+            .from("employees").select("id").eq("company_id", company.id)
+            .ilike("name", `%${employeeName}%`).maybeSingle();
+          if (emp?.id) q = q.eq("employee_id", emp.id);
+        }
+        if (projectName) {
+          const { data: proj } = await admin
+            .from("projects").select("id").eq("company_id", company.id)
+            .ilike("name", `%${projectName}%`).maybeSingle();
+          if (proj?.id) q = q.eq("project_id", proj.id);
+        }
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data?.length) return json({ response: "Brak wpisów godzinowych dla podanych kryteriów." });
+        const empIds = [...new Set(data.map((d) => d.employee_id).filter(Boolean))];
+        const projIds = [...new Set(data.map((d) => d.project_id).filter(Boolean))];
+        const [{ data: emps }, { data: projs }] = await Promise.all([
+          empIds.length ? admin.from("employees").select("id, name").in("id", empIds as string[]) : Promise.resolve({ data: [] as any[] }),
+          projIds.length ? admin.from("projects").select("id, name").in("id", projIds as string[]) : Promise.resolve({ data: [] as any[] }),
+        ]);
+        const empMap = new Map((emps || []).map((e: any) => [e.id, e.name]));
+        const projMap = new Map((projs || []).map((p: any) => [p.id, p.name]));
+        const totalH = data.reduce((s, r) => s + Number(r.hours || 0), 0);
+        const lines = data.map((r) => {
+          const eName = (r.employee_id && empMap.get(r.employee_id)) || r.employee_name_raw || "?";
+          const pName = (r.project_id && projMap.get(r.project_id)) || "bez projektu";
+          return `${r.work_date}: ${eName} — ${r.hours}h, ${pName}${r.description ? ` (${r.description})` : ""}`;
+        });
+        return json({ response: `Karty pracy (${data.length} wpisów, łącznie ${totalH}h):\n${lines.join("\n")}` });
+      }
+
+      case "get_project_hours_summary":
+      case "godziny_na_projekcie": {
+        if (!projectName) return json({ response: "Podaj nazwę projektu." });
+        const { data: proj } = await admin
+          .from("projects").select("id, name, status, budget").eq("company_id", company.id)
+          .ilike("name", `%${projectName}%`).maybeSingle();
+        if (!proj) return json({ response: `Nie znalazłem projektu "${projectName}".` });
+        const { data: hours } = await admin
+          .from("employee_hours").select("hours, employee_id, work_date")
+          .eq("company_id", company.id).eq("project_id", proj.id);
+        const total = (hours || []).reduce((s, h: any) => s + Number(h.hours || 0), 0);
+        const byEmp = new Map<string, number>();
+        for (const h of hours || []) {
+          if (!h.employee_id) continue;
+          byEmp.set(h.employee_id, (byEmp.get(h.employee_id) || 0) + Number(h.hours || 0));
+        }
+        const empIds = [...byEmp.keys()];
+        const { data: emps } = empIds.length
+          ? await admin.from("employees").select("id, name").in("id", empIds)
+          : { data: [] as any[] };
+        const empMap = new Map((emps || []).map((e: any) => [e.id, e.name]));
+        const top = [...byEmp.entries()]
+          .sort((a, b) => b[1] - a[1]).slice(0, 5)
+          .map(([id, h]) => `${empMap.get(id) || "?"}: ${h}h`).join(", ");
+        return json({ response: `Projekt "${proj.name}": łącznie ${total}h pracy z ${hours?.length || 0} wpisów. Top pracownicy: ${top || "brak"}.` });
+      }
+
+      case "get_recent_scans":
+      case "ostatnie_skany_kart": {
+        const { data, error } = await admin
+          .from("timesheet_scans")
+          .select("id, status, rows_count, rows_assigned, created_at, error_message")
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false }).limit(limit);
+        if (error) throw error;
+        if (!data?.length) return json({ response: "Brak zeskanowanych kart pracy." });
+        const lines = data.map((s, idx) =>
+          `${idx + 1}. ${new Date(s.created_at).toLocaleDateString("pl-PL")} — ${s.status}, ${s.rows_assigned}/${s.rows_count} przypisanych${s.error_message ? ` (błąd: ${s.error_message})` : ""}`,
+        );
+        return json({ response: `Ostatnie skany (${data.length}):\n${lines.join("\n")}` });
+      }
+
+      // ============ HARMONOGRAM (assignments) ============
+      case "get_schedule":
+      case "harmonogram":
+      case "get_assignments": {
+        const dateFrom: string = parsedBody.date_from ?? p.date_from ?? new Date().toISOString().slice(0, 10);
+        const dateTo: string | undefined = parsedBody.date_to ?? p.date_to;
+        let q = admin
+          .from("assignments")
+          .select("id, start_date, end_date, task_type, location, description, employee_id, vehicle_id")
+          .eq("company_id", company.id)
+          .gte("end_date", dateFrom)
+          .order("start_date", { ascending: true })
+          .limit(limit);
+        if (dateTo) q = q.lte("start_date", dateTo);
+        const employeeName: string | undefined = parsedBody.employee_name ?? p.employee_name;
+        if (employeeName) {
+          const { data: emp } = await admin.from("employees").select("id").eq("company_id", company.id)
+            .ilike("name", `%${employeeName}%`).maybeSingle();
+          if (emp?.id) q = q.eq("employee_id", emp.id);
+        }
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data?.length) return json({ response: "Brak zaplanowanych zadań w tym okresie." });
+        const empIds = [...new Set(data.map((d) => d.employee_id).filter(Boolean))];
+        const vehIds = [...new Set(data.map((d) => d.vehicle_id).filter(Boolean))];
+        const [{ data: emps }, { data: vehs }] = await Promise.all([
+          empIds.length ? admin.from("employees").select("id, name").in("id", empIds as string[]) : Promise.resolve({ data: [] as any[] }),
+          vehIds.length ? admin.from("vehicles").select("id, name, registration").in("id", vehIds as string[]) : Promise.resolve({ data: [] as any[] }),
+        ]);
+        const empMap = new Map((emps || []).map((e: any) => [e.id, e.name]));
+        const vehMap = new Map((vehs || []).map((v: any) => [v.id, `${v.name}${v.registration ? ` (${v.registration})` : ""}`]));
+        const lines = data.map((a) => {
+          const range = a.start_date === a.end_date ? a.start_date : `${a.start_date} → ${a.end_date}`;
+          const eName = a.employee_id ? empMap.get(a.employee_id) : "—";
+          const vName = a.vehicle_id ? vehMap.get(a.vehicle_id) : null;
+          return `${range}: ${eName} — ${a.task_type}${a.location ? ` @ ${a.location}` : ""}${vName ? `, pojazd: ${vName}` : ""}${a.description ? ` (${a.description})` : ""}`;
+        });
+        return json({ response: `Harmonogram (${data.length} zadań):\n${lines.join("\n")}` });
+      }
+
+      // ============ PRACOWNICY ============
+      case "get_employees":
+      case "lista_pracownikow":
+      case "pracownicy": {
+        const { data, error } = await admin
+          .from("employees").select("id, name, phone, active, order_number")
+          .eq("company_id", company.id).eq("active", true)
+          .order("order_number", { ascending: true, nullsFirst: false }).limit(limit);
+        if (error) throw error;
+        if (!data?.length) return json({ response: "Brak aktywnych pracowników." });
+        const lines = data.map((e, idx) => `${idx + 1}. ${e.name}${e.phone ? ` — tel. ${e.phone}` : ""}`);
+        return json({ response: `Pracownicy (${data.length}):\n${lines.join("\n")}` });
+      }
+
+      // ============ POJAZDY ============
+      case "get_vehicles":
+      case "lista_pojazdow":
+      case "pojazdy": {
+        const { data, error } = await admin
+          .from("vehicles").select("name, registration, active")
+          .eq("company_id", company.id).eq("active", true).limit(limit);
+        if (error) throw error;
+        if (!data?.length) return json({ response: "Brak aktywnych pojazdów." });
+        const lines = data.map((v, idx) => `${idx + 1}. ${v.name}${v.registration ? ` (${v.registration})` : ""}`);
+        return json({ response: `Pojazdy (${data.length}):\n${lines.join("\n")}` });
+      }
+
+      // ============ PROJEKT — szczegóły z rentownością ============
+      case "get_project_details":
+      case "szczegoly_projektu":
+      case "rentownosc_projektu": {
+        if (!projectName) return json({ response: "Podaj nazwę projektu." });
+        const { data: proj } = await admin
+          .from("projects").select("id, name, status, budget, description")
+          .eq("company_id", company.id)
+          .ilike("name", `%${projectName}%`).maybeSingle();
+        if (!proj) return json({ response: `Nie znalazłem projektu "${projectName}".` });
+        const [{ data: invs }, { data: costs }, { data: hrs }, { data: ests }] = await Promise.all([
+          admin.from("invoices").select("invoice_type, gross_amount").eq("company_id", company.id).eq("project_id", proj.id),
+          admin.from("project_costs").select("net_amount, gross_amount").eq("project_id", proj.id),
+          admin.from("employee_hours").select("hours").eq("company_id", company.id).eq("project_id", proj.id),
+          admin.from("estimates").select("id, nazwa_kosztorysu, status").eq("company_id", company.id).eq("project_id", proj.id),
+        ]);
+        const revenue = (invs || []).filter((i: any) => i.invoice_type === "przychodowa").reduce((s, i: any) => s + Number(i.gross_amount || 0), 0);
+        const invCost = (invs || []).filter((i: any) => i.invoice_type === "kosztowa").reduce((s, i: any) => s + Number(i.gross_amount || 0), 0);
+        const allocCost = (costs || []).reduce((s, c: any) => s + Number(c.gross_amount || 0), 0);
+        const totalCost = invCost + allocCost;
+        const profit = revenue - totalCost;
+        const hours = (hrs || []).reduce((s, h: any) => s + Number(h.hours || 0), 0);
+        const budgetPart = proj.budget ? `, budżet ${fmtPLN(Number(proj.budget))}` : "";
+        const estPart = ests?.length ? ` Kosztorysy: ${ests.map((e: any) => `${e.nazwa_kosztorysu} (${e.status})`).join(", ")}.` : "";
+        return json({
+          response: `Projekt "${proj.name}" (${proj.status})${budgetPart}. Przychody ${fmtPLN(revenue)}, koszty ${fmtPLN(totalCost)} (faktury ${fmtPLN(invCost)} + alokowane ${fmtPLN(allocCost)}), wynik ${fmtPLN(profit)}. Godzin pracy: ${hours}h.${estPart}`,
+        });
+      }
+
+      // ============ WYDATKI ============
+      case "get_expenses":
+      case "lista_wydatkow":
+      case "wydatki": {
+        const dateFrom: string | undefined = parsedBody.date_from ?? p.date_from;
+        let q = admin.from("expenses")
+          .select("date, amount, currency, vendor_name, description, project_id")
+          .eq("company_id", company.id)
+          .order("date", { ascending: false }).limit(limit);
+        if (dateFrom) q = q.gte("date", dateFrom);
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data?.length) return json({ response: "Brak wydatków." });
+        const total = data.reduce((s, e: any) => s + Number(e.amount || 0), 0);
+        const lines = data.map((e: any) =>
+          `${e.date}: ${fmtPLN(Number(e.amount))} — ${e.vendor_name || "?"}${e.description ? ` (${e.description})` : ""}`,
+        );
+        return json({ response: `Wydatki (${data.length} pozycji, łącznie ${fmtPLN(total)}):\n${lines.join("\n")}` });
+      }
+
       default:
         return json({
-          response: `Nie znam akcji "${action}". Dostępne: get_summary, get_invoices, get_unpaid, get_clients, get_projects, send_to_portal, assign_to_project, get_download_link, add_calendar_event, search_drive, open_drive_file, read_drive_file, create_doc, update_doc, create_sheet, update_sheet.`,
+          response: `Nie znam akcji "${action}". Dostępne: get_summary, get_invoices, get_unpaid, get_clients, get_projects, get_project_details, get_estimates, get_estimate_details, get_employee_hours, get_project_hours_summary, get_recent_scans, get_schedule, get_employees, get_vehicles, get_expenses, send_to_portal, assign_to_project, get_download_link, add_calendar_event, search_drive, open_drive_file, read_drive_file, create_doc, update_doc, create_sheet, update_sheet.`,
         });
     }
   } catch (err) {
