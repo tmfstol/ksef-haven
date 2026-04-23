@@ -99,34 +99,35 @@ const Expenses = () => {
 
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6 pb-24 lg:pb-6">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
+          <div className="rounded-xl border border-border/50 bg-card/50 p-3 md:p-4">
             <p className="text-xs text-muted-foreground">Liczba wydatków</p>
-            <p className="text-2xl font-bold text-foreground">{filtered.length}</p>
+            <p className="text-xl md:text-2xl font-bold text-foreground">{filtered.length}</p>
           </div>
-          <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+          <div className="rounded-xl border border-border/50 bg-card/50 p-3 md:p-4">
             <p className="text-xs text-muted-foreground">Suma</p>
-            <p className="text-2xl font-bold text-foreground">{totalAmount.toLocaleString("pl-PL", { style: "currency", currency: "PLN" })}</p>
+            <p className="text-xl md:text-2xl font-bold text-foreground">{totalAmount.toLocaleString("pl-PL", { style: "currency", currency: "PLN" })}</p>
           </div>
-          <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+          <div className="rounded-xl border border-border/50 bg-card/50 p-3 md:p-4 col-span-2 md:col-span-1">
             <p className="text-xs text-muted-foreground">Kategorie</p>
-            <p className="text-2xl font-bold text-foreground">{categories?.length || 0}</p>
+            <p className="text-xl md:text-2xl font-bold text-foreground">{categories?.length || 0}</p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
+          <div className="relative flex-1 sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Szukaj po nazwie lub opisie..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+              className="pl-9 h-11"
+              inputMode="search"
             />
           </div>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px] h-11">
               <SelectValue placeholder="Kategoria" />
             </SelectTrigger>
             <SelectContent>
@@ -143,7 +144,7 @@ const Expenses = () => {
           </Select>
         </div>
 
-        {/* Table */}
+        {/* Table on desktop, cards on mobile/tablet */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -155,6 +156,46 @@ const Expenses = () => {
             <p className="text-sm text-muted-foreground mt-1">
               Dodaj pierwszy wydatek klikając przycisk powyżej.
             </p>
+          </div>
+        ) : isMobile ? (
+          <div className="grid grid-cols-1 gap-3">
+            {filtered.map((exp) => {
+              const cat = exp.category_id ? categoryMap.get(exp.category_id) : null;
+              return (
+                <div key={exp.id} className="glass-panel-elevated rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{exp.vendor_name || "—"}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(exp.date), "dd.MM.yyyy")}</p>
+                    </div>
+                    <p className="text-base font-bold tabular-nums text-foreground flex-shrink-0">
+                      {exp.amount.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
+                    </p>
+                  </div>
+                  {exp.description && (
+                    <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{exp.description}</p>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    {cat ? (
+                      <Badge variant="outline" className="text-xs" style={{ borderColor: cat.color, color: cat.color }}>
+                        {cat.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Bez kategorii</span>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="min-h-[44px] min-w-[44px] text-muted-foreground hover:text-destructive"
+                      onClick={() => deleteExpense.mutate(exp.id)}
+                      aria-label="Usuń wydatek"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="rounded-xl border border-border/50 overflow-hidden">
