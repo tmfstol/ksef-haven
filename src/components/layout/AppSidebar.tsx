@@ -1,7 +1,7 @@
 import { useLocation, Link } from "react-router-dom";
 import { 
   LayoutDashboard, FileText, Users, BarChart3, Settings, 
-  LogOut, ChevronLeft, ChevronRight, Zap, Receipt, FolderOpen, LayoutGrid, CalendarRange, Calculator
+  LogOut, ChevronLeft, ChevronRight, Zap, Receipt, FolderOpen, LayoutGrid, CalendarRange, Calculator, ScanLine
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,6 +17,7 @@ const navItems = [
   { label: "Wydatki", icon: Receipt, path: "/expenses" },
   { label: "Projekty", icon: FolderOpen, path: "/projects" },
   { label: "Kosztorysy", icon: Calculator, path: "/estimates" },
+  { label: "Karty pracy", icon: ScanLine, path: "/timesheets" },
   { label: "Analityka", icon: BarChart3, path: "/analytics" },
   { label: "Workspace", icon: LayoutGrid, path: "/workspace" },
 ];
