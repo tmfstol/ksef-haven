@@ -5,6 +5,39 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function base64UrlDecodeToString(b64url: string): string {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b64url.length + 3) % 4);
+  return atob(b64);
+}
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function hmacVerify(payloadB64: string, signatureB64Url: string, secret: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const expected = await crypto.subtle.sign("HMAC", key, enc.encode(payloadB64));
+  const expectedB64 = base64UrlEncode(new Uint8Array(expected));
+  // Constant-time compare
+  if (expectedB64.length !== signatureB64Url.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expectedB64.length; i++) {
+    diff |= expectedB64.charCodeAt(i) ^ signatureB64Url.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+const STATE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -19,6 +52,7 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const clientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID")!;
   const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET")!;
+  const stateSecret = Deno.env.get("OAUTH_STATE_SECRET");
   const callbackUrl = `${supabaseUrl}/functions/v1/google-oauth-callback`;
 
   const finishHtml = (ok: boolean, msg: string, redirectOrigin?: string) => {
@@ -36,12 +70,35 @@ ${target ? `<script>setTimeout(()=>{window.location.href=${JSON.stringify(target
   try {
     if (errorParam) return finishHtml(false, `Google odmówił dostępu: ${errorParam}`);
     if (!code || !stateRaw) return finishHtml(false, "Brak code/state");
+    if (!stateSecret) return finishHtml(false, "Server misconfiguration");
 
+    // Verify HMAC-signed state
     let state: { c: string; u: string; t: number; r?: string };
     try {
-      state = JSON.parse(atob(stateRaw));
+      const dot = stateRaw.lastIndexOf(".");
+      if (dot < 0) throw new Error("malformed state");
+      const payloadB64 = stateRaw.slice(0, dot);
+      const sig = stateRaw.slice(dot + 1);
+      const ok = await hmacVerify(payloadB64, sig, stateSecret);
+      if (!ok) throw new Error("bad signature");
+      state = JSON.parse(base64UrlDecodeToString(payloadB64));
     } catch {
-      return finishHtml(false, "Nieprawidłowy state");
+      return finishHtml(false, "Nieprawidłowy state (sygnatura nie pasuje)");
+    }
+
+    // Reject expired state to limit replay window
+    if (!state.t || Date.now() - state.t > STATE_MAX_AGE_MS) {
+      return finishHtml(false, "State wygasł, spróbuj ponownie", state.r);
+    }
+
+    // Verify the user from state actually has owner/admin access to that company
+    const admin = createClient(supabaseUrl, serviceRoleKey);
+    const { data: hasAccess } = await admin.rpc("is_company_owner_or_admin", {
+      _user_id: state.u,
+      _company_id: state.c,
+    });
+    if (!hasAccess) {
+      return finishHtml(false, "Brak uprawnień do tej firmy", state.r);
     }
 
     // Exchange code for tokens
@@ -77,7 +134,6 @@ ${target ? `<script>setTimeout(()=>{window.location.href=${JSON.stringify(target
     const expiresAt = new Date(Date.now() + (expires_in - 60) * 1000).toISOString();
     const scopes = (scope || "").split(" ").filter(Boolean);
 
-    const admin = createClient(supabaseUrl, serviceRoleKey);
     const { error: upsertError } = await admin
       .from("google_workspace_credentials")
       .upsert(
