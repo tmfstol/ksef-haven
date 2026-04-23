@@ -236,6 +236,7 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
   const { data: invoices, isLoading: invLoading } = useProjectInvoices(project.id);
   const { data: expenses, isLoading: expLoading } = useProjectExpenses(project.id);
   const { data: allInvoices } = useInvoices(companyId);
+  const { data: projectCosts, isLoading: costsLoading } = useProjectCostsByProject(project.id);
   const assignInvoice = useAssignInvoiceToProject();
   const [assignOpen, setAssignOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -257,11 +258,17 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
     [allInvoices, project.id]
   );
 
+  const splitTotal = useMemo(
+    () => (projectCosts || []).reduce((s: number, c: any) => s + Number(c.gross_amount), 0),
+    [projectCosts]
+  );
+
   const totalCost = useMemo(
     () =>
       (invoices || []).reduce((s, i: any) => s + Number(i.gross_amount), 0) +
-      (expenses || []).reduce((s, e: any) => s + Number(e.amount), 0),
-    [invoices, expenses]
+      (expenses || []).reduce((s, e: any) => s + Number(e.amount), 0) +
+      splitTotal,
+    [invoices, expenses, splitTotal]
   );
 
   return (
