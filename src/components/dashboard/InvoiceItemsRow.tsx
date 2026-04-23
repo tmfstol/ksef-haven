@@ -357,6 +357,14 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
             </tbody>
           </table>
         )}
+        {invoice && companyId && (
+          <SplitInvoiceDialog
+            open={splitOpen}
+            onOpenChange={setSplitOpen}
+            invoice={invoice}
+            companyId={companyId}
+          />
+        )}
       </td>
     </motion.tr>
   );
