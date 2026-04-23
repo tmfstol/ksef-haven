@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsTabletOrBelow } from "@/hooks/use-mobile";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 
 interface AppLayoutProps {
@@ -8,12 +8,12 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const isMobile = useIsMobile();
+  const isTabletOrBelow = useIsTabletOrBelow();
 
-  if (isMobile) {
+  if (isTabletOrBelow) {
     return (
       <div className="flex flex-col h-screen bg-background">
-        <main className="flex-1 overflow-y-auto pb-20">
+        <main className="flex-1 overflow-y-auto pb-24">
           {children}
         </main>
         <MobileBottomNav />
