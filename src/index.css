@@ -222,6 +222,12 @@
     50%      { transform: scale(1.6); opacity: 0.4; }
   }
   .pulse-live-dot { animation: pulse-dot 1.8s ease-in-out infinite; }
+
+  /* Hero text helpers — kept on dark hero only */
+  .pulse-text-on-dark { color: hsl(0 0% 100%); }
+  .pulse-text-on-dark-muted { color: hsl(0 0% 100% / 0.7); }
+  .pulse-text-on-dark-faint { color: hsl(0 0% 100% / 0.5); }
+  .pulse-surface-on-dark { background: hsl(0 0% 100% / 0.08); border: 1px solid hsl(0 0% 100% / 0.12); backdrop-filter: blur(8px); }
 }
 
 @layer utilities {
