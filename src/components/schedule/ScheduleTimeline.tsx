@@ -248,7 +248,8 @@ export function ScheduleTimeline({
                         className={cn(
                           "flex-shrink-0 border-r hover:bg-primary/5 transition-colors",
                           isWeekend && "bg-muted/30",
-                          isToday && "bg-primary/5"
+                          isToday && "bg-primary/5",
+                          pasteMode && "cursor-crosshair hover:bg-primary/15"
                         )}
                         style={{ width: COL_WIDTH, height: ROW_HEIGHT }}
                       />
@@ -286,6 +287,12 @@ export function ScheduleTimeline({
                           e.stopPropagation();
                           onAssignmentClick(a);
                         }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onCopyAssignment(a);
+                        }}
+                        title="Klik = edytuj · PPM = kopiuj"
                       >
                         {/* Left resize handle */}
                         <div
