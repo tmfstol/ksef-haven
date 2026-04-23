@@ -7,12 +7,46 @@ export function useCompanies() {
   return useQuery<Company[]>({
     queryKey: ["companies"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // 1) Try full companies (owners/admins)
+      const { data: ownData, error: ownErr } = await supabase
         .from("companies")
         .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id, street, city, postal_code, country_code, bank_name, bank_account, email, phone, invoice_pattern, client_portal_email, make_webhook_url")
         .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data as Company[];
+      if (ownErr) throw ownErr;
+
+      // 2) Also fetch companies the user has access to via user_roles (invited members)
+      //    Use companies_safe view which excludes sensitive ksef_token
+      const { data: { user } } = await supabase.auth.getUser();
+      let merged: Company[] = (ownData || []) as Company[];
+
+      if (user) {
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("company_id")
+          .eq("user_id", user.id);
+
+        const ownedIds = new Set(merged.map((c) => c.id));
+        const roleCompanyIds = (roles || [])
+          .map((r: any) => r.company_id)
+          .filter((id: string) => !ownedIds.has(id));
+
+        if (roleCompanyIds.length > 0) {
+          const { data: safeData, error: safeErr } = await supabase
+            .from("companies_safe")
+            .select("id, name, nip, storage_path, is_active, created_at, updated_at, user_id, street, city, postal_code, country_code, email, phone, invoice_pattern, client_portal_email")
+            .in("id", roleCompanyIds);
+          if (safeErr) throw safeErr;
+          merged = [...merged, ...((safeData || []) as unknown as Company[])];
+        }
+      }
+
+      // Sort by created_at ascending
+      merged.sort((a, b) => {
+        const da = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const db = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return da - db;
+      });
+      return merged;
     },
     retry: 1,
     refetchOnWindowFocus: false,
