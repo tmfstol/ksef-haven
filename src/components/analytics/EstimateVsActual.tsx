@@ -280,7 +280,7 @@ export function EstimateVsActual({ companyId }: Props) {
               <Receipt className="h-4 w-4 text-violet-500" />
             </div>
             <div className="text-lg font-bold text-foreground tabular-nums">{fmt(totals.actualCosts)}</div>
-            <div className="text-xs text-muted-foreground mt-1">z faktur KSeF</div>
+            <div className="text-xs text-muted-foreground mt-1">faktury kosztowe (brutto)</div>
           </CardContent>
         </Card>
 
