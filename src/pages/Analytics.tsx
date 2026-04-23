@@ -263,6 +263,9 @@ const Analytics = () => {
               </Card>
             </div>
 
+            {/* Kosztorys vs Koszty rzeczywiste */}
+            {activeCompanyId && <EstimateVsActual companyId={activeCompanyId} />}
+
             {/* Cashflow chart */}
             <Card className="fintech-card">
               <CardHeader className="pb-1">
