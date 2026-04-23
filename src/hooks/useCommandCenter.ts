@@ -129,6 +129,55 @@ export function useCommandCenter(companyId: string | null) {
     enabled: !!companyId,
   });
 
+  const { data: bankAccounts } = useQuery({
+    queryKey: ["cc-bank-accounts", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const { data, error } = await supabase
+        .from("bank_accounts")
+        .select("id, bank_name, last_synced_at")
+        .eq("company_id", companyId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  const { data: bankTxs } = useQuery({
+    queryKey: ["cc-bank-txs", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      const { data, error } = await supabase
+        .from("bank_transactions")
+        .select("date, amount, type")
+        .eq("company_id", companyId)
+        .gte("date", since.toISOString().slice(0, 10))
+        .order("date", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  const { data: todayAssignments } = useQuery({
+    queryKey: ["cc-today-assignments", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("assignments")
+        .select("id, employee_id, start_date, end_date")
+        .eq("company_id", companyId)
+        .lte("start_date", today)
+        .gte("end_date", today);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
   const { data: company } = useQuery({
     queryKey: ["cc-company", companyId],
     queryFn: async () => {
@@ -271,6 +320,58 @@ export function useCommandCenter(companyId: string | null) {
     });
   }, [projects, invoices, expenses]);
 
+  // Cash position (saldo z transakcji 30d) + sparkline
+  const cashPosition = useMemo(() => {
+    const txs = bankTxs || [];
+    let runningSum = 0;
+    const series: number[] = [];
+    // Wpływy minus wydatki (bilans 30 dni — uproszczona płynność)
+    for (const t of txs) {
+      runningSum += Number(t.amount) || 0;
+      series.push(runningSum);
+    }
+    if (series.length === 0) {
+      // Fallback: bilans z faktur z ostatnich 30 dni
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      const recent = (invoices || []).filter((i) => new Date(i.date) >= since);
+      let s = 0;
+      const sortedDates = [...new Set(recent.map((i) => i.date))].sort();
+      for (const d of sortedDates) {
+        const dayInvs = recent.filter((i) => i.date === d);
+        const flow = dayInvs.reduce((acc, i) => acc + (i.invoice_type === "przychodowa" ? Number(i.gross_amount) : -Number(i.gross_amount)), 0);
+        s += flow;
+        series.push(s);
+      }
+    }
+    return {
+      balance: runningSum || (series.length ? series[series.length - 1] : 0),
+      sparkline: series.length > 1 ? series : [0, 0],
+      hasBank: (bankAccounts?.length || 0) > 0,
+    };
+  }, [bankTxs, bankAccounts, invoices]);
+
+  // Najbliższy termin płatności
+  const nextPaymentDue = useMemo(() => {
+    const list = upcomingPayments;
+    if (!list.length) return null;
+    const totalDueSoon = list.filter((p) => p.days_until_due <= 14).reduce((s, p) => s + p.gross_amount, 0);
+    return {
+      nearest: list[0],
+      totalDueSoon,
+      countDueSoon: list.filter((p) => p.days_until_due <= 14).length,
+    };
+  }, [upcomingPayments]);
+
+  // Ludzie w terenie dziś
+  const peopleOnSite = useMemo(() => {
+    const ids = new Set((todayAssignments || []).map((a) => a.employee_id));
+    return ids.size;
+  }, [todayAssignments]);
+
+  // Aktywne projekty count
+  const activeProjectsCount = projects?.length || 0;
+
   return {
     kpis,
     vatForecast,
@@ -282,6 +383,10 @@ export function useCommandCenter(companyId: string | null) {
     contacts: contacts || [],
     company,
     invoices: invoices || [],
+    cashPosition,
+    nextPaymentDue,
+    peopleOnSite,
+    activeProjectsCount,
     isLoading: invoicesLoading || expensesLoading || projectsLoading || contactsLoading || itemsLoading,
   };
 }

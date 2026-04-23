@@ -3,15 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useCommandCenter } from "@/hooks/useCommandCenter";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { KpiCards } from "@/components/command-center/KpiCards";
-import { VatIncomeWidgets } from "@/components/command-center/VatIncomeWidgets";
-import { CashFlowChart } from "@/components/command-center/CashFlowChart";
+import { HaviInsightBar } from "@/components/command-center/HaviInsightBar";
+import { BentoKpiGrid } from "@/components/command-center/BentoKpiGrid";
+import { ProjectsHealth } from "@/components/command-center/ProjectsHealth";
+import { SmoothCashFlow } from "@/components/command-center/SmoothCashFlow";
+import { PendingActions } from "@/components/command-center/PendingActions";
 import { UpcomingPayments } from "@/components/command-center/UpcomingPayments";
 import { SmartInbox } from "@/components/command-center/SmartInbox";
 import { ContactsList } from "@/components/command-center/ContactsList";
-import { ProjectBudgets } from "@/components/command-center/ProjectBudgets";
-import { PulseHero } from "@/components/command-center/PulseHero";
-import { Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Building2 } from "lucide-react";
 
 const CommandCenter = () => {
   const navigate = useNavigate();
@@ -30,8 +31,8 @@ const CommandCenter = () => {
   );
 
   const {
-    kpis, vatForecast, incomeForecast, monthlyData, upcomingPayments,
-    projectBudgets, contacts, invoices, company, isLoading
+    projectBudgets, contacts, invoices, monthlyData, upcomingPayments,
+    cashPosition, nextPaymentDue, peopleOnSite, activeProjectsCount, isLoading
   } = useCommandCenter(activeCompanyId);
 
   useEffect(() => {
@@ -39,6 +40,28 @@ const CommandCenter = () => {
       navigate("/onboarding", { replace: true });
     }
   }, [companies, companiesLoading, navigate]);
+
+  // Insighty dla Haviego
+  const ksefToReview = useMemo(
+    () => invoices.filter((i: any) => i.source === "ksef" && i.status === "new" && !i.project_id).length,
+    [invoices]
+  );
+  const projectsNearLimit = useMemo(
+    () =>
+      projectBudgets
+        .filter((p) => p.budget && p.spent / p.budget >= 0.8)
+        .map((p) => ({ name: p.name, pct: Math.round((p.spent / (p.budget || 1)) * 100) }))
+        .sort((a, b) => b.pct - a.pct),
+    [projectBudgets]
+  );
+  const overdueCount = useMemo(
+    () => upcomingPayments.filter((p) => p.days_until_due < 0).length,
+    [upcomingPayments]
+  );
+  const invoicesToVerify = useMemo(
+    () => invoices.filter((i: any) => i.status === "new" && i.source !== "ksef").length,
+    [invoices]
+  );
 
   if (companiesLoading) {
     return (
@@ -52,51 +75,84 @@ const CommandCenter = () => {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
-        {/* WOW hero */}
-        <PulseHero
-          companies={companies}
-          activeCompany={activeCompany}
-          activeCompanyId={activeCompanyId}
-          onChangeCompany={setActiveCompanyId}
-          profit={kpis.profit}
-          prevProfit={kpis.prevProfit}
-          revenue={kpis.revenue}
-          costs={kpis.costs}
-        />
+      <div className="p-4 md:p-6 lg:p-8 space-y-5 max-w-[1600px] mx-auto">
+        {/* Page header — minimalistyczny */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl md:text-2xl font-semibold text-foreground tracking-tight">Pulse</h1>
+            <p className="text-xs md:text-sm text-muted-foreground mt-0.5">Centrum dowodzenia Twoją firmą</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {companies && companies.length > 1 ? (
+              <Select value={activeCompanyId || ""} onValueChange={setActiveCompanyId}>
+                <SelectTrigger className="w-[200px] h-9 rounded-lg text-sm">
+                  <SelectValue placeholder="Wybierz firmę" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : activeCompany ? (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-lg">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{activeCompany.name}</span>
+                <span className="text-xs text-muted-foreground">NIP: {activeCompany.nip}</span>
+              </div>
+            ) : null}
+          </div>
+        </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center h-[40vh]">
+          <div className="flex items-center justify-center h-[60vh]">
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
           </div>
         ) : (
           <>
-            {/* Row 1: KPIs */}
-            <KpiCards kpis={kpis} />
+            {/* Havi Insight Bar */}
+            <HaviInsightBar
+              ksefToReview={ksefToReview}
+              projectsNearLimit={projectsNearLimit}
+              overduePayments={overdueCount}
+              totalDueSoon={nextPaymentDue?.totalDueSoon || 0}
+              peopleOnSite={peopleOnSite}
+              companyName={activeCompany?.name}
+            />
 
-            {/* Row 2: VAT/Income widgets + Upcoming payments */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <VatIncomeWidgets vat={vatForecast} income={incomeForecast} taxType={company?.tax_type || "liniowy"} />
-              <div className="lg:col-span-2">
-                <UpcomingPayments payments={upcomingPayments} companyId={activeCompanyId} />
-              </div>
-            </div>
+            {/* Rząd 1: Bento KPI Grid */}
+            <BentoKpiGrid
+              cash={cashPosition}
+              nextPayment={nextPaymentDue}
+              activeProjects={activeProjectsCount}
+              peopleOnSite={peopleOnSite}
+            />
 
-            {/* Row 3: Cash-flow chart + Smart Inbox */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Rząd 2: Projects Health (60%) + Cash-flow (40%) */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-5">
               <div className="lg:col-span-3">
-                <CashFlowChart data={monthlyData} />
+                <ProjectsHealth projects={projectBudgets} />
               </div>
-              <div className="lg:col-span-2">
-                <SmartInbox invoices={invoices} />
+              <div className="lg:col-span-2 flex flex-col gap-4 lg:gap-5">
+                <div className="flex-1 min-h-[280px]">
+                  <SmoothCashFlow data={monthlyData} />
+                </div>
+                <PendingActions
+                  ksefToReview={ksefToReview}
+                  overduePayments={overdueCount}
+                  invoicesToVerify={invoicesToVerify}
+                />
               </div>
             </div>
 
-            {/* Row 4: Projects + CRM Contacts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ProjectBudgets projects={projectBudgets} />
-              <ContactsList contacts={contacts} />
+            {/* Rząd 3: Płatności + Smart Inbox */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
+              <UpcomingPayments payments={upcomingPayments} companyId={activeCompanyId} />
+              <SmartInbox invoices={invoices} />
             </div>
+
+            {/* Rząd 4: Kontakty */}
+            <ContactsList contacts={contacts} />
           </>
         )}
       </div>
