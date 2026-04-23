@@ -129,6 +129,55 @@ export function useCommandCenter(companyId: string | null) {
     enabled: !!companyId,
   });
 
+  const { data: bankAccounts } = useQuery({
+    queryKey: ["cc-bank-accounts", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const { data, error } = await supabase
+        .from("bank_accounts")
+        .select("id, bank_name, last_synced_at")
+        .eq("company_id", companyId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  const { data: bankTxs } = useQuery({
+    queryKey: ["cc-bank-txs", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      const { data, error } = await supabase
+        .from("bank_transactions")
+        .select("date, amount, type")
+        .eq("company_id", companyId)
+        .gte("date", since.toISOString().slice(0, 10))
+        .order("date", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  const { data: todayAssignments } = useQuery({
+    queryKey: ["cc-today-assignments", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("assignments")
+        .select("id, employee_id, start_date, end_date")
+        .eq("company_id", companyId)
+        .lte("start_date", today)
+        .gte("end_date", today);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
   const { data: company } = useQuery({
     queryKey: ["cc-company", companyId],
     queryFn: async () => {
