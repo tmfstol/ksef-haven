@@ -648,6 +648,193 @@ export type Database = {
           },
         ]
       }
+      estimate_items: {
+        Row: {
+          catalog_id: string | null
+          cena_mat: number
+          cena_rob: number
+          created_at: string
+          estimate_id: string
+          id: string
+          ilosc: number
+          jednostka: string
+          nazwa: string
+          notes: string | null
+          ordinal: number
+          stage_id: string | null
+          updated_at: string
+          wymiary: string | null
+        }
+        Insert: {
+          catalog_id?: string | null
+          cena_mat?: number
+          cena_rob?: number
+          created_at?: string
+          estimate_id: string
+          id?: string
+          ilosc?: number
+          jednostka?: string
+          nazwa: string
+          notes?: string | null
+          ordinal?: number
+          stage_id?: string | null
+          updated_at?: string
+          wymiary?: string | null
+        }
+        Update: {
+          catalog_id?: string | null
+          cena_mat?: number
+          cena_rob?: number
+          created_at?: string
+          estimate_id?: string
+          id?: string
+          ilosc?: number
+          jednostka?: string
+          nazwa?: string
+          notes?: string | null
+          ordinal?: number
+          stage_id?: string | null
+          updated_at?: string
+          wymiary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimate_items_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "master_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimate_items_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimate_items_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimate_stages: {
+        Row: {
+          created_at: string
+          description: string | null
+          estimate_id: string
+          id: string
+          name: string
+          ordinal: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          estimate_id: string
+          id?: string
+          name: string
+          ordinal?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          estimate_id?: string
+          id?: string
+          name?: string
+          ordinal?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimate_stages_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimates: {
+        Row: {
+          branza: string
+          client_name: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          marza_material: number
+          marza_robocizna: number
+          nazwa_kosztorysu: string
+          notes: string | null
+          project_id: string | null
+          status: string
+          suma_material: number
+          suma_robocizna: number
+          updated_at: string
+        }
+        Insert: {
+          branza: string
+          client_name?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          marza_material?: number
+          marza_robocizna?: number
+          nazwa_kosztorysu: string
+          notes?: string | null
+          project_id?: string | null
+          status?: string
+          suma_material?: number
+          suma_robocizna?: number
+          updated_at?: string
+        }
+        Update: {
+          branza?: string
+          client_name?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          marza_material?: number
+          marza_robocizna?: number
+          nazwa_kosztorysu?: string
+          notes?: string | null
+          project_id?: string | null
+          status?: string
+          suma_material?: number
+          suma_robocizna?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_categories: {
         Row: {
           color: string | null
@@ -1042,6 +1229,66 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      master_catalog: {
+        Row: {
+          active: boolean
+          branza: string
+          cena_robocizny_netto: number
+          cena_zakupu_materialu: number
+          company_id: string
+          created_at: string
+          id: string
+          jednostka: string
+          kategoria: string
+          nazwa: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          branza: string
+          cena_robocizny_netto?: number
+          cena_zakupu_materialu?: number
+          company_id: string
+          created_at?: string
+          id?: string
+          jednostka?: string
+          kategoria?: string
+          nazwa: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          branza?: string
+          cena_robocizny_netto?: number
+          cena_zakupu_materialu?: number
+          company_id?: string
+          created_at?: string
+          id?: string
+          jednostka?: string
+          kategoria?: string
+          nazwa?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_catalog_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_catalog_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
             referencedColumns: ["id"]
           },
         ]
