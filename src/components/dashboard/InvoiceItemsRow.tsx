@@ -252,6 +252,23 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
                 {assignMutation.isPending && (
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 )}
+                {invoice && companyId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5"
+                    onClick={() => setSplitOpen(true)}
+                  >
+                    <Split className="h-3.5 w-3.5" />
+                    Rozdziel na projekty
+                    {splitCount > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                        {splitCount}
+                      </Badge>
+                    )}
+                  </Button>
+                )}
               </div>
             </caption>
             {/* Bookkeeper note */}
