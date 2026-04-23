@@ -109,10 +109,19 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
     for (const c of existing || []) {
       const key = c.invoice_item_id && grouped[c.invoice_item_id] ? c.invoice_item_id : "__whole__";
       if (!grouped[key]) grouped[key] = [];
+      const ln = lines.find((l) => l.key === key);
+      let qtyStr = "";
+      if (c.quantity != null && Number(c.quantity) > 0) {
+        qtyStr = String(Number(c.quantity)).replace(".", ",");
+      } else if (ln && ln.unit_gross > 0) {
+        // Backfill qty from amount/unit_price if older row had no qty
+        qtyStr = String(Number((c.gross_amount / ln.unit_gross).toFixed(4))).replace(".", ",");
+      }
       grouped[key].push({
         uid: uid(),
         project_id: c.project_id,
         amount: fmt(c.gross_amount).replace(/\s/g, ""),
+        qty: qtyStr,
         invoice_item_id: c.invoice_item_id,
         item_name: c.item_name,
       });
@@ -121,7 +130,7 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, existingLoading, itemsLoading, existing?.length, items?.length]);
 
-  const addAllocation = (lineKey: string, line: typeof lines[number], remainingForLine: number) => {
+  const addAllocation = (lineKey: string, line: typeof lines[number], remainingForLine: number, remainingQty: number) => {
     setAllocByLine((prev) => ({
       ...prev,
       [lineKey]: [
@@ -130,6 +139,10 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
           uid: uid(),
           project_id: "",
           amount: remainingForLine > 0 ? fmt(remainingForLine).replace(/\s/g, "") : "",
+          qty:
+            line.unit_gross > 0 && remainingQty > 0
+              ? String(Number(remainingQty.toFixed(4))).replace(".", ",")
+              : "",
           invoice_item_id: line.invoice_item_id,
           item_name: line.name,
         },
