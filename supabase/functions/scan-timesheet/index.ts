@@ -7,6 +7,131 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ===== Helpers do parsowania =====
+
+const MONTHS_PL: Record<string, number> = {
+  "stycznia": 1, "sty": 1, "01": 1, "1": 1,
+  "lutego": 2, "lut": 2, "02": 2, "2": 2,
+  "marca": 3, "mar": 3, "03": 3, "3": 3,
+  "kwietnia": 4, "kwi": 4, "04": 4, "4": 4,
+  "maja": 5, "maj": 5, "05": 5, "5": 5,
+  "czerwca": 6, "cze": 6, "06": 6, "6": 6,
+  "lipca": 7, "lip": 7, "07": 7, "7": 7,
+  "sierpnia": 8, "sie": 8, "08": 8, "8": 8,
+  "września": 9, "wrz": 9, "09": 9, "9": 9,
+  "października": 10, "paź": 10, "paz": 10, "10": 10,
+  "listopada": 11, "lis": 11, "11": 11,
+  "grudnia": 12, "gru": 12, "12": 12,
+};
+
+function pad(n: number) { return n < 10 ? `0${n}` : `${n}`; }
+
+function tryParseDate(s: string, fallbackYear: number): string | null {
+  // YYYY-MM-DD lub YYYY/MM/DD
+  let m = s.match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+  if (m) return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
+  // DD.MM.YYYY  /  DD-MM-YYYY  /  DD/MM/YYYY
+  m = s.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
+  if (m) {
+    const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+    return `${y}-${pad(+m[2])}-${pad(+m[1])}`;
+  }
+  // DD.MM (bez roku)
+  m = s.match(/\b(\d{1,2})[-./](\d{1,2})\b/);
+  if (m) return `${fallbackYear}-${pad(+m[2])}-${pad(+m[1])}`;
+  // "12 maja 2026" / "12 maj"
+  m = s.match(/\b(\d{1,2})\s+([A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]+)(?:\s+(\d{2,4}))?/);
+  if (m) {
+    const month = MONTHS_PL[m[2].toLowerCase()];
+    if (month) {
+      const y = m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : fallbackYear;
+      return `${y}-${pad(month)}-${pad(+m[1])}`;
+    }
+  }
+  return null;
+}
+
+function tryParseHours(s: string): number | null {
+  // "8", "8h", "8.5", "8,5", "8:30"
+  let m = s.match(/\b(\d{1,2})[:.,](\d{1,2})\s*h?\b/);
+  if (m) {
+    const h = +m[1];
+    const min = +m[2];
+    // jeśli wygląda na format godziny:minuty (min < 60) — konwertuj
+    if (min < 60 && s.includes(":")) return Math.round((h + min / 60) * 100) / 100;
+    // inaczej traktuj jak ułamek dziesiętny
+    return Math.round((h + min / 10) * 100) / 100;
+  }
+  m = s.match(/\b(\d{1,2})\s*h\b/i);
+  if (m) return +m[1];
+  m = s.match(/\b(\d{1,2})\b/);
+  if (m) {
+    const v = +m[1];
+    if (v >= 1 && v <= 24) return v;
+  }
+  return null;
+}
+
+interface ParsedRow {
+  employee_name: string;
+  work_date: string;
+  hours: number;
+  description: string;
+  confidence: "high" | "medium" | "low";
+}
+
+/**
+ * Parsuje surowy tekst OCR na wiersze.
+ * Strategia:
+ *  - dla każdej linii próbujemy znaleźć datę + godziny
+ *  - imię/nazwisko: pierwsze 2-3 słowa kapitalizowane lub fragment przed datą
+ */
+function parseTimesheetText(text: string): ParsedRow[] {
+  const year = new Date().getFullYear();
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length >= 3);
+
+  const rows: ParsedRow[] = [];
+
+  for (const line of lines) {
+    const date = tryParseDate(line, year);
+    const hours = tryParseHours(line);
+    if (!date || !hours) continue;
+
+    // Wyciągnij imię/nazwisko: weź fragment przed datą lub liczbą
+    const dateIdx = line.search(/\d{1,4}[-./]\d{1,2}/);
+    let namePart = "";
+    if (dateIdx > 0) {
+      namePart = line.substring(0, dateIdx).trim();
+    } else {
+      // przed pierwszą cyfrą
+      const numIdx = line.search(/\d/);
+      namePart = numIdx > 0 ? line.substring(0, numIdx).trim() : "";
+    }
+    namePart = namePart.replace(/[|\-•·:;,]+$/g, "").trim();
+
+    // Opis: reszta po dacie/godzinie
+    const description = line
+      .replace(namePart, "")
+      .replace(date, "")
+      .replace(/\b\d{1,2}([:.,]\d{1,2})?\s*h?\b/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    rows.push({
+      employee_name: namePart || "[?]",
+      work_date: date,
+      hours,
+      description: description || "[?]",
+      confidence: namePart && description ? "medium" : "low",
+    });
+  }
+
+  return rows;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -30,163 +155,81 @@ serve(async (req) => {
       throw new Error("Brak scan_id / file_path / company_id");
     }
 
-    // Oznacz skan jako przetwarzany
     await supabase
       .from("timesheet_scans")
       .update({ status: "processing" })
       .eq("id", scan_id);
 
-    // Pobierz plik z storage
+    // Pobierz plik
     const { data: fileData, error: dlErr } = await supabase.storage
       .from("timesheet-scans")
       .download(file_path);
     if (dlErr || !fileData) throw new Error("Nie udało się pobrać zdjęcia: " + dlErr?.message);
 
-    const arrayBuffer = await fileData.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
+    const OCR_API_KEY = Deno.env.get("OCR_SPACE_API_KEY");
+    if (!OCR_API_KEY) throw new Error("OCR_SPACE_API_KEY nie jest skonfigurowany");
 
-    // Bezpieczna konwersja do base64 (chunki, by nie przekroczyć stack size)
-    let binary = "";
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-    }
-    const base64 = btoa(binary);
-
+    // OCR.space — multipart/form-data z plikiem
     const lower = file_path.toLowerCase();
     const mimeType = lower.endsWith(".png")
       ? "image/png"
       : lower.endsWith(".webp")
       ? "image/webp"
-      : lower.endsWith(".heic") || lower.endsWith(".heif")
-      ? "image/heic"
       : "image/jpeg";
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY nie jest skonfigurowany");
+    const form = new FormData();
+    form.append("file", new Blob([await fileData.arrayBuffer()], { type: mimeType }), "scan.jpg");
+    form.append("language", "pol");
+    form.append("isOverlayRequired", "false");
+    form.append("OCREngine", "2"); // engine 2 — lepszy dla pisma odręcznego
+    form.append("scale", "true");
+    form.append("detectOrientation", "true");
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const ocrRes = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          {
-            role: "system",
-            content:
-              "Jesteś ekspertem OCR odręcznego pisma z polskich list obecności i kart pracy. " +
-              "Analizujesz zdjęcie i wyciągasz każdy wiersz z listy. " +
-              "Każdy wiersz to jeden wpis: pracownik, data, liczba godzin, opis (np. nazwa budowy, lokalizacja, zadanie). " +
-              "Jeśli dany wiersz zawiera kilka dni w tabeli tygodniowej — rozwiń go na osobne wpisy (jeden wiersz per dzień z godzinami > 0). " +
-              "Jeśli pole jest nieczytelne, zwróć dokładnie '[?]'. " +
-              "Daty zwracaj w formacie YYYY-MM-DD. Jeśli na kartce jest tylko dzień/miesiąc, użyj bieżącego roku. " +
-              "Godziny zwracaj jako liczbę (np. 8, 7.5, 10). " +
-              "Zwróć dane wyłącznie przez wywołanie funkcji extract_timesheet.",
-          },
-          {
-            role: "user",
-            content: [
-              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
-              {
-                type: "text",
-                text:
-                  "Odczytaj tę kartę pracy / listę obecności i zwróć wszystkie wiersze z godzinami. " +
-                  "Dla każdego wiersza podaj: employee_name, work_date (YYYY-MM-DD), hours (number), description. " +
-                  "Jeśli czegoś nie możesz odczytać — użyj [?].",
-              },
-            ],
-          },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "extract_timesheet",
-              description: "Zwraca wiersze listy obecności odczytane ze zdjęcia",
-              parameters: {
-                type: "object",
-                properties: {
-                  rows: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        employee_name: { type: "string" },
-                        work_date: { type: "string" },
-                        hours: { type: "number" },
-                        description: { type: "string" },
-                        confidence: {
-                          type: "string",
-                          enum: ["high", "medium", "low"],
-                        },
-                      },
-                      required: ["employee_name", "work_date", "hours", "description"],
-                      additionalProperties: false,
-                    },
-                  },
-                  notes: { type: "string", description: "Dodatkowe uwagi od AI (opcjonalne)" },
-                },
-                required: ["rows"],
-                additionalProperties: false,
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "extract_timesheet" } },
-      }),
+      headers: { apikey: OCR_API_KEY },
+      body: form,
     });
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      if (aiResponse.status === 429) {
-        await supabase.from("timesheet_scans").update({
-          status: "failed",
-          error_message: "Limit zapytań AI osiągnięty. Spróbuj ponownie za chwilę.",
-        }).eq("id", scan_id);
-        return new Response(
-          JSON.stringify({ error: "Rate limit — spróbuj ponownie za chwilę" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      if (aiResponse.status === 402) {
-        await supabase.from("timesheet_scans").update({
-          status: "failed",
-          error_message: "Brak środków na AI. Doładuj workspace w Lovable Cloud.",
-        }).eq("id", scan_id);
-        return new Response(
-          JSON.stringify({ error: "Brak środków — doładuj workspace" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      throw new Error("AI gateway error: " + errText);
+    if (!ocrRes.ok) {
+      const errText = await ocrRes.text();
+      throw new Error(`OCR.space błąd ${ocrRes.status}: ${errText.slice(0, 200)}`);
     }
 
-    const aiJson = await aiResponse.json();
-    const toolCall = aiJson?.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("AI nie zwróciło danych — spróbuj zrobić wyraźniejsze zdjęcie");
-
-    let parsed: { rows: Array<{ employee_name: string; work_date: string; hours: number; description: string; confidence?: string }>; notes?: string };
-    try {
-      parsed = JSON.parse(toolCall.function.arguments);
-    } catch {
-      throw new Error("AI zwróciło nieprawidłowy format");
+    const ocrJson = await ocrRes.json();
+    if (ocrJson.IsErroredOnProcessing) {
+      const msg = Array.isArray(ocrJson.ErrorMessage)
+        ? ocrJson.ErrorMessage.join("; ")
+        : (ocrJson.ErrorMessage || "Nieznany błąd OCR");
+      throw new Error("OCR błąd: " + msg);
     }
 
-    // Aktualizuj skan
+    const rawText: string = (ocrJson.ParsedResults ?? [])
+      .map((r: any) => r.ParsedText ?? "")
+      .join("\n")
+      .trim();
+
+    const rows = parseTimesheetText(rawText);
+
+    const parsed = {
+      rows,
+      notes: rows.length === 0
+        ? "OCR nie znalazł wierszy z datą i godzinami — sprawdź jakość zdjęcia lub uzupełnij ręcznie."
+        : `Rozpoznano ${rows.length} wierszy z surowego tekstu OCR.`,
+      raw_text: rawText,
+    };
+
     await supabase
       .from("timesheet_scans")
       .update({
         status: "completed",
         ai_response: parsed,
-        rows_count: parsed.rows?.length ?? 0,
+        rows_count: rows.length,
       })
       .eq("id", scan_id);
 
     return new Response(
-      JSON.stringify({ ok: true, rows: parsed.rows ?? [], notes: parsed.notes ?? null }),
+      JSON.stringify({ ok: true, rows, notes: parsed.notes, raw_text: rawText }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
