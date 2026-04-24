@@ -7,133 +7,34 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ===== Helpers do parsowania =====
+const SYSTEM_PROMPT = `Jesteś ekspertem od odczytywania polskich kart pracy (timesheet'ów) ze zdjęć.
 
-const MONTHS_PL: Record<string, number> = {
-  "stycznia": 1, "sty": 1, "01": 1, "1": 1,
-  "lutego": 2, "lut": 2, "02": 2, "2": 2,
-  "marca": 3, "mar": 3, "03": 3, "3": 3,
-  "kwietnia": 4, "kwi": 4, "04": 4, "4": 4,
-  "maja": 5, "maj": 5, "05": 5, "5": 5,
-  "czerwca": 6, "cze": 6, "06": 6, "6": 6,
-  "lipca": 7, "lip": 7, "07": 7, "7": 7,
-  "sierpnia": 8, "sie": 8, "08": 8, "8": 8,
-  "września": 9, "wrz": 9, "09": 9, "9": 9,
-  "października": 10, "paź": 10, "paz": 10, "10": 10,
-  "listopada": 11, "lis": 11, "11": 11,
-  "grudnia": 12, "gru": 12, "12": 12,
-};
+Karta pracy zazwyczaj zawiera:
+- Imię i nazwisko pracownika (zwykle u góry)
+- Miesiąc i rok (np. "marzec 2026", "..2026")
+- Tabelę z dniami miesiąca (1-31) w jednej kolumnie
+- Godziny pracy "od-do" w drugiej kolumnie (np. "8:00 - 20:00", "800 - 2000")
+- Czasem dodatkowo miejsce pracy / projekt / pauzę
+- Suma godzin dziennie
 
-function pad(n: number) { return n < 10 ? `0${n}` : `${n}`; }
+Twoje zadanie:
+1. Rozpoznaj imię i nazwisko pracownika (jedno na całą kartę).
+2. Rozpoznaj miesiąc i rok karty.
+3. Dla KAŻDEGO dnia, w którym są wpisane godziny, utwórz osobny wiersz:
+   - work_date w formacie YYYY-MM-DD (na podstawie dnia + miesiąca + roku karty)
+   - hours: liczba przepracowanych godzin (od-do, np. 8:00-20:00 = 12h)
+   - description: miejsce pracy / projekt jeśli widoczne, inaczej puste
+   - employee_name: imię i nazwisko pracownika
+4. POMIŃ dni puste, dni z kreską "-", dni wolne.
+5. Jeśli widzisz "800 - 2000" to znaczy 8:00 - 20:00 (12 godzin). "800 - 17°°" = 8:00-17:00 (9h).
+6. Jeśli nie jesteś pewien wartości — użyj confidence "low" i wpisz najlepszą propozycję.
 
-function tryParseDate(s: string, fallbackYear: number): string | null {
-  // YYYY-MM-DD lub YYYY/MM/DD
-  let m = s.match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
-  if (m) return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
-  // DD.MM.YYYY  /  DD-MM-YYYY  /  DD/MM/YYYY
-  m = s.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
-  if (m) {
-    const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
-    return `${y}-${pad(+m[2])}-${pad(+m[1])}`;
-  }
-  // DD.MM (bez roku)
-  m = s.match(/\b(\d{1,2})[-./](\d{1,2})\b/);
-  if (m) return `${fallbackYear}-${pad(+m[2])}-${pad(+m[1])}`;
-  // "12 maja 2026" / "12 maj"
-  m = s.match(/\b(\d{1,2})\s+([A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]+)(?:\s+(\d{2,4}))?/);
-  if (m) {
-    const month = MONTHS_PL[m[2].toLowerCase()];
-    if (month) {
-      const y = m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : fallbackYear;
-      return `${y}-${pad(month)}-${pad(+m[1])}`;
-    }
-  }
-  return null;
-}
-
-function tryParseHours(s: string): number | null {
-  // "8", "8h", "8.5", "8,5", "8:30"
-  let m = s.match(/\b(\d{1,2})[:.,](\d{1,2})\s*h?\b/);
-  if (m) {
-    const h = +m[1];
-    const min = +m[2];
-    // jeśli wygląda na format godziny:minuty (min < 60) — konwertuj
-    if (min < 60 && s.includes(":")) return Math.round((h + min / 60) * 100) / 100;
-    // inaczej traktuj jak ułamek dziesiętny
-    return Math.round((h + min / 10) * 100) / 100;
-  }
-  m = s.match(/\b(\d{1,2})\s*h\b/i);
-  if (m) return +m[1];
-  m = s.match(/\b(\d{1,2})\b/);
-  if (m) {
-    const v = +m[1];
-    if (v >= 1 && v <= 24) return v;
-  }
-  return null;
-}
-
-interface ParsedRow {
-  employee_name: string;
-  work_date: string;
-  hours: number;
-  description: string;
-  confidence: "high" | "medium" | "low";
-}
-
-/**
- * Parsuje surowy tekst OCR na wiersze.
- * Strategia:
- *  - dla każdej linii próbujemy znaleźć datę + godziny
- *  - imię/nazwisko: pierwsze 2-3 słowa kapitalizowane lub fragment przed datą
- */
-function parseTimesheetText(text: string): ParsedRow[] {
-  const year = new Date().getFullYear();
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length >= 3);
-
-  const rows: ParsedRow[] = [];
-
-  for (const line of lines) {
-    const date = tryParseDate(line, year);
-    const hours = tryParseHours(line);
-    if (!date || !hours) continue;
-
-    // Wyciągnij imię/nazwisko: weź fragment przed datą lub liczbą
-    const dateIdx = line.search(/\d{1,4}[-./]\d{1,2}/);
-    let namePart = "";
-    if (dateIdx > 0) {
-      namePart = line.substring(0, dateIdx).trim();
-    } else {
-      // przed pierwszą cyfrą
-      const numIdx = line.search(/\d/);
-      namePart = numIdx > 0 ? line.substring(0, numIdx).trim() : "";
-    }
-    namePart = namePart.replace(/[|\-•·:;,]+$/g, "").trim();
-
-    // Opis: reszta po dacie/godzinie
-    const description = line
-      .replace(namePart, "")
-      .replace(date, "")
-      .replace(/\b\d{1,2}([:.,]\d{1,2})?\s*h?\b/i, "")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    rows.push({
-      employee_name: namePart || "[?]",
-      work_date: date,
-      hours,
-      description: description || "[?]",
-      confidence: namePart && description ? "medium" : "low",
-    });
-  }
-
-  return rows;
-}
+Zwróć dane przez wywołanie funkcji extract_timesheet.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  let scanIdForError: string | null = null;
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -154,6 +55,7 @@ serve(async (req) => {
     if (!scan_id || !file_path || !company_id) {
       throw new Error("Brak scan_id / file_path / company_id");
     }
+    scanIdForError = scan_id;
 
     await supabase
       .from("timesheet_scans")
@@ -166,10 +68,10 @@ serve(async (req) => {
       .download(file_path);
     if (dlErr || !fileData) throw new Error("Nie udało się pobrać zdjęcia: " + dlErr?.message);
 
-    const OCR_API_KEY = Deno.env.get("OCR_SPACE_API_KEY");
-    if (!OCR_API_KEY) throw new Error("OCR_SPACE_API_KEY nie jest skonfigurowany");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY nie jest skonfigurowany");
 
-    // OCR.space — multipart/form-data z plikiem
+    // Konwersja zdjęcia do base64 data URL
     const lower = file_path.toLowerCase();
     const mimeType = lower.endsWith(".png")
       ? "image/png"
@@ -177,67 +79,145 @@ serve(async (req) => {
       ? "image/webp"
       : "image/jpeg";
 
-    const form = new FormData();
-    form.append("file", new Blob([await fileData.arrayBuffer()], { type: mimeType }), "scan.jpg");
-    form.append("language", "pol");
-    form.append("isOverlayRequired", "false");
-    form.append("OCREngine", "2"); // engine 2 — lepszy dla pisma odręcznego
-    form.append("scale", "true");
-    form.append("detectOrientation", "true");
+    const arrayBuffer = await fileData.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize) as unknown as number[]);
+    }
+    const base64 = btoa(binary);
+    const dataUrl = `data:${mimeType};base64,${base64}`;
 
-    const ocrRes = await fetch("https://api.ocr.space/parse/image", {
+    // Wywołanie Lovable AI Gateway (Gemini 2.5 Pro — najlepszy do złożonych obrazów)
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { apikey: OCR_API_KEY },
-      body: form,
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-pro",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Odczytaj tę kartę pracy i zwróć wszystkie dni z godzinami." },
+              { type: "image_url", image_url: { url: dataUrl } },
+            ],
+          },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "extract_timesheet",
+              description: "Zwraca rozpoznane wiersze karty pracy.",
+              parameters: {
+                type: "object",
+                properties: {
+                  employee_name: {
+                    type: "string",
+                    description: "Imię i nazwisko pracownika z nagłówka karty.",
+                  },
+                  month: {
+                    type: "integer",
+                    description: "Numer miesiąca 1-12.",
+                  },
+                  year: {
+                    type: "integer",
+                    description: "Rok 4-cyfrowy.",
+                  },
+                  rows: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        employee_name: { type: "string" },
+                        work_date: { type: "string", description: "YYYY-MM-DD" },
+                        hours: { type: "number" },
+                        description: { type: "string" },
+                        confidence: { type: "string", enum: ["high", "medium", "low"] },
+                      },
+                      required: ["employee_name", "work_date", "hours", "confidence"],
+                      additionalProperties: false,
+                    },
+                  },
+                  notes: { type: "string", description: "Krótka notatka o jakości / brakach." },
+                },
+                required: ["employee_name", "rows"],
+                additionalProperties: false,
+              },
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "extract_timesheet" } },
+      }),
     });
 
-    if (!ocrRes.ok) {
-      const errText = await ocrRes.text();
-      throw new Error(`OCR.space błąd ${ocrRes.status}: ${errText.slice(0, 200)}`);
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      if (aiRes.status === 429) {
+        throw new Error("Zbyt wiele zapytań — spróbuj za chwilę.");
+      }
+      if (aiRes.status === 402) {
+        throw new Error("Brak środków — doładuj workspace w Lovable Cloud.");
+      }
+      throw new Error(`AI Gateway błąd ${aiRes.status}: ${errText.slice(0, 300)}`);
     }
 
-    const ocrJson = await ocrRes.json();
-    if (ocrJson.IsErroredOnProcessing) {
-      const msg = Array.isArray(ocrJson.ErrorMessage)
-        ? ocrJson.ErrorMessage.join("; ")
-        : (ocrJson.ErrorMessage || "Nieznany błąd OCR");
-      throw new Error("OCR błąd: " + msg);
+    const aiJson = await aiRes.json();
+    const toolCall = aiJson?.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall) {
+      throw new Error("AI nie zwróciło struktury (brak tool_call). Surowa odpowiedź: " + JSON.stringify(aiJson).slice(0, 300));
     }
 
-    const rawText: string = (ocrJson.ParsedResults ?? [])
-      .map((r: any) => r.ParsedText ?? "")
-      .join("\n")
-      .trim();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(toolCall.function.arguments);
+    } catch (e) {
+      throw new Error("Nie udało się sparsować odpowiedzi AI: " + (e as Error).message);
+    }
 
-    const rows = parseTimesheetText(rawText);
+    // Normalizacja: upewnij się że każdy wiersz ma employee_name
+    const employeeName = parsed.employee_name || "[nieznany]";
+    const rows = (parsed.rows ?? []).map((r: any) => ({
+      employee_name: r.employee_name || employeeName,
+      work_date: r.work_date,
+      hours: Number(r.hours) || 0,
+      description: r.description || "",
+      confidence: r.confidence || "medium",
+    })).filter((r: any) => r.work_date && r.hours > 0);
 
-    const parsed = {
+    const finalResponse = {
+      employee_name: employeeName,
+      month: parsed.month,
+      year: parsed.year,
       rows,
-      notes: rows.length === 0
-        ? "OCR nie znalazł wierszy z datą i godzinami — sprawdź jakość zdjęcia lub uzupełnij ręcznie."
-        : `Rozpoznano ${rows.length} wierszy z surowego tekstu OCR.`,
-      raw_text: rawText,
+      notes: parsed.notes ?? (rows.length === 0
+        ? "AI nie wykryło żadnych dni z godzinami — sprawdź jakość zdjęcia."
+        : `Rozpoznano ${rows.length} dni pracy dla ${employeeName}.`),
     };
 
     await supabase
       .from("timesheet_scans")
       .update({
         status: "completed",
-        ai_response: parsed,
+        ai_response: finalResponse,
         rows_count: rows.length,
       })
       .eq("id", scan_id);
 
     return new Response(
-      JSON.stringify({ ok: true, rows, notes: parsed.notes, raw_text: rawText }),
+      JSON.stringify({ ok: true, ...finalResponse }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
     console.error("scan-timesheet error:", e);
     const msg = e instanceof Error ? e.message : "Nieznany błąd";
-    try {
-      const bodyCopy = await req.clone().json().catch(() => null);
-      if (bodyCopy?.scan_id) {
+    if (scanIdForError) {
+      try {
         const supabase = createClient(
           Deno.env.get("SUPABASE_URL")!,
           Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -245,9 +225,9 @@ serve(async (req) => {
         await supabase
           .from("timesheet_scans")
           .update({ status: "failed", error_message: msg })
-          .eq("id", bodyCopy.scan_id);
-      }
-    } catch { /* ignore */ }
+          .eq("id", scanIdForError);
+      } catch { /* ignore */ }
+    }
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
