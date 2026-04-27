@@ -310,22 +310,39 @@ function stripPrefix(key: string): string {
 }
 
 /**
- * Generate QR code URL for KSeF verification.
- * Oficjalny format MF (PROD):
- *   https://ksef.mf.gov.pl/client-app/invoice/{NumerKSeF}/{KodWeryfikujacy}
- * gdzie KodWeryfikujacy = Base64URL( SHA-256( XML faktury ) ).
+ * Generate QR code URL (KOD I) zgodnie ze specyfikacją MF KSeF 2.0.
+ * Oficjalny format:
+ *   {baseUrl}/invoice/{NIP_sprzedawcy}/{DD-MM-YYYY}/{hash_base64url}
+ * gdzie hash_base64url = Base64URL( SHA-256( XML faktury ) ).
+ *
+ * Środowisko produkcyjne MF: https://ksef.podatki.gov.pl/client-app
+ * (środowisko testowe: https://ksef-test.mf.gov.pl/client-app)
  */
-async function generateKsefQrUrl(ksefNumber: string, xmlString: string): Promise<string> {
+async function generateKsefQrUrl(
+  xmlString: string,
+  nipSprzedawcy: string,
+  dataWystawienia: string,
+): Promise<string> {
+  // SHA-256 z XML faktury
   const data = new TextEncoder().encode(xmlString);
   const hashBuf = await crypto.subtle.digest("SHA-256", data);
   const bytes = new Uint8Array(hashBuf);
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  const base64Url = btoa(bin)
+  const hashBase64Url = btoa(bin)
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
-  return `https://ksef.mf.gov.pl/client-app/invoice/${ksefNumber}/${base64Url}`;
+
+  // Format daty: DD-MM-YYYY (z YYYY-MM-DD wg pola P_1)
+  const cleanNip = (nipSprzedawcy || "").replace(/[^0-9]/g, "");
+  let dateFormatted = dataWystawienia || "";
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateFormatted);
+  if (isoMatch) {
+    dateFormatted = `${isoMatch[3]}-${isoMatch[2]}-${isoMatch[1]}`;
+  }
+
+  return `https://ksef.podatki.gov.pl/client-app/invoice/${cleanNip}/${dateFormatted}/${hashBase64Url}`;
 }
 
 async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Promise<string> {
@@ -343,7 +360,23 @@ async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Pro
 
   const invoice = jsonDoc.Faktura;
   const wersja = invoice?.Naglowek?.KodFormularza?._attributes?.kodSystemowy;
-  const qrUrl = await generateKsefQrUrl(ksefNumber, xmlString);
+
+  // NIP sprzedawcy z Podmiot1 → DaneIdentyfikacyjne → NIP
+  const nipSprzedawcy =
+    invoice?.Podmiot1?.DaneIdentyfikacyjne?.NIP?._text ||
+    invoice?.Podmiot1?.DaneIdentyfikacyjne?.NIP ||
+    "";
+  // Data wystawienia: FA → P_1 (YYYY-MM-DD)
+  const dataWystawienia =
+    invoice?.Fa?.P_1?._text ||
+    invoice?.Fa?.P_1 ||
+    "";
+
+  const qrUrl = await generateKsefQrUrl(
+    xmlString,
+    String(nipSprzedawcy),
+    String(dataWystawienia),
+  );
 
   const additionalData = {
     nrKSeF: ksefNumber,
