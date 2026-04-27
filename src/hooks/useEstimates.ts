@@ -16,6 +16,18 @@ export interface Estimate {
   notes: string | null;
   suma_material: number;
   suma_robocizna: number;
+  suma_sprzet: number;
+  // KNR / Norma PRO
+  inwestor_nazwa: string | null;
+  inwestor_adres: string | null;
+  wykonawca_nazwa: string | null;
+  wykonawca_adres: string | null;
+  lokalizacja_obiektu: string | null;
+  podstawa_opracowania: string | null;
+  narzut_kp_proc: number;     // koszty pośrednie (od R+S)
+  narzut_zysk_proc: number;   // zysk (od R+S+Kp)
+  vat_proc: number;
+  data_kosztorysu: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -39,8 +51,20 @@ export interface EstimateItem {
   ilosc: number;
   cena_mat: number;
   cena_rob: number;
+  cena_sprz: number;
   wymiary: string | null;
   notes: string | null;
+  // KNR
+  knr_number: string | null;
+  opis_pelny: string | null;
+  naklad_robocizny: number;  // r-g / jm
+  naklad_materialu: number;  // jm mat / jm rob
+  naklad_sprzetu: number;    // m-g / jm
+  stawka_rg: number;
+  // Wartości obliczone (denormalizacja, do RMS)
+  wartosc_r: number;
+  wartosc_m: number;
+  wartosc_s: number;
 }
 
 export function useEstimates(companyId: string | null) {
@@ -226,7 +250,17 @@ export function useAddItem() {
         ilosc: item.ilosc ?? 1,
         cena_mat: item.cena_mat ?? 0,
         cena_rob: item.cena_rob ?? 0,
+        cena_sprz: item.cena_sprz ?? 0,
         wymiary: item.wymiary ?? null,
+        knr_number: item.knr_number ?? null,
+        opis_pelny: item.opis_pelny ?? null,
+        naklad_robocizny: item.naklad_robocizny ?? 0,
+        naklad_materialu: item.naklad_materialu ?? 1,
+        naklad_sprzetu: item.naklad_sprzetu ?? 0,
+        stawka_rg: item.stawka_rg ?? 25,
+        wartosc_r: item.wartosc_r ?? 0,
+        wartosc_m: item.wartosc_m ?? 0,
+        wartosc_s: item.wartosc_s ?? 0,
       }).select("*").single();
       if (error) throw error;
       return data as unknown as EstimateItem;
