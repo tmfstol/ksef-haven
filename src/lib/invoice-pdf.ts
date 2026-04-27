@@ -310,11 +310,22 @@ function stripPrefix(key: string): string {
 }
 
 /**
- * Generate QR code URL for KSeF verification
- * Format: https://ksef.mf.gov.pl/web/verify/{ksefNumber}/{checksum}
+ * Generate QR code URL for KSeF verification.
+ * Oficjalny format MF (PROD):
+ *   https://ksef.mf.gov.pl/client-app/invoice/{NumerKSeF}/{KodWeryfikujacy}
+ * gdzie KodWeryfikujacy = Base64URL( SHA-256( XML faktury ) ).
  */
-function generateKsefQrUrl(ksefNumber: string): string {
-  return `https://ksef.mf.gov.pl/web/verify/${ksefNumber}`;
+async function generateKsefQrUrl(ksefNumber: string, xmlString: string): Promise<string> {
+  const data = new TextEncoder().encode(xmlString);
+  const hashBuf = await crypto.subtle.digest("SHA-256", data);
+  const bytes = new Uint8Array(hashBuf);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  const base64Url = btoa(bin)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  return `https://ksef.mf.gov.pl/client-app/invoice/${ksefNumber}/${base64Url}`;
 }
 
 async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Promise<string> {
@@ -332,7 +343,7 @@ async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Pro
 
   const invoice = jsonDoc.Faktura;
   const wersja = invoice?.Naglowek?.KodFormularza?._attributes?.kodSystemowy;
-  const qrUrl = generateKsefQrUrl(ksefNumber);
+  const qrUrl = await generateKsefQrUrl(ksefNumber, xmlString);
 
   const additionalData = {
     nrKSeF: ksefNumber,
