@@ -310,13 +310,17 @@ function stripPrefix(key: string): string {
 }
 
 /**
- * Generate QR code URL (KOD I) zgodnie ze specyfikacją MF KSeF 2.0.
- * Oficjalny format:
- *   {baseUrl}/invoice/{NIP_sprzedawcy}/{DD-MM-YYYY}/{hash_base64url}
+ * Generate QR code URL (KOD I) zgodnie z oficjalną specyfikacją MF KSeF 2.0.
+ * Źródło: https://github.com/CIRFMF/ksef-docs/blob/main/kody-qr.md
+ *
+ * Format:
+ *   {baseUrl}/invoice/{NIP_sprzedawcy}/{DD-MM-RRRR}/{hash_base64url}
  * gdzie hash_base64url = Base64URL( SHA-256( XML faktury ) ).
  *
- * Środowisko produkcyjne MF: https://ksef.podatki.gov.pl/client-app
- * (środowisko testowe: https://ksef-test.mf.gov.pl/client-app)
+ * Środowiska:
+ *   PRD  -> https://qr.ksef.mf.gov.pl
+ *   DEMO -> https://qr-demo.ksef.mf.gov.pl
+ *   TE   -> https://qr-test.ksef.mf.gov.pl
  */
 async function generateKsefQrUrl(
   xmlString: string,
@@ -334,7 +338,7 @@ async function generateKsefQrUrl(
     .replace(/\//g, "_")
     .replace(/=+$/, "");
 
-  // Format daty: DD-MM-YYYY (z YYYY-MM-DD wg pola P_1)
+  // Format daty: DD-MM-RRRR (z YYYY-MM-DD wg pola P_1)
   const cleanNip = (nipSprzedawcy || "").replace(/[^0-9]/g, "");
   let dateFormatted = dataWystawienia || "";
   const isoMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateFormatted);
@@ -342,7 +346,7 @@ async function generateKsefQrUrl(
     dateFormatted = `${isoMatch[3]}-${isoMatch[2]}-${isoMatch[1]}`;
   }
 
-  return `https://ksef.podatki.gov.pl/client-app/invoice/${cleanNip}/${dateFormatted}/${hashBase64Url}`;
+  return `https://qr.ksef.mf.gov.pl/invoice/${cleanNip}/${dateFormatted}/${hashBase64Url}`;
 }
 
 async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Promise<string> {
