@@ -15,12 +15,6 @@ import { cn } from "@/lib/utils";
 const BRANZE: Branza[] = ["Budowlanka", "Instalacje", "Meble"];
 const JEDNOSTKI = ["szt", "m2", "m3", "mb", "godz", "kpl", "kg", "l", "punkt"];
 
-const branzaColor: Record<Branza, string> = {
-  Budowlanka: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  Instalacje: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  Meble: "bg-violet-500/10 text-violet-600 border-violet-500/20",
-};
-
 const Catalog = () => {
   const navigate = useNavigate();
   const { data: companies } = useCompanies();
@@ -39,7 +33,11 @@ const Catalog = () => {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return catalog;
-    return catalog.filter((i) => i.nazwa.toLowerCase().includes(q) || i.kategoria.toLowerCase().includes(q));
+    return catalog.filter((i) =>
+      i.nazwa.toLowerCase().includes(q) ||
+      i.kategoria.toLowerCase().includes(q) ||
+      (i.knr_number ?? "").toLowerCase().includes(q)
+    );
   }, [catalog, search]);
 
   const updateField = (item: CatalogItem, field: keyof CatalogItem, value: any) => {
@@ -56,6 +54,14 @@ const Catalog = () => {
       jednostka: "szt",
       cena_zakupu_materialu: 0,
       cena_robocizny_netto: 0,
+      cena_sprzetu_netto: 0,
+      knr_number: null,
+      knr_chapter: null,
+      opis_pelny: null,
+      naklad_robocizny: 0,
+      naklad_materialu: 1,
+      naklad_sprzetu: 0,
+      stawka_rg: 32,
     });
   };
 
@@ -71,8 +77,8 @@ const Catalog = () => {
               <Calculator className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Cennik bazowy</h1>
-              <p className="text-sm text-muted-foreground">Master Catalog — stawki i ceny dla kosztorysów</p>
+              <h1 className="text-2xl font-semibold tracking-tight">Cennik bazowy KNR</h1>
+              <p className="text-sm text-muted-foreground">Katalog Nakładów Rzeczowych — nakłady R / M / S per pozycja</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -88,7 +94,7 @@ const Catalog = () => {
               disabled={!companyId || seed.isPending}
             >
               <Download className="h-4 w-4 mr-2" />
-              Importuj przykładowe
+              Importuj bazę KNR
             </Button>
             <Button onClick={addNew} disabled={!companyId}>
               <Plus className="h-4 w-4 mr-2" />
@@ -101,7 +107,7 @@ const Catalog = () => {
           <div className="flex items-center gap-3 mb-4 flex-wrap">
             <div className="relative flex-1 min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Szukaj nazwy lub kategorii..." className="pl-9" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Szukaj po nazwie, kategorii lub numerze KNR..." className="pl-9" />
             </div>
             <div className="flex items-center gap-1 p-1 rounded-lg bg-muted">
               <button
@@ -125,7 +131,7 @@ const Catalog = () => {
             <div className="text-center py-16 text-muted-foreground">
               <p className="mb-3">Brak pozycji w cenniku.</p>
               <Button variant="outline" onClick={() => companyId && seed.mutate(companyId)} disabled={!companyId}>
-                <Download className="h-4 w-4 mr-2" />Importuj przykładowe dane
+                <Download className="h-4 w-4 mr-2" />Importuj bazę KNR
               </Button>
             </div>
           ) : (
@@ -133,12 +139,15 @@ const Catalog = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[140px]">Nr KNR</TableHead>
                     <TableHead className="w-[110px]">Branża</TableHead>
-                    <TableHead className="w-[160px]">Kategoria</TableHead>
                     <TableHead>Nazwa</TableHead>
-                    <TableHead className="w-[90px]">J.m.</TableHead>
-                    <TableHead className="w-[130px] text-right">Cena materiału</TableHead>
-                    <TableHead className="w-[130px] text-right">Cena robocizny</TableHead>
+                    <TableHead className="w-[70px]">J.m.</TableHead>
+                    <TableHead className="w-[80px] text-right">Nakł. R (r-g)</TableHead>
+                    <TableHead className="w-[90px] text-right">Stawka R (zł/r-g)</TableHead>
+                    <TableHead className="w-[90px] text-right">Cena M (zł/jm)</TableHead>
+                    <TableHead className="w-[80px] text-right">Nakł. S (m-g)</TableHead>
+                    <TableHead className="w-[90px] text-right">Cena S (zł/m-g)</TableHead>
                     <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -146,19 +155,20 @@ const Catalog = () => {
                   {filtered.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
+                        <Input
+                          defaultValue={item.knr_number ?? ""}
+                          placeholder="KNR ..."
+                          onBlur={(e) => e.target.value !== (item.knr_number ?? "") && updateField(item, "knr_number", e.target.value || null)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </TableCell>
+                      <TableCell>
                         <Select value={item.branza} onValueChange={(v) => updateField(item, "branza", v as Branza)}>
                           <SelectTrigger className="h-8 px-2"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {BRANZE.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          defaultValue={item.kategoria}
-                          onBlur={(e) => e.target.value !== item.kategoria && updateField(item, "kategoria", e.target.value)}
-                          className="h-8"
-                        />
                       </TableCell>
                       <TableCell>
                         <Input
@@ -175,28 +185,11 @@ const Catalog = () => {
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number" step="0.01"
-                          defaultValue={item.cena_zakupu_materialu}
-                          onBlur={(e) => {
-                            const v = parseFloat(e.target.value) || 0;
-                            if (v !== item.cena_zakupu_materialu) updateField(item, "cena_zakupu_materialu", v);
-                          }}
-                          className="h-8 text-right"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number" step="0.01"
-                          defaultValue={item.cena_robocizny_netto}
-                          onBlur={(e) => {
-                            const v = parseFloat(e.target.value) || 0;
-                            if (v !== item.cena_robocizny_netto) updateField(item, "cena_robocizny_netto", v);
-                          }}
-                          className="h-8 text-right"
-                        />
-                      </TableCell>
+                      <NumCell value={item.naklad_robocizny} onChange={(v) => updateField(item, "naklad_robocizny", v)} />
+                      <NumCell value={item.stawka_rg} onChange={(v) => updateField(item, "stawka_rg", v)} />
+                      <NumCell value={item.cena_zakupu_materialu} onChange={(v) => updateField(item, "cena_zakupu_materialu", v)} />
+                      <NumCell value={item.naklad_sprzetu} onChange={(v) => updateField(item, "naklad_sprzetu", v)} />
+                      <NumCell value={item.cena_sprzetu_netto} onChange={(v) => updateField(item, "cena_sprzetu_netto", v)} />
                       <TableCell>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => del.mutate(item.id)}>
                           <Trash2 className="h-4 w-4" />
@@ -213,5 +206,19 @@ const Catalog = () => {
     </AppLayout>
   );
 };
+
+const NumCell = ({ value, onChange }: { value: number; onChange: (v: number) => void }) => (
+  <TableCell>
+    <Input
+      type="number" step="0.01"
+      defaultValue={value}
+      onBlur={(e) => {
+        const v = parseFloat(e.target.value) || 0;
+        if (v !== value) onChange(v);
+      }}
+      className="h-8 text-right tabular-nums"
+    />
+  </TableCell>
+);
 
 export default Catalog;
