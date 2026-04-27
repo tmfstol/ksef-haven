@@ -343,7 +343,7 @@ async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Pro
 
   const invoice = jsonDoc.Faktura;
   const wersja = invoice?.Naglowek?.KodFormularza?._attributes?.kodSystemowy;
-  const qrUrl = generateKsefQrUrl(ksefNumber);
+  const qrUrl = await generateKsefQrUrl(ksefNumber, xmlString);
 
   const additionalData = {
     nrKSeF: ksefNumber,
