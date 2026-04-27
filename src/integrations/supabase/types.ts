@@ -712,48 +712,78 @@ export type Database = {
           catalog_id: string | null
           cena_mat: number
           cena_rob: number
+          cena_sprz: number
           created_at: string
           estimate_id: string
           id: string
           ilosc: number
           jednostka: string
+          knr_number: string | null
+          naklad_materialu: number
+          naklad_robocizny: number
+          naklad_sprzetu: number
           nazwa: string
           notes: string | null
+          opis_pelny: string | null
           ordinal: number
           stage_id: string | null
+          stawka_rg: number
           updated_at: string
+          wartosc_m: number
+          wartosc_r: number
+          wartosc_s: number
           wymiary: string | null
         }
         Insert: {
           catalog_id?: string | null
           cena_mat?: number
           cena_rob?: number
+          cena_sprz?: number
           created_at?: string
           estimate_id: string
           id?: string
           ilosc?: number
           jednostka?: string
+          knr_number?: string | null
+          naklad_materialu?: number
+          naklad_robocizny?: number
+          naklad_sprzetu?: number
           nazwa: string
           notes?: string | null
+          opis_pelny?: string | null
           ordinal?: number
           stage_id?: string | null
+          stawka_rg?: number
           updated_at?: string
+          wartosc_m?: number
+          wartosc_r?: number
+          wartosc_s?: number
           wymiary?: string | null
         }
         Update: {
           catalog_id?: string | null
           cena_mat?: number
           cena_rob?: number
+          cena_sprz?: number
           created_at?: string
           estimate_id?: string
           id?: string
           ilosc?: number
           jednostka?: string
+          knr_number?: string | null
+          naklad_materialu?: number
+          naklad_robocizny?: number
+          naklad_sprzetu?: number
           nazwa?: string
           notes?: string | null
+          opis_pelny?: string | null
           ordinal?: number
           stage_id?: string | null
+          stawka_rg?: number
           updated_at?: string
+          wartosc_m?: number
+          wartosc_r?: number
+          wartosc_s?: number
           wymiary?: string | null
         }
         Relationships: [
@@ -825,16 +855,27 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          data_kosztorysu: string | null
           id: string
+          inwestor_adres: string | null
+          inwestor_nazwa: string | null
+          lokalizacja_obiektu: string | null
           marza_material: number
           marza_robocizna: number
+          narzut_kp_proc: number
+          narzut_zysk_proc: number
           nazwa_kosztorysu: string
           notes: string | null
+          podstawa_opracowania: string | null
           project_id: string | null
           status: string
           suma_material: number
           suma_robocizna: number
+          suma_sprzet: number
           updated_at: string
+          vat_proc: number
+          wykonawca_adres: string | null
+          wykonawca_nazwa: string | null
         }
         Insert: {
           branza: string
@@ -842,16 +883,27 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
+          data_kosztorysu?: string | null
           id?: string
+          inwestor_adres?: string | null
+          inwestor_nazwa?: string | null
+          lokalizacja_obiektu?: string | null
           marza_material?: number
           marza_robocizna?: number
+          narzut_kp_proc?: number
+          narzut_zysk_proc?: number
           nazwa_kosztorysu: string
           notes?: string | null
+          podstawa_opracowania?: string | null
           project_id?: string | null
           status?: string
           suma_material?: number
           suma_robocizna?: number
+          suma_sprzet?: number
           updated_at?: string
+          vat_proc?: number
+          wykonawca_adres?: string | null
+          wykonawca_nazwa?: string | null
         }
         Update: {
           branza?: string
@@ -859,16 +911,27 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          data_kosztorysu?: string | null
           id?: string
+          inwestor_adres?: string | null
+          inwestor_nazwa?: string | null
+          lokalizacja_obiektu?: string | null
           marza_material?: number
           marza_robocizna?: number
+          narzut_kp_proc?: number
+          narzut_zysk_proc?: number
           nazwa_kosztorysu?: string
           notes?: string | null
+          podstawa_opracowania?: string | null
           project_id?: string | null
           status?: string
           suma_material?: number
           suma_robocizna?: number
+          suma_sprzet?: number
           updated_at?: string
+          vat_proc?: number
+          wykonawca_adres?: string | null
+          wykonawca_nazwa?: string | null
         }
         Relationships: [
           {
@@ -1297,42 +1360,66 @@ export type Database = {
           active: boolean
           branza: string
           cena_robocizny_netto: number
+          cena_sprzetu_netto: number
           cena_zakupu_materialu: number
           company_id: string
           created_at: string
           id: string
           jednostka: string
           kategoria: string
+          knr_chapter: string | null
+          knr_number: string | null
+          naklad_materialu: number
+          naklad_robocizny: number
+          naklad_sprzetu: number
           nazwa: string
           notes: string | null
+          opis_pelny: string | null
+          stawka_rg: number
           updated_at: string
         }
         Insert: {
           active?: boolean
           branza: string
           cena_robocizny_netto?: number
+          cena_sprzetu_netto?: number
           cena_zakupu_materialu?: number
           company_id: string
           created_at?: string
           id?: string
           jednostka?: string
           kategoria?: string
+          knr_chapter?: string | null
+          knr_number?: string | null
+          naklad_materialu?: number
+          naklad_robocizny?: number
+          naklad_sprzetu?: number
           nazwa: string
           notes?: string | null
+          opis_pelny?: string | null
+          stawka_rg?: number
           updated_at?: string
         }
         Update: {
           active?: boolean
           branza?: string
           cena_robocizny_netto?: number
+          cena_sprzetu_netto?: number
           cena_zakupu_materialu?: number
           company_id?: string
           created_at?: string
           id?: string
           jednostka?: string
           kategoria?: string
+          knr_chapter?: string | null
+          knr_number?: string | null
+          naklad_materialu?: number
+          naklad_robocizny?: number
+          naklad_sprzetu?: number
           nazwa?: string
           notes?: string | null
+          opis_pelny?: string | null
+          stawka_rg?: number
           updated_at?: string
         }
         Relationships: [
