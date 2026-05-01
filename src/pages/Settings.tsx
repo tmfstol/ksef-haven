@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import TeamManagement from "@/components/settings/TeamManagement";
+import { SubscriptionPanel } from "@/components/settings/SubscriptionPanel";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCompanies, useAddCompany, useUpdateCompany, useDeleteCompany } from "@/hooks/useCompanies";
@@ -452,6 +453,9 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
             </div>
             <input type="text" value={invoicePattern} onChange={(e) => setInvoicePattern(e.target.value)} placeholder="FV/{NNN}/{MM}/{RRRR}" className="w-full px-4 py-3 text-sm bg-secondary/50 border-0 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono" />
           </motion.div>
+
+          {/* Subskrypcja */}
+          <SubscriptionPanel />
 
           {/* Zarządzanie zespołem */}
           <TeamManagement />

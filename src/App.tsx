@@ -27,6 +27,8 @@ import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import Pricing from "./pages/Pricing";
+import CheckoutReturn from "./pages/CheckoutReturn";
 import { Loader2 } from "lucide-react";
 import { VoiceAgentWidget } from "@/components/dashboard/VoiceAgentWidget";
 import { useCompanies } from "@/hooks/useCompanies";
@@ -86,6 +88,8 @@ const AppRoutes = () => {
         <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/checkout/return" element={<CheckoutReturn />} />
         <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/invoices/new" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
