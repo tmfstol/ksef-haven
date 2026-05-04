@@ -173,11 +173,22 @@ Deno.serve(async (req) => {
       },
     });
 
+    // Plain-text fallback — zawiera notatkę, by zawsze była widoczna w portalu/biurze
+    const textBody = [
+      `Faktura: ${invoice.ksef_number || invoice.vendor}`,
+      `Kontrahent: ${invoice.vendor}`,
+      `NIP: ${invoice.nip}`,
+      `Data wystawienia: ${formattedDate}`,
+      `Kwota brutto: ${formattedAmount}`,
+      `Numer KSeF: ${invoice.ksef_number || "—"}`,
+      rawNote ? `\nNotatka dla księgowego:\n${rawNote}` : "",
+    ].filter(Boolean).join("\n");
+
     await client.send({
       from: `KSeF Archiwum <${gmailAddress}>`,
       to: company.client_portal_email,
       subject,
-      content: "auto",
+      content: textBody,
       html: htmlBody,
     });
 
