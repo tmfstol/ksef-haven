@@ -113,8 +113,13 @@ Deno.serve(async (req) => {
     const ksefNumber = escapeHtml(invoice.ksef_number || "—");
     const formattedDate = formatDate(invoice.date);
     const formattedAmount = formatCurrency(Number(invoice.gross_amount || 0));
-    const bookNote = invoice.bookkeeper_note ? escapeHtml(invoice.bookkeeper_note) : null;
-    const subject = `Faktura ${invoice.ksef_number || invoice.vendor} z dnia ${formattedDate}`;
+    const rawNote = invoice.bookkeeper_note ? String(invoice.bookkeeper_note).trim() : "";
+    const bookNote = rawNote ? escapeHtml(rawNote) : null;
+    // Skrócona notatka w temacie, by księgowy widział ją w skrzynce
+    const noteForSubject = rawNote
+      ? ` [Notatka: ${rawNote.length > 60 ? rawNote.slice(0, 60) + "…" : rawNote}]`
+      : "";
+    const subject = `Faktura ${invoice.ksef_number || invoice.vendor} z dnia ${formattedDate}${noteForSubject}`;
 
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff; color: #111827;">
@@ -168,11 +173,22 @@ Deno.serve(async (req) => {
       },
     });
 
+    // Plain-text fallback — zawiera notatkę, by zawsze była widoczna w portalu/biurze
+    const textBody = [
+      `Faktura: ${invoice.ksef_number || invoice.vendor}`,
+      `Kontrahent: ${invoice.vendor}`,
+      `NIP: ${invoice.nip}`,
+      `Data wystawienia: ${formattedDate}`,
+      `Kwota brutto: ${formattedAmount}`,
+      `Numer KSeF: ${invoice.ksef_number || "—"}`,
+      rawNote ? `\nNotatka dla księgowego:\n${rawNote}` : "",
+    ].filter(Boolean).join("\n");
+
     await client.send({
       from: `KSeF Archiwum <${gmailAddress}>`,
       to: company.client_portal_email,
       subject,
-      content: "auto",
+      content: textBody,
       html: htmlBody,
     });
 
