@@ -246,11 +246,24 @@ const EstimateBuilder = () => {
                 </div>
               </SheetContent>
             </Sheet>
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />Import przedmiaru (Excel)
+            </Button>
             <Button size="sm" onClick={handlePdf}>
               <FileDown className="h-4 w-4 mr-2" />Drukuj kosztorys (KNR)
             </Button>
           </div>
         </div>
+
+        <ImportPrzedmiarDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          estimateId={estimate.id}
+          companyId={estimate.company_id}
+          branza={estimate.branza}
+          stageId={activeStageId ?? (stages[0]?.id ?? null)}
+          startOrdinal={items.filter((i) => i.stage_id === (activeStageId ?? stages[0]?.id)).length + 1}
+        />
 
         {/* Body: split view */}
         <div className="flex-1 flex overflow-hidden">
