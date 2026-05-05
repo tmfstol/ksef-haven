@@ -1,12 +1,13 @@
-import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X } from "lucide-react";
+import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X, RefreshCcw, ReceiptText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseKsefXml, generateInvoicePdf } from "@/lib/invoice-pdf";
+import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrBlockReason, type InvoicePaymentDetails } from "@/lib/invoice-payment";
 import { useSwipeable } from "@/hooks/useSwipeable";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useProjects, useAssignInvoiceToProject } from "@/hooks/useProjects";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,6 +32,26 @@ function formatCurrency(amount: number) {
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("pl-PL", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function toNumber(value: string | number) {
+  const normalized = typeof value === "number" ? value : Number(String(value).replace(",", "."));
+  return Number.isFinite(normalized) ? normalized : 0;
+}
+
+function mapXmlItems(xml: string, invoiceId: string, ksefNumber: string) {
+  const parsed = parseKsefXml(xml, ksefNumber);
+  return parsed.pozycje.map((item, index) => ({
+    id: `${invoiceId}-${index + 1}`,
+    ordinal: Number(item.nr) || index + 1,
+    name: item.opis || "—",
+    quantity: toNumber(item.ilosc),
+    unit: item.jm || "szt.",
+    unit_price_net: toNumber(item.cenaNetto),
+    net_amount: toNumber(item.wartoscNetto),
+    vat_rate: item.stawkaVat || "—",
+    gross_amount: toNumber(item.brutto),
+  }));
 }
 
 interface InvoiceCardProps {
