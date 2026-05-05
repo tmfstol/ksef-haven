@@ -90,11 +90,10 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
         });
         if (data?.xml) {
           details = extractPaymentDetailsFromXml(data.xml);
-          if (details.iban) {
-            supabase.from("invoices").update({ vat_whitelist_account: details.iban } as any).eq("id", invoice.id);
-          }
         }
-      } catch {}
+      } catch (error) {
+        console.warn("Nie udało się pobrać danych QR z XML:", error);
+      }
     }
     setQrPaymentDetails(details);
     setQrInvoice(invoice);
