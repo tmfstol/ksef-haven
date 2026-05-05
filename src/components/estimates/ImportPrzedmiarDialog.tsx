@@ -52,6 +52,18 @@ function calcRMS(c: CatalogItem, ilosc: number) {
   return { r, m, s, total: r + m + s };
 }
 
+function calcRowValue(row: MatchedRow): { r: number; m: number; s: number; total: number } {
+  // Priorytet: ręczne stawki override
+  const hasOverride = row.override_r !== undefined || row.override_m !== undefined;
+  if (hasOverride) {
+    const r = (row.override_r ?? 0) * row.ilosc;
+    const m = (row.override_m ?? 0) * row.ilosc;
+    return { r, m, s: 0, total: r + m };
+  }
+  if (row.catalog) return calcRMS(row.catalog, row.ilosc);
+  return { r: 0, m: 0, s: 0, total: 0 };
+}
+
 const fmt = (n: number) => n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyId, branza, stageId, startOrdinal }: Props) {
