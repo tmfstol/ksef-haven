@@ -111,7 +111,12 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
       const downloadedItems = mapXmlItems(data.xml, invoice.id, invoice.ksef_number);
       const details = extractPaymentDetailsFromXml(data.xml);
 
-      if (downloadedItems.length > 0 && (!items || items.length === 0)) {
+      const { count } = await supabase
+        .from("invoice_items")
+        .select("id", { count: "exact", head: true })
+        .eq("invoice_id", invoice.id);
+
+      if (downloadedItems.length > 0 && (count ?? 0) === 0) {
         await supabase.from("invoice_items").insert(
           downloadedItems.map(({ id, ...item }) => ({
             invoice_id: invoice.id,
@@ -420,7 +425,7 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
                 <div className="grid grid-cols-2 gap-2">
                   {invoice.invoice_type === "kosztowa" && (
                     <>
-                      <Button variant="outline" size="sm" className="min-h-[44px] text-xs gap-1.5" onClick={handleOpenQr} disabled={isHydrating}>
+                      <Button variant="outline" size="sm" className="min-h-[44px] text-xs gap-1.5" onClick={handleOpenQr} disabled={isHydrating || paymentDetails.kind === "cash"}>
                         {isHydrating ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
                         {paymentDetails.kind === "cash" ? "Gotówka" : "QR płatności"}
                       </Button>
