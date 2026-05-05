@@ -16,9 +16,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { ArrowLeft, Plus, Search, Trash2, FileDown, Loader2, Calculator, Layers, Briefcase, Settings2 } from "lucide-react";
+import { ArrowLeft, Plus, Search, Trash2, FileDown, Loader2, Calculator, Layers, Briefcase, Settings2, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { generateEstimatePdf } from "@/lib/estimate-pdf";
+import { ImportPrzedmiarDialog } from "@/components/estimates/ImportPrzedmiarDialog";
 import { toast } from "sonner";
 
 const branzaColor: Record<Branza, string> = {
@@ -57,6 +58,7 @@ const EstimateBuilder = () => {
 
   const [search, setSearch] = useState("");
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     if (stages.length && !activeStageId) setActiveStageId(stages[0].id);
@@ -244,11 +246,24 @@ const EstimateBuilder = () => {
                 </div>
               </SheetContent>
             </Sheet>
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />Import przedmiaru (Excel)
+            </Button>
             <Button size="sm" onClick={handlePdf}>
               <FileDown className="h-4 w-4 mr-2" />Drukuj kosztorys (KNR)
             </Button>
           </div>
         </div>
+
+        <ImportPrzedmiarDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          estimateId={estimate.id}
+          companyId={estimate.company_id}
+          branza={estimate.branza}
+          stageId={activeStageId ?? (stages[0]?.id ?? null)}
+          startOrdinal={items.filter((i) => i.stage_id === (activeStageId ?? stages[0]?.id)).length + 1}
+        />
 
         {/* Body: split view */}
         <div className="flex-1 flex overflow-hidden">
