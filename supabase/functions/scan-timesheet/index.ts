@@ -13,21 +13,26 @@ Karta pracy zazwyczaj zawiera:
 - Imię i nazwisko pracownika (zwykle u góry)
 - Miesiąc i rok (np. "marzec 2026", "..2026")
 - Tabelę z dniami miesiąca (1-31) w jednej kolumnie
-- Godziny pracy "od-do" w drugiej kolumnie (np. "8:00 - 20:00", "800 - 2000")
-- Czasem dodatkowo miejsce pracy / projekt / pauzę
+- Godziny pracy "od-do" (np. "8:00 - 20:00", "800 - 2000")
+- DODATKOWE KOLUMNY/ADNOTACJE które MUSISZ uwzględnić:
+  * "dojazd" / "doj." / "dj" — godziny dojazdu (osobna liczba, np. "2" lub "1.5")
+  * "nadgodziny" / "ndg" / "nad."
+  * "pauza" / "przerwa"
+  * miejsce pracy / projekt / budowa / obiekt
+  * "delegacja", "diety"
 - Suma godzin dziennie
 
 Twoje zadanie:
 1. Rozpoznaj imię i nazwisko pracownika (jedno na całą kartę).
 2. Rozpoznaj miesiąc i rok karty.
-3. Dla KAŻDEGO dnia, w którym są wpisane godziny, utwórz osobny wiersz:
-   - work_date w formacie YYYY-MM-DD (na podstawie dnia + miesiąca + roku karty)
-   - hours: liczba przepracowanych godzin (od-do, np. 8:00-20:00 = 12h)
-   - description: miejsce pracy / projekt jeśli widoczne, inaczej puste
+3. Dla KAŻDEGO dnia z wpisanymi godzinami utwórz osobny wiersz:
+   - work_date w formacie YYYY-MM-DD
+   - hours: SUMA wszystkich godzin tego dnia = (godziny pracy od-do) + (godziny dojazdu jeśli są) - (pauza jeśli wyraźnie odejmowana). Dojazd ZAWSZE doliczaj do hours, jeśli widnieje jako osobna liczba.
+   - description: WSZYSTKIE dodatkowe informacje z wiersza w formacie "miejsce: X; dojazd: Yh; nadgodziny: Zh; pauza: Wh" — wpisz tylko te które są obecne. NIGDY nie pomijaj informacji o dojeździe, nadgodzinach ani miejscu pracy.
    - employee_name: imię i nazwisko pracownika
-4. POMIŃ dni puste, dni z kreską "-", dni wolne.
-5. Jeśli widzisz "800 - 2000" to znaczy 8:00 - 20:00 (12 godzin). "800 - 17°°" = 8:00-17:00 (9h).
-6. Jeśli nie jesteś pewien wartości — użyj confidence "low" i wpisz najlepszą propozycję.
+4. POMIŃ dni całkowicie puste, z kreską "-" lub "wolne". Jeśli jest sam dojazd bez pracy — też uwzględnij (hours = sam dojazd, description: "tylko dojazd").
+5. "800 - 2000" = 8:00-20:00 (12h). "800 - 17°°" = 8:00-17:00 (9h). Małe liczby przy godzinach (np. "+2", "doj 2") to najczęściej dojazd.
+6. Jeśli nie jesteś pewien — confidence "low" + najlepsza propozycja. ZAWSZE skanuj CAŁĄ szerokość wiersza, nie tylko pierwszą kolumnę z godzinami.
 
 Zwróć dane przez wywołanie funkcji extract_timesheet.`;
 
