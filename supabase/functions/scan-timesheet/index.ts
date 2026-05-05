@@ -190,13 +190,27 @@ serve(async (req) => {
 
     // Normalizacja: upewnij się że każdy wiersz ma employee_name
     const employeeName = parsed.employee_name || "[nieznany]";
-    const rows = (parsed.rows ?? []).map((r: any) => ({
-      employee_name: r.employee_name || employeeName,
-      work_date: r.work_date,
-      hours: Number(r.hours) || 0,
-      description: r.description || "",
-      confidence: r.confidence || "medium",
-    })).filter((r: any) => r.work_date && r.hours > 0);
+    const rows = (parsed.rows ?? []).map((r: any) => {
+      const travel = Number(r.travel_hours) || 0;
+      const overtime = Number(r.overtime_hours) || 0;
+      const location = (r.location || "").trim();
+      const baseDesc = (r.description || "").trim();
+      const parts: string[] = [];
+      if (location) parts.push(location);
+      if (travel > 0) parts.push(`dojazd: ${travel}h`);
+      if (overtime > 0) parts.push(`nadgodziny: ${overtime}h`);
+      const extras = parts.join("; ");
+      const composedDesc = baseDesc
+        ? (extras && !baseDesc.toLowerCase().includes("dojazd") ? `${baseDesc} | ${extras}` : baseDesc)
+        : extras;
+      return {
+        employee_name: r.employee_name || employeeName,
+        work_date: r.work_date,
+        hours: Number(r.hours) || 0,
+        description: composedDesc,
+        confidence: r.confidence || "medium",
+      };
+    }).filter((r: any) => r.work_date && r.hours > 0);
 
     const finalResponse = {
       employee_name: employeeName,
