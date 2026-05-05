@@ -1,4 +1,5 @@
 import { xml2js } from "xml-js";
+import { buildInvoicePaymentDetails } from "./invoice-payment";
 
 // ── XML Parsing using DOMParser (kept for line-item extraction) ──
 
@@ -420,13 +421,14 @@ export async function generateInvoicePdf(inv: ParsedInvoice, xmlString?: string)
     throw new Error("XML string is required for official KSeF PDF generation");
   }
   let pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
-  // Append polish payment QR if we have an account
-  if (inv.nrRachunku) {
+  const paymentDetails = buildInvoicePaymentDetails({ iban: inv.nrRachunku, paymentMethodCode: inv.formaPlatnosci });
+  // Append polish payment QR only for transfer invoices with an account.
+  if (paymentDetails.kind === "transfer" && paymentDetails.iban) {
     try {
       const { appendPaymentQrToPdf } = await import("./pdf-payment-qr");
       pdfBase64 = await appendPaymentQrToPdf(pdfBase64, {
         nip: inv.sprzedawca?.nip,
-        iban: inv.nrRachunku,
+        iban: paymentDetails.iban,
         amount: parseFloat(inv.doZaplaty || inv.sumaBrutto || "0") || 0,
         recipientName: inv.sprzedawca?.nazwa || "",
         title: inv.nrFaktury || inv.ksefNumber,
@@ -449,12 +451,13 @@ export async function generateInvoicePdfBase64(inv: ParsedInvoice, xmlString?: s
     throw new Error("XML string is required for official KSeF PDF generation");
   }
   let pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
-  if (inv.nrRachunku) {
+  const paymentDetails = buildInvoicePaymentDetails({ iban: inv.nrRachunku, paymentMethodCode: inv.formaPlatnosci });
+  if (paymentDetails.kind === "transfer" && paymentDetails.iban) {
     try {
       const { appendPaymentQrToPdf } = await import("./pdf-payment-qr");
       pdfBase64 = await appendPaymentQrToPdf(pdfBase64, {
         nip: inv.sprzedawca?.nip,
-        iban: inv.nrRachunku,
+        iban: paymentDetails.iban,
         amount: parseFloat(inv.doZaplaty || inv.sumaBrutto || "0") || 0,
         recipientName: inv.sprzedawca?.nazwa || "",
         title: inv.nrFaktury || inv.ksefNumber,
