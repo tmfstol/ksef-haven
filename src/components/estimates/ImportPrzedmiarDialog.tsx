@@ -323,12 +323,17 @@ export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyI
                     <th className="px-2 py-2">Z przedmiaru</th>
                     <th className="px-2 py-2 w-24">Ilość</th>
                     <th className="px-2 py-2">Dopasowanie KNR</th>
-                    <th className="px-2 py-2 w-24 text-right">Wartość</th>
+                    <th className="px-2 py-2 w-28">Robocizna /jm</th>
+                    <th className="px-2 py-2 w-28">Materiał /jm</th>
+                    <th className="px-2 py-2 w-28 text-right">Wartość</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r, i) => {
-                    const v = r.catalog ? calcRMS(r.catalog, r.ilosc) : null;
+                    const v = calcRowValue(r);
+                    const hasOverride = r.override_r !== undefined || r.override_m !== undefined;
+                    const defaultR = r.catalog ? Number(r.catalog.naklad_robocizny) * Number(r.catalog.stawka_rg) : 0;
+                    const defaultM = r.catalog ? Number(r.catalog.naklad_materialu) * Number(r.catalog.cena_zakupu_materialu) : 0;
                     return (
                       <tr key={i} className="border-t hover:bg-muted/30">
                         <td className="px-2 py-2 align-top text-muted-foreground">{r.lp}</td>
@@ -367,8 +372,33 @@ export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyI
                             </div>
                           )}
                         </td>
+                        <td className="px-2 py-2 align-top">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={defaultR ? fmt(defaultR) : "0,00"}
+                            defaultValue={r.override_r !== undefined ? r.override_r : ""}
+                            onBlur={(e) => handleOverride(i, "override_r", e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </td>
+                        <td className="px-2 py-2 align-top">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={defaultM ? fmt(defaultM) : "0,00"}
+                            defaultValue={r.override_m !== undefined ? r.override_m : ""}
+                            onBlur={(e) => handleOverride(i, "override_m", e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </td>
                         <td className="px-2 py-2 align-top text-right font-medium">
-                          {v ? `${fmt(v.total)} zł` : "—"}
+                          {v.total > 0 ? (
+                            <>
+                              <div>{fmt(v.total)} zł</div>
+                              {hasOverride && <div className="text-[10px] text-amber-600">ręcznie</div>}
+                            </>
+                          ) : "—"}
                         </td>
                       </tr>
                     );
@@ -384,9 +414,9 @@ export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyI
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => { reset(); }}>Wgraj inny plik</Button>
-                <Button onClick={handleImport} disabled={loading || rows.filter((r) => r.catalog).length === 0}>
+                <Button onClick={handleImport} disabled={loading || usableCount === 0}>
                   {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                  Dodaj do kosztorysu ({rows.filter((r) => r.catalog).length})
+                  Dodaj do kosztorysu ({usableCount})
                 </Button>
               </div>
             </div>
