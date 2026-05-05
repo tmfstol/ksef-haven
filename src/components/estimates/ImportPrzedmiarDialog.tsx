@@ -23,6 +23,9 @@ interface MatchedRow extends PrzedmiarRow {
   confidence: "high" | "medium" | "low" | "none";
   catalog?: CatalogItem | null;
   reason?: string;
+  // Override stawek (jeśli użytkownik wpisał własne)
+  override_r?: number; // stawka robocizny za jm
+  override_m?: number; // koszt materiału za jm
 }
 
 interface Props {
