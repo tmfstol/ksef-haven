@@ -23,6 +23,9 @@ interface MatchedRow extends PrzedmiarRow {
   confidence: "high" | "medium" | "low" | "none";
   catalog?: CatalogItem | null;
   reason?: string;
+  // Override stawek (jeśli użytkownik wpisał własne)
+  override_r?: number; // stawka robocizny za jm
+  override_m?: number; // koszt materiału za jm
 }
 
 interface Props {
@@ -47,6 +50,18 @@ function calcRMS(c: CatalogItem, ilosc: number) {
   const m = ilosc * Number(c.naklad_materialu) * Number(c.cena_zakupu_materialu);
   const s = ilosc * Number(c.naklad_sprzetu) * Number(c.cena_sprzetu_netto);
   return { r, m, s, total: r + m + s };
+}
+
+function calcRowValue(row: MatchedRow): { r: number; m: number; s: number; total: number } {
+  // Priorytet: ręczne stawki override
+  const hasOverride = row.override_r !== undefined || row.override_m !== undefined;
+  if (hasOverride) {
+    const r = (row.override_r ?? 0) * row.ilosc;
+    const m = (row.override_m ?? 0) * row.ilosc;
+    return { r, m, s: 0, total: r + m };
+  }
+  if (row.catalog) return calcRMS(row.catalog, row.ilosc);
+  return { r: 0, m: 0, s: 0, total: 0 };
 }
 
 const fmt = (n: number) => n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -191,42 +206,68 @@ export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyI
 
   const handleManualPick = (idx: number, catId: string) => {
     const cat = catalog.find((c) => c.id === catId) ?? null;
-    setRows((prev) => prev.map((r, i) => i === idx ? { ...r, catalog_id: catId, catalog: cat, confidence: "high" } : r));
+    setRows((prev) => prev.map((r, i) => i === idx ? { ...r, catalog_id: catId, catalog: cat, confidence: "high", override_r: undefined, override_m: undefined } : r));
   };
 
-  const totalValue = rows.reduce((sum, r) => {
-    if (!r.catalog) return sum;
-    return sum + calcRMS(r.catalog, r.ilosc).total;
-  }, 0);
+  const handleOverride = (idx: number, field: "override_r" | "override_m", value: string) => {
+    const num = parseFloat(value.replace(",", "."));
+    setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: isFinite(num) ? num : undefined } : r));
+  };
+
+  const totalValue = rows.reduce((sum, r) => sum + calcRowValue(r).total, 0);
+
+  const usableCount = rows.filter((r) => r.catalog || r.override_r !== undefined || r.override_m !== undefined).length;
 
   const handleImport = async () => {
-    const usable = rows.filter((r) => r.catalog);
-    if (usable.length === 0) { toast.error("Brak dopasowanych pozycji"); return; }
+    const usable = rows.filter((r) => r.catalog || r.override_r !== undefined || r.override_m !== undefined);
+    if (usable.length === 0) { toast.error("Brak pozycji do dodania"); return; }
     setLoading(true);
     try {
       let ord = startOrdinal;
       for (const r of usable) {
-        const cat = r.catalog!;
-        const v = calcRMS(cat, r.ilosc);
-        await addItem.mutateAsync({
-          estimate_id: estimateId,
-          stage_id: stageId,
-          catalog_id: cat.id,
-          ordinal: ord++,
-          nazwa: cat.nazwa,
-          jednostka: cat.jednostka,
-          ilosc: r.ilosc,
-          cena_mat: cat.cena_zakupu_materialu,
-          cena_rob: cat.cena_robocizny_netto,
-          cena_sprz: cat.cena_sprzetu_netto,
-          knr_number: cat.knr_number,
-          opis_pelny: cat.opis_pelny,
-          naklad_robocizny: cat.naklad_robocizny,
-          naklad_materialu: cat.naklad_materialu,
-          naklad_sprzetu: cat.naklad_sprzetu,
-          stawka_rg: cat.stawka_rg,
-          wartosc_r: v.r, wartosc_m: v.m, wartosc_s: v.s,
-        } as Partial<EstimateItem> & { estimate_id: string });
+        const v = calcRowValue(r);
+        const hasOverride = r.override_r !== undefined || r.override_m !== undefined;
+        if (hasOverride && !r.catalog) {
+          // Pozycja ręczna bez KNR
+          await addItem.mutateAsync({
+            estimate_id: estimateId,
+            stage_id: stageId,
+            catalog_id: null,
+            ordinal: ord++,
+            nazwa: r.nazwa,
+            jednostka: r.jednostka || "szt",
+            ilosc: r.ilosc,
+            cena_mat: r.override_m ?? 0,
+            cena_rob: r.override_r ?? 0,
+            cena_sprz: 0,
+            naklad_robocizny: 1,
+            naklad_materialu: 1,
+            naklad_sprzetu: 0,
+            stawka_rg: r.override_r ?? 0,
+            wartosc_r: v.r, wartosc_m: v.m, wartosc_s: 0,
+          } as Partial<EstimateItem> & { estimate_id: string });
+        } else {
+          const cat = r.catalog!;
+          await addItem.mutateAsync({
+            estimate_id: estimateId,
+            stage_id: stageId,
+            catalog_id: cat.id,
+            ordinal: ord++,
+            nazwa: cat.nazwa,
+            jednostka: cat.jednostka,
+            ilosc: r.ilosc,
+            cena_mat: hasOverride ? (r.override_m ?? 0) : cat.cena_zakupu_materialu,
+            cena_rob: hasOverride ? (r.override_r ?? 0) : cat.cena_robocizny_netto,
+            cena_sprz: hasOverride ? 0 : cat.cena_sprzetu_netto,
+            knr_number: cat.knr_number,
+            opis_pelny: cat.opis_pelny,
+            naklad_robocizny: hasOverride ? 1 : cat.naklad_robocizny,
+            naklad_materialu: hasOverride ? 1 : cat.naklad_materialu,
+            naklad_sprzetu: hasOverride ? 0 : cat.naklad_sprzetu,
+            stawka_rg: hasOverride ? (r.override_r ?? 0) : cat.stawka_rg,
+            wartosc_r: v.r, wartosc_m: v.m, wartosc_s: v.s,
+          } as Partial<EstimateItem> & { estimate_id: string });
+        }
       }
       toast.success(`Dodano ${usable.length} pozycji do kosztorysu`);
       reset();
@@ -282,12 +323,17 @@ export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyI
                     <th className="px-2 py-2">Z przedmiaru</th>
                     <th className="px-2 py-2 w-24">Ilość</th>
                     <th className="px-2 py-2">Dopasowanie KNR</th>
-                    <th className="px-2 py-2 w-24 text-right">Wartość</th>
+                    <th className="px-2 py-2 w-28">Robocizna /jm</th>
+                    <th className="px-2 py-2 w-28">Materiał /jm</th>
+                    <th className="px-2 py-2 w-28 text-right">Wartość</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r, i) => {
-                    const v = r.catalog ? calcRMS(r.catalog, r.ilosc) : null;
+                    const v = calcRowValue(r);
+                    const hasOverride = r.override_r !== undefined || r.override_m !== undefined;
+                    const defaultR = r.catalog ? Number(r.catalog.naklad_robocizny) * Number(r.catalog.stawka_rg) : 0;
+                    const defaultM = r.catalog ? Number(r.catalog.naklad_materialu) * Number(r.catalog.cena_zakupu_materialu) : 0;
                     return (
                       <tr key={i} className="border-t hover:bg-muted/30">
                         <td className="px-2 py-2 align-top text-muted-foreground">{r.lp}</td>
@@ -326,8 +372,33 @@ export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyI
                             </div>
                           )}
                         </td>
+                        <td className="px-2 py-2 align-top">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={defaultR ? fmt(defaultR) : "0,00"}
+                            defaultValue={r.override_r !== undefined ? r.override_r : ""}
+                            onBlur={(e) => handleOverride(i, "override_r", e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </td>
+                        <td className="px-2 py-2 align-top">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={defaultM ? fmt(defaultM) : "0,00"}
+                            defaultValue={r.override_m !== undefined ? r.override_m : ""}
+                            onBlur={(e) => handleOverride(i, "override_m", e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </td>
                         <td className="px-2 py-2 align-top text-right font-medium">
-                          {v ? `${fmt(v.total)} zł` : "—"}
+                          {v.total > 0 ? (
+                            <>
+                              <div>{fmt(v.total)} zł</div>
+                              {hasOverride && <div className="text-[10px] text-amber-600">ręcznie</div>}
+                            </>
+                          ) : "—"}
                         </td>
                       </tr>
                     );
@@ -343,9 +414,9 @@ export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyI
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => { reset(); }}>Wgraj inny plik</Button>
-                <Button onClick={handleImport} disabled={loading || rows.filter((r) => r.catalog).length === 0}>
+                <Button onClick={handleImport} disabled={loading || usableCount === 0}>
                   {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                  Dodaj do kosztorysu ({rows.filter((r) => r.catalog).length})
+                  Dodaj do kosztorysu ({usableCount})
                 </Button>
               </div>
             </div>
