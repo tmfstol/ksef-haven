@@ -366,6 +366,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                           </Button>
                         </>
                       )}
+                      <Button
                         variant="ghost"
                         size="sm"
                         className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
