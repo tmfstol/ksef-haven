@@ -134,12 +134,6 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
         queryClient.invalidateQueries({ queryKey: ["invoice-items", invoice.id] });
       }
 
-      if (details.iban) {
-        supabase.from("invoices").update({ vat_whitelist_account: details.iban } as Record<string, string>).eq("id", invoice.id).then(() => {
-          queryClient.invalidateQueries({ queryKey: ["invoices"] });
-        });
-      }
-
       return { downloadedItems, details };
     },
     onSuccess: ({ downloadedItems, details }) => {
