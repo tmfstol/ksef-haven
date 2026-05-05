@@ -141,8 +141,11 @@ serve(async (req) => {
                       properties: {
                         employee_name: { type: "string" },
                         work_date: { type: "string", description: "YYYY-MM-DD" },
-                        hours: { type: "number" },
-                        description: { type: "string" },
+                        hours: { type: "number", description: "Suma godzin dnia: praca + dojazd (- pauza)." },
+                        travel_hours: { type: "number", description: "Godziny dojazdu jeśli wpisane osobno, inaczej 0." },
+                        overtime_hours: { type: "number", description: "Nadgodziny jeśli wpisane osobno, inaczej 0." },
+                        location: { type: "string", description: "Miejsce pracy / projekt / budowa." },
+                        description: { type: "string", description: "Pełny opis: miejsce + dojazd + nadgodziny + pauza." },
                         confidence: { type: "string", enum: ["high", "medium", "low"] },
                       },
                       required: ["employee_name", "work_date", "hours", "confidence"],
