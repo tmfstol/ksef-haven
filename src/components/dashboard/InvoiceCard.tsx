@@ -459,9 +459,11 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
         onOpenChange={setQrOpen}
         vendorName={invoice.vendor}
         vendorNip={invoice.nip}
-        iban={null}
+        iban={paymentDetails.iban}
         amount={invoice.gross_amount}
         title={invoice.ksef_number || invoice.vendor}
+        paymentMethodLabel={paymentDetails.paymentMethodLabel}
+        blockReason={qrBlockReason}
       />
     </div>
   );
