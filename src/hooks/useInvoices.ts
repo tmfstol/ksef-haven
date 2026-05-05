@@ -37,6 +37,7 @@ export function useInvoices(companyId?: string | null) {
         paid_at: row.paid_at,
         vat_whitelist_status: row.vat_whitelist_status,
         vat_whitelist_checked_at: row.vat_whitelist_checked_at,
+        vat_whitelist_account: row.vat_whitelist_account,
         created_at: row.created_at,
         updated_at: row.updated_at,
       })) as Invoice[];

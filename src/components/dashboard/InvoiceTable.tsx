@@ -9,6 +9,7 @@ import { parseKsefXml, generateInvoicePdf, generateInvoicePdfBase64 } from "@/li
 import { InvoiceItemsRow } from "./InvoiceItemsRow";
 import { AdBanner, AdBannerPlaceholder } from "./AdBanner";
 import { PaymentQrModal } from "@/components/payments/PaymentQrModal";
+import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrBlockReason, type InvoicePaymentDetails } from "@/lib/invoice-payment";
 
 type DownloadState = { id: string; format: "xml" | "upo" | "pdf" | "email" } | null;
 
@@ -65,7 +66,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
   const [downloading, setDownloading] = useState<DownloadState>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [qrInvoice, setQrInvoice] = useState<Invoice | null>(null);
-  const [qrIban, setQrIban] = useState<string>("");
+  const [qrPaymentDetails, setQrPaymentDetails] = useState<InvoicePaymentDetails>(buildInvoicePaymentDetails({}));
 
   const handleMarkPaid = async (invoice: Invoice) => {
     const isPaid = invoice.payment_status === "paid";
@@ -81,20 +82,20 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
   };
 
   const handleOpenQr = async (invoice: Invoice) => {
-    // Try to fetch IBAN from invoice XML
-    let iban = "";
+    let details = buildInvoicePaymentDetails({ iban: invoice.vat_whitelist_account });
     if (invoice.ksef_number) {
       try {
         const { data } = await supabase.functions.invoke("ksef-download", {
           body: { invoice_id: invoice.id, format: "xml" },
         });
         if (data?.xml) {
-          const m = data.xml.match(/<[^>]*NrRB[^>]*>([^<]+)<\/[^>]*NrRB[^>]*>/i);
-          if (m) iban = m[1].trim();
+          details = extractPaymentDetailsFromXml(data.xml);
         }
-      } catch {}
+      } catch (error) {
+        console.warn("Nie udało się pobrać danych QR z XML:", error);
+      }
     }
-    setQrIban(iban);
+    setQrPaymentDetails(details);
     setQrInvoice(invoice);
   };
 
@@ -453,9 +454,11 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
           onOpenChange={(v) => !v && setQrInvoice(null)}
           vendorName={qrInvoice.vendor}
           vendorNip={qrInvoice.nip}
-          iban={qrIban}
+          iban={qrPaymentDetails.iban}
           amount={qrInvoice.gross_amount}
           title={qrInvoice.ksef_number || `Faktura ${qrInvoice.vendor}`}
+          paymentMethodLabel={qrPaymentDetails.paymentMethodLabel}
+          blockReason={getPaymentQrBlockReason(qrPaymentDetails)}
         />
       )}
     </div>

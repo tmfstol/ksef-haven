@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
 import { PaymentQrModal } from "@/components/payments/PaymentQrModal";
+import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrBlockReason, type InvoicePaymentDetails } from "@/lib/invoice-payment";
 
 interface Payment {
   id: string;
@@ -35,7 +36,7 @@ function generateEpcQr(vendor: string, amount: number, _nip?: string): string {
 
 export function UpcomingPayments({ payments, companyId }: { payments: Payment[]; companyId: string | null }) {
   const [qrPayment, setQrPayment] = useState<Payment | null>(null);
-  const [qrIban, setQrIban] = useState<string>("");
+  const [qrDetails, setQrDetails] = useState<InvoicePaymentDetails>(buildInvoicePaymentDetails({}));
 
   const handleMarkPaid = async (invoiceId: string) => {
     if (!companyId) return;
@@ -48,17 +49,18 @@ export function UpcomingPayments({ payments, companyId }: { payments: Payment[];
   };
 
   const handleQr = async (p: Payment) => {
-    let iban = "";
+    let details = buildInvoicePaymentDetails({});
     if (p.ksef_number) {
       try {
         const { data } = await supabase.functions.invoke("ksef-download", { body: { invoice_id: p.id, format: "xml" } });
         if (data?.xml) {
-          const m = data.xml.match(/<[^>]*NrRB[^>]*>([^<]+)<\/[^>]*NrRB[^>]*>/i);
-          if (m) iban = m[1].trim();
+          details = extractPaymentDetailsFromXml(data.xml);
         }
-      } catch {}
+      } catch (error) {
+        console.warn("Nie udało się pobrać danych QR z XML:", error);
+      }
     }
-    setQrIban(iban);
+    setQrDetails(details);
     setQrPayment(p);
   };
 
@@ -123,9 +125,11 @@ export function UpcomingPayments({ payments, companyId }: { payments: Payment[];
           open={!!qrPayment}
           onOpenChange={(v) => !v && setQrPayment(null)}
           vendorName={qrPayment.vendor}
-          iban={qrIban}
+          iban={qrDetails.iban}
           amount={qrPayment.gross_amount}
           title={qrPayment.ksef_number || `Faktura ${qrPayment.vendor}`}
+          paymentMethodLabel={qrDetails.paymentMethodLabel}
+          blockReason={getPaymentQrBlockReason(qrDetails)}
         />
       )}
     </Card>

@@ -1,4 +1,5 @@
 import { xml2js } from "xml-js";
+import { buildInvoicePaymentDetails } from "./invoice-payment";
 
 // ── XML Parsing using DOMParser (kept for line-item extraction) ──
 
@@ -73,6 +74,10 @@ interface ZaliczkaLine {
   opis: string;
   kwota: string;
   stawkaVat: string;
+}
+
+interface KsefPdfDocument {
+  getBase64: (callback: (base64: string) => void) => void;
 }
 
 export interface ParsedInvoice {
@@ -360,20 +365,28 @@ async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Pro
     trim: true,
     elementNameFn: stripPrefix,
     attributeNameFn: stripPrefix,
-  }) as any;
+  }) as { Faktura?: Record<string, unknown> };
 
   const invoice = jsonDoc.Faktura;
-  const wersja = invoice?.Naglowek?.KodFormularza?._attributes?.kodSystemowy;
+  const getNestedText = (source: unknown, path: string[]): string => {
+    let current: unknown = source;
+    for (const key of path) {
+      if (!current || typeof current !== "object") return "";
+      current = (current as Record<string, unknown>)[key];
+    }
+    return typeof current === "string" ? current : "";
+  };
+  const wersja = getNestedText(invoice, ["Naglowek", "KodFormularza", "_attributes", "kodSystemowy"]);
 
   // NIP sprzedawcy z Podmiot1 → DaneIdentyfikacyjne → NIP
   const nipSprzedawcy =
-    invoice?.Podmiot1?.DaneIdentyfikacyjne?.NIP?._text ||
-    invoice?.Podmiot1?.DaneIdentyfikacyjne?.NIP ||
+    getNestedText(invoice, ["Podmiot1", "DaneIdentyfikacyjne", "NIP", "_text"]) ||
+    getNestedText(invoice, ["Podmiot1", "DaneIdentyfikacyjne", "NIP"]) ||
     "";
   // Data wystawienia: FA → P_1 (YYYY-MM-DD)
   const dataWystawienia =
-    invoice?.Fa?.P_1?._text ||
-    invoice?.Fa?.P_1 ||
+    getNestedText(invoice, ["Fa", "P_1", "_text"]) ||
+    getNestedText(invoice, ["Fa", "P_1"]) ||
     "";
 
   const qrUrl = await generateKsefQrUrl(
@@ -387,7 +400,7 @@ async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Pro
     qrCode: qrUrl,
   };
 
-  let pdf: any;
+  let pdf: KsefPdfDocument;
   switch (wersja) {
     case "FA (1)":
       pdf = generateFA1(invoice, additionalData);
@@ -420,13 +433,14 @@ export async function generateInvoicePdf(inv: ParsedInvoice, xmlString?: string)
     throw new Error("XML string is required for official KSeF PDF generation");
   }
   let pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
-  // Append polish payment QR if we have an account
-  if (inv.nrRachunku) {
+  const paymentDetails = buildInvoicePaymentDetails({ iban: inv.nrRachunku, paymentMethodCode: inv.formaPlatnosci });
+  // Append polish payment QR only for transfer invoices with an account.
+  if (paymentDetails.kind === "transfer" && paymentDetails.iban) {
     try {
       const { appendPaymentQrToPdf } = await import("./pdf-payment-qr");
       pdfBase64 = await appendPaymentQrToPdf(pdfBase64, {
         nip: inv.sprzedawca?.nip,
-        iban: inv.nrRachunku,
+        iban: paymentDetails.iban,
         amount: parseFloat(inv.doZaplaty || inv.sumaBrutto || "0") || 0,
         recipientName: inv.sprzedawca?.nazwa || "",
         title: inv.nrFaktury || inv.ksefNumber,
@@ -449,12 +463,13 @@ export async function generateInvoicePdfBase64(inv: ParsedInvoice, xmlString?: s
     throw new Error("XML string is required for official KSeF PDF generation");
   }
   let pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
-  if (inv.nrRachunku) {
+  const paymentDetails = buildInvoicePaymentDetails({ iban: inv.nrRachunku, paymentMethodCode: inv.formaPlatnosci });
+  if (paymentDetails.kind === "transfer" && paymentDetails.iban) {
     try {
       const { appendPaymentQrToPdf } = await import("./pdf-payment-qr");
       pdfBase64 = await appendPaymentQrToPdf(pdfBase64, {
         nip: inv.sprzedawca?.nip,
-        iban: inv.nrRachunku,
+        iban: paymentDetails.iban,
         amount: parseFloat(inv.doZaplaty || inv.sumaBrutto || "0") || 0,
         recipientName: inv.sprzedawca?.nazwa || "",
         title: inv.nrFaktury || inv.ksefNumber,

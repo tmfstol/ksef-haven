@@ -1,12 +1,13 @@
-import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X } from "lucide-react";
+import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X, RefreshCcw, ReceiptText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseKsefXml, generateInvoicePdf } from "@/lib/invoice-pdf";
+import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrBlockReason, type InvoicePaymentDetails } from "@/lib/invoice-payment";
 import { useSwipeable } from "@/hooks/useSwipeable";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useProjects, useAssignInvoiceToProject } from "@/hooks/useProjects";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +34,26 @@ function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("pl-PL", { year: "numeric", month: "short", day: "numeric" });
 }
 
+function toNumber(value: string | number) {
+  const normalized = typeof value === "number" ? value : Number(String(value).replace(",", "."));
+  return Number.isFinite(normalized) ? normalized : 0;
+}
+
+function mapXmlItems(xml: string, invoiceId: string, ksefNumber: string) {
+  const parsed = parseKsefXml(xml, ksefNumber);
+  return parsed.pozycje.map((item, index) => ({
+    id: `${invoiceId}-${index + 1}`,
+    ordinal: Number(item.nr) || index + 1,
+    name: item.opis || "—",
+    quantity: toNumber(item.ilosc),
+    unit: item.jm || "szt.",
+    unit_price_net: toNumber(item.cenaNetto),
+    net_amount: toNumber(item.wartoscNetto),
+    vat_rate: item.stawkaVat || "—",
+    gross_amount: toNumber(item.brutto),
+  }));
+}
+
 interface InvoiceCardProps {
   invoice: Invoice;
   isNew?: boolean;
@@ -45,16 +66,89 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
   const [qrOpen, setQrOpen] = useState(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(invoice.bookkeeper_note ?? "");
+  const [fallbackItems, setFallbackItems] = useState<ReturnType<typeof mapXmlItems> | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<InvoicePaymentDetails>(() =>
+    buildInvoicePaymentDetails({ iban: invoice.vat_whitelist_account })
+  );
 
   const { data: projects } = useProjects(invoice.company_id);
   const assignMutation = useAssignInvoiceToProject();
+
+  const { data: items, isLoading: isLoadingItems } = useQuery({
+    queryKey: ["invoice-items", invoice.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoice_items")
+        .select("id, ordinal, name, quantity, unit, unit_price_net, net_amount, vat_rate, gross_amount")
+        .eq("invoice_id", invoice.id)
+        .order("ordinal", { ascending: true });
+      if (error) throw error;
+      return (data || []).map((row) => ({
+        id: row.id,
+        ordinal: Number(row.ordinal),
+        name: row.name,
+        quantity: Number(row.quantity),
+        unit: row.unit || "szt.",
+        unit_price_net: Number(row.unit_price_net),
+        net_amount: Number(row.net_amount),
+        vat_rate: row.vat_rate || "—",
+        gross_amount: Number(row.gross_amount),
+      }));
+    },
+    enabled: expanded,
+  });
+
+  const hydrateDetailsMutation = useMutation({
+    mutationFn: async () => {
+      if (!invoice.ksef_number) throw new Error("Faktura nie ma numeru KSeF");
+      const { data, error } = await supabase.functions.invoke("ksef-download", {
+        body: { invoice_id: invoice.id, format: "xml" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.xml) throw new Error("Brak danych XML faktury");
+
+      const downloadedItems = mapXmlItems(data.xml, invoice.id, invoice.ksef_number);
+      const details = extractPaymentDetailsFromXml(data.xml);
+
+      const { count } = await supabase
+        .from("invoice_items")
+        .select("id", { count: "exact", head: true })
+        .eq("invoice_id", invoice.id);
+
+      if (downloadedItems.length > 0 && (count ?? 0) === 0) {
+        await supabase.from("invoice_items").insert(
+          downloadedItems.map(({ id, ...item }) => ({
+            invoice_id: invoice.id,
+            ordinal: item.ordinal,
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price_net: item.unit_price_net,
+            net_amount: item.net_amount,
+            vat_rate: item.vat_rate,
+            vat_amount: Math.max(item.gross_amount - item.net_amount, 0),
+            gross_amount: item.gross_amount,
+          }))
+        );
+        queryClient.invalidateQueries({ queryKey: ["invoice-items", invoice.id] });
+      }
+
+      return { downloadedItems, details };
+    },
+    onSuccess: ({ downloadedItems, details }) => {
+      setFallbackItems(downloadedItems);
+      setPaymentDetails(details);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Nie udało się pobrać treści faktury"),
+  });
 
   const saveNoteMutation = useMutation({
     mutationFn: async (note: string) => {
       const trimmed = note.trim() || null;
       const { error } = await supabase
         .from("invoices")
-        .update({ bookkeeper_note: trimmed } as any)
+        .update({ bookkeeper_note: trimmed })
         .eq("id", invoice.id);
       if (error) throw error;
     },
@@ -119,6 +213,22 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
     maxSwipe: 120,
   });
 
+  const displayItems = items && items.length > 0 ? items : fallbackItems ?? [];
+  const isHydrating = hydrateDetailsMutation.isPending;
+  const qrBlockReason = getPaymentQrBlockReason(paymentDetails);
+
+  const handleOpenQr = async () => {
+    if ((!paymentDetails.iban || paymentDetails.kind === "unknown") && invoice.ksef_number && !isHydrating) {
+      try {
+        const result = await hydrateDetailsMutation.mutateAsync();
+        setPaymentDetails(result.details);
+      } catch {
+        return;
+      }
+    }
+    setQrOpen(true);
+  };
+
   return (
     <div className="relative overflow-hidden rounded-xl">
       <div className="absolute inset-0 flex items-center justify-between px-6 pointer-events-none">
@@ -143,7 +253,13 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
         <button
           type="button"
           {...handlers}
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => {
+            const shouldOpen = !expanded;
+            setExpanded(shouldOpen);
+            if (shouldOpen && invoice.ksef_number && !hydrateDetailsMutation.isSuccess && !isHydrating) {
+              hydrateDetailsMutation.mutate();
+            }
+          }}
           style={{ touchAction: "pan-y" }}
           className="w-full text-left"
         >
@@ -182,6 +298,49 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
               className="overflow-hidden"
             >
               <div className="pt-3 mt-2 border-t border-border/50 space-y-3">
+                {/* Invoice contents */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      <ReceiptText className="h-3.5 w-3.5" />
+                      Zawartość faktury
+                    </div>
+                    {(isLoadingItems || isHydrating) && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                  </div>
+                  {displayItems.length > 0 ? (
+                    <div className="space-y-2">
+                      {displayItems.slice(0, 6).map((item) => (
+                        <div key={item.id} className="rounded-lg bg-secondary/40 px-3 py-2">
+                          <p className="text-sm font-medium text-foreground leading-snug">{item.name || "—"}</p>
+                          <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span>{item.quantity} {item.unit} · VAT {item.vat_rate}</span>
+                            <span className="font-semibold text-foreground tabular-nums">{formatCurrency(item.gross_amount)}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {displayItems.length > 6 && (
+                        <p className="text-xs text-muted-foreground">+ {displayItems.length - 6} kolejnych pozycji</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2 rounded-lg bg-secondary/30 px-3 py-2">
+                      <p className="text-sm text-muted-foreground">
+                        {isLoadingItems || isHydrating ? "Pobieranie treści faktury..." : "Brak zapisanych pozycji faktury."}
+                      </p>
+                      {!isLoadingItems && !isHydrating && invoice.ksef_number && (
+                        <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => hydrateDetailsMutation.mutate()}>
+                          <RefreshCcw className="h-3.5 w-3.5" /> Pobierz
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-secondary/30 px-3 py-2 text-xs">
+                  <span className="text-muted-foreground">Forma płatności</span>
+                  <span className="font-medium text-foreground">{paymentDetails.paymentMethodLabel}</span>
+                </div>
+
                 {/* Project assignment */}
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -260,8 +419,9 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
                 <div className="grid grid-cols-2 gap-2">
                   {invoice.invoice_type === "kosztowa" && (
                     <>
-                      <Button variant="outline" size="sm" className="min-h-[44px] text-xs gap-1.5" onClick={() => setQrOpen(true)}>
-                        <QrCode className="h-4 w-4" /> QR płatności
+                      <Button variant="outline" size="sm" className="min-h-[44px] text-xs gap-1.5" onClick={handleOpenQr} disabled={isHydrating || paymentDetails.kind === "cash"}>
+                        {isHydrating ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                        {paymentDetails.kind === "cash" ? "Gotówka" : "QR płatności"}
                       </Button>
                       <Button
                         variant="outline"
@@ -298,9 +458,11 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
         onOpenChange={setQrOpen}
         vendorName={invoice.vendor}
         vendorNip={invoice.nip}
-        iban={null}
+        iban={paymentDetails.iban}
         amount={invoice.gross_amount}
         title={invoice.ksef_number || invoice.vendor}
+        paymentMethodLabel={paymentDetails.paymentMethodLabel}
+        blockReason={qrBlockReason}
       />
     </div>
   );
