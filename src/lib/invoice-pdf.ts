@@ -419,7 +419,20 @@ export async function generateInvoicePdf(inv: ParsedInvoice, xmlString?: string)
   if (!xmlString) {
     throw new Error("XML string is required for official KSeF PDF generation");
   }
-  const pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
+  let pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
+  // Append polish payment QR if we have an account
+  if (inv.nrRachunku) {
+    try {
+      const { appendPaymentQrToPdf } = await import("./pdf-payment-qr");
+      pdfBase64 = await appendPaymentQrToPdf(pdfBase64, {
+        nip: inv.sprzedawca?.nip,
+        iban: inv.nrRachunku,
+        amount: parseFloat(inv.doZaplaty || inv.sumaBrutto || "0") || 0,
+        recipientName: inv.sprzedawca?.nazwa || "",
+        title: inv.nrFaktury || inv.ksefNumber,
+      });
+    } catch (e) { console.warn("QR overlay skipped:", e); }
+  }
   const anchor = document.createElement("a");
   anchor.href = `data:application/pdf;base64,${pdfBase64}`;
   anchor.download = `${inv.ksefNumber}.pdf`;
@@ -435,5 +448,18 @@ export async function generateInvoicePdfBase64(inv: ParsedInvoice, xmlString?: s
   if (!xmlString) {
     throw new Error("XML string is required for official KSeF PDF generation");
   }
-  return generatePdfWithCirfmf(xmlString, inv.ksefNumber);
+  let pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
+  if (inv.nrRachunku) {
+    try {
+      const { appendPaymentQrToPdf } = await import("./pdf-payment-qr");
+      pdfBase64 = await appendPaymentQrToPdf(pdfBase64, {
+        nip: inv.sprzedawca?.nip,
+        iban: inv.nrRachunku,
+        amount: parseFloat(inv.doZaplaty || inv.sumaBrutto || "0") || 0,
+        recipientName: inv.sprzedawca?.nazwa || "",
+        title: inv.nrFaktury || inv.ksefNumber,
+      });
+    } catch (e) { console.warn("QR overlay skipped:", e); }
+  }
+  return pdfBase64;
 }
