@@ -73,34 +73,63 @@ export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyI
       const ws = wb.Sheets[wb.SheetNames[0]];
       const json: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" });
 
-      // Heurystyka: znajdź wiersz z nagłówkiem (zawiera "nazwa" / "opis" / "lp")
-      let headerIdx = 0;
-      for (let i = 0; i < Math.min(json.length, 15); i++) {
-        const line = json[i].map((c) => String(c).toLowerCase()).join(" ");
-        if (/lp|l\.p\.|nazwa|opis|jednostka|j\.m\./.test(line)) { headerIdx = i; break; }
+      // Heurystyka: znajdź wiersz nagłówka — szukamy max 25 wierszy w górę
+      let headerIdx = -1;
+      for (let i = 0; i < Math.min(json.length, 25); i++) {
+        const line = json[i].map((c) => String(c).toLowerCase()).join(" | ");
+        if (/(^|\|)\s*(lp\.?|l\.p\.?|nr|poz)\s*(\||$)/.test(line) ||
+            /nazwa|opis|rodzaj|przedmiot|wyszczeg/.test(line)) {
+          headerIdx = i; break;
+        }
       }
-      const headers = json[headerIdx].map((c) => String(c).toLowerCase().trim());
-      const idxLp = headers.findIndex((h) => /^l\.?p\.?$/.test(h) || h === "nr" || h === "poz");
-      const idxNazwa = headers.findIndex((h) => h.includes("nazwa") || h.includes("opis") || h.includes("rodzaj"));
-      const idxJm = headers.findIndex((h) => h.includes("jedn") || h === "j.m." || h === "jm");
-      const idxIlosc = headers.findIndex((h) => h.includes("ilo") || h.includes("liczba"));
+      if (headerIdx < 0) headerIdx = 0;
 
-      if (idxNazwa < 0 || idxIlosc < 0) {
-        toast.error("Nie rozpoznano kolumn. Wymagane: Nazwa pozycji + Ilość.");
+      const rawHeaders = json[headerIdx].map((c) => String(c ?? ""));
+      const headers = rawHeaders.map((c) => c.toLowerCase().trim());
+      const idxLp = headers.findIndex((h) => /^l\.?p\.?$/.test(h) || h === "nr" || h === "poz" || h === "poz." || h === "lp");
+      // Kolumny opisowe (nazwa/opis/rodzaj/przedmiot/branża/średnica/kondygnacja itp.)
+      const descKeywords = ["nazwa", "opis", "rodzaj", "przedmiot", "wyszczeg", "branż", "średnica", "srednica", "kondygnac", "typ", "materiał", "material"];
+      const descIdxs: number[] = [];
+      headers.forEach((h, i) => { if (descKeywords.some((k) => h.includes(k))) descIdxs.push(i); });
+      // Kolumna ilości — obsługa "ilość", "liczba", "długość", "[mb]", "[m]", "m2", "szt", "kpl"
+      let idxIlosc = headers.findIndex((h) => /ilo[śs]|liczba|d[łl]ugo[śs]|obmiar|krotno/.test(h));
+      if (idxIlosc < 0) idxIlosc = headers.findIndex((h) => /\[(mb|m|m2|m3|szt|kpl|kg|t)\]?/.test(h));
+      // Kolumna jednostki
+      let idxJm = headers.findIndex((h) => /jedn|j\.?m\.?$|^jm$/.test(h));
+      // Wyciągnij jednostkę z nagłówka ilości jeśli brak osobnej kolumny (np. "Długość [mb]")
+      let unitFromHeader = "";
+      if (idxJm < 0 && idxIlosc >= 0) {
+        const m = rawHeaders[idxIlosc].match(/\[([^\]]+)\]/);
+        if (m) unitFromHeader = m[1].trim();
+        else if (/d[łl]ugo[śs]/i.test(rawHeaders[idxIlosc])) unitFromHeader = "mb";
+      }
+
+      // Fallback: jeśli nie ma kolumn opisowych, weź wszystkie tekstowe poza Lp/ilość/jm
+      if (descIdxs.length === 0) {
+        headers.forEach((_, i) => {
+          if (i !== idxLp && i !== idxIlosc && i !== idxJm) descIdxs.push(i);
+        });
+      }
+
+      if (descIdxs.length === 0 || idxIlosc < 0) {
+        toast.error("Nie rozpoznano kolumn.", {
+          description: `Wykryte nagłówki: ${rawHeaders.filter(Boolean).join(" | ")}. Wymagana kolumna z opisem i ilością/długością.`,
+        });
         return;
       }
 
       const parsed: PrzedmiarRow[] = [];
       for (let i = headerIdx + 1; i < json.length; i++) {
         const r = json[i];
-        const nazwa = String(r[idxNazwa] ?? "").trim();
+        const nazwa = descIdxs.map((di) => String(r[di] ?? "").trim()).filter(Boolean).join(" • ");
         const iloscRaw = r[idxIlosc];
-        const ilosc = typeof iloscRaw === "number" ? iloscRaw : parseFloat(String(iloscRaw).replace(",", "."));
+        const ilosc = typeof iloscRaw === "number" ? iloscRaw : parseFloat(String(iloscRaw).replace(/\s/g, "").replace(",", "."));
         if (!nazwa || !isFinite(ilosc) || ilosc <= 0) continue;
+        const jm = idxJm >= 0 ? String(r[idxJm] ?? "").trim() : unitFromHeader;
         parsed.push({
           lp: String(r[idxLp] ?? parsed.length + 1),
           nazwa,
-          jednostka: String(r[idxJm] ?? "").trim(),
+          jednostka: jm,
           ilosc,
         });
       }
