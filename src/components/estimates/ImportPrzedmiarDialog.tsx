@@ -73,14 +73,19 @@ export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyI
       const ws = wb.Sheets[wb.SheetNames[0]];
       const json: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" });
 
-      // Heurystyka: znajdź wiersz nagłówka — szukamy max 25 wierszy w górę
+      // Heurystyka: znajdź wiersz nagłówka — musi mieć ≥2 niepuste, krótkie komórki
+      const isHeaderRow = (row: any[]) => {
+        const cells = row.map((c) => String(c ?? "").trim()).filter(Boolean);
+        if (cells.length < 2) return false;
+        // Każda komórka nagłówka powinna być krótka (≤40 znaków) — odrzuca wiersze opisowe/komentarze
+        if (cells.some((c) => c.length > 40)) return false;
+        const line = cells.join(" | ").toLowerCase();
+        return /(^|\| ?)(lp\.?|l\.p\.?|nr|poz\.?)( ?\||$)/.test(line) ||
+               /\bnazwa\b|\bopis\b|\brodzaj\b|\bprzedmiot\b|wyszczeg|branż|średnica|srednica|kondygnac|ilość|ilosc|d[łl]ugo[śs]|jedn|j\.m\./.test(line);
+      };
       let headerIdx = -1;
-      for (let i = 0; i < Math.min(json.length, 25); i++) {
-        const line = json[i].map((c) => String(c).toLowerCase()).join(" | ");
-        if (/(^|\|)\s*(lp\.?|l\.p\.?|nr|poz)\s*(\||$)/.test(line) ||
-            /nazwa|opis|rodzaj|przedmiot|wyszczeg/.test(line)) {
-          headerIdx = i; break;
-        }
+      for (let i = 0; i < Math.min(json.length, 30); i++) {
+        if (isHeaderRow(json[i])) { headerIdx = i; break; }
       }
       if (headerIdx < 0) headerIdx = 0;
 
