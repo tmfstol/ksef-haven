@@ -361,22 +361,35 @@ const EstimateBuilder = () => {
                       </div>
                     ) : (
                       <div className="space-y-1.5">
-                        <div className="grid gap-2 px-2 text-[10px] uppercase tracking-wide text-muted-foreground font-semibold grid-cols-[110px_1fr_70px_70px_90px_90px_90px_36px]">
+                        <div className="grid gap-2 px-2 text-[10px] uppercase tracking-wide text-muted-foreground font-semibold grid-cols-[90px_1fr_60px_50px_90px_90px_90px_36px]">
                           <div>Nr KNR</div>
                           <div>Pozycja</div>
                           <div className="text-right">Ilość</div>
                           <div>J.m.</div>
-                          <div className="text-right">R (zł)</div>
-                          <div className="text-right">M (zł)</div>
+                          <div className="text-right">Stawka R / jm</div>
+                          <div className="text-right">Cena M / jm</div>
                           <div className="text-right">Razem</div>
                           <div></div>
                         </div>
                         {stageItems.map((it) => {
+                          // Stawka robocizny za jednostkę (np. mb) = naklad_robocizny * stawka_rg
+                          const stawkaR = Number(it.naklad_robocizny || 0) * Number(it.stawka_rg || 0);
+                          const cenaM = Number(it.naklad_materialu || 0) * Number(it.cena_mat || 0);
                           const v = calcRMS(it as any);
                           return (
-                            <div key={it.id} className="grid gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 items-center grid-cols-[110px_1fr_70px_70px_90px_90px_90px_36px]">
-                              <div className="text-[10px] font-mono text-primary truncate">{it.knr_number ?? "—"}</div>
-                              <div className="text-sm font-medium truncate" title={it.opis_pelny ?? it.nazwa}>{it.nazwa}</div>
+                            <div key={it.id} className="grid gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 items-center grid-cols-[90px_1fr_60px_50px_90px_90px_90px_36px]">
+                              <Input
+                                defaultValue={it.knr_number ?? ""}
+                                onBlur={(e) => e.target.value !== (it.knr_number ?? "") && handleItemPatch(it, { knr_number: e.target.value || null })}
+                                className="h-7 text-[10px] font-mono text-primary px-1.5"
+                                placeholder="—"
+                              />
+                              <Input
+                                defaultValue={it.nazwa}
+                                onBlur={(e) => e.target.value !== it.nazwa && handleItemPatch(it, { nazwa: e.target.value })}
+                                className="h-7 text-sm font-medium px-2"
+                                title={it.opis_pelny ?? it.nazwa}
+                              />
                               <Input
                                 type="number" step="0.01"
                                 defaultValue={it.ilosc}
@@ -384,11 +397,38 @@ const EstimateBuilder = () => {
                                   const num = parseFloat(e.target.value.replace(",", ".")) || 0;
                                   if (num !== Number(it.ilosc)) handleItemPatch(it, { ilosc: num });
                                 }}
-                                className="h-7 text-right tabular-nums text-sm"
+                                className="h-7 text-right tabular-nums text-sm px-1.5"
                               />
-                              <div className="text-xs text-muted-foreground">{it.jednostka}</div>
-                              <div className="text-right text-sm tabular-nums text-muted-foreground">{fmt(v.r)}</div>
-                              <div className="text-right text-sm tabular-nums text-muted-foreground">{fmt(v.m)}</div>
+                              <Input
+                                defaultValue={it.jednostka}
+                                onBlur={(e) => e.target.value !== it.jednostka && handleItemPatch(it, { jednostka: e.target.value || "szt" })}
+                                className="h-7 text-xs text-muted-foreground px-1.5"
+                              />
+                              <Input
+                                type="number" step="0.01"
+                                defaultValue={stawkaR.toFixed(2)}
+                                onBlur={(e) => {
+                                  const num = parseFloat(e.target.value.replace(",", ".")) || 0;
+                                  if (Math.abs(num - stawkaR) > 0.001) {
+                                    // Zapisujemy jako stawka_rg z nakładem 1, dla prostego edytowania ceny za jm
+                                    handleItemPatch(it, { stawka_rg: num, naklad_robocizny: 1 });
+                                  }
+                                }}
+                                className="h-7 text-right tabular-nums text-sm px-1.5"
+                                placeholder="0.00"
+                              />
+                              <Input
+                                type="number" step="0.01"
+                                defaultValue={cenaM.toFixed(2)}
+                                onBlur={(e) => {
+                                  const num = parseFloat(e.target.value.replace(",", ".")) || 0;
+                                  if (Math.abs(num - cenaM) > 0.001) {
+                                    handleItemPatch(it, { cena_mat: num, naklad_materialu: 1 });
+                                  }
+                                }}
+                                className="h-7 text-right tabular-nums text-sm px-1.5"
+                                placeholder="0.00"
+                              />
                               <div className="text-right font-semibold text-sm tabular-nums">{fmt(v.total)}</div>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteItem.mutate({ id: it.id, estimate_id: estimate.id })}>
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -396,6 +436,29 @@ const EstimateBuilder = () => {
                             </div>
                           );
                         })}
+                        <div className="pt-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const ord = stageItems.length + 1;
+                              addItem.mutate({
+                                estimate_id: estimate.id,
+                                stage_id: stage.id,
+                                ordinal: ord,
+                                nazwa: "Nowa pozycja",
+                                jednostka: "mb",
+                                ilosc: 1,
+                                naklad_robocizny: 1,
+                                naklad_materialu: 1,
+                                stawka_rg: 0,
+                                cena_mat: 0,
+                              });
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />Dodaj pozycję ręcznie
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </Card>
