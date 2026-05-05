@@ -16,9 +16,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { ArrowLeft, Plus, Search, Trash2, FileDown, Loader2, Calculator, Layers, Briefcase, Settings2 } from "lucide-react";
+import { ArrowLeft, Plus, Search, Trash2, FileDown, Loader2, Calculator, Layers, Briefcase, Settings2, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { generateEstimatePdf } from "@/lib/estimate-pdf";
+import { ImportPrzedmiarDialog } from "@/components/estimates/ImportPrzedmiarDialog";
 import { toast } from "sonner";
 
 const branzaColor: Record<Branza, string> = {
