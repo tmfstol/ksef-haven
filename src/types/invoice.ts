@@ -14,6 +14,11 @@ export interface Invoice {
   ksef_number?: string | null;
   project_id?: string | null;
   bookkeeper_note?: string | null;
+  payment_status?: string;
+  payment_due_date?: string | null;
+  paid_at?: string | null;
+  vat_whitelist_status?: "not_checked" | "verified" | "invalid" | "unknown";
+  vat_whitelist_checked_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }

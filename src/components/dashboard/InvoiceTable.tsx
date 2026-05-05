@@ -1,4 +1,4 @@
-import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight } from "lucide-react";
+import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { parseKsefXml, generateInvoicePdf, generateInvoicePdfBase64 } from "@/lib/invoice-pdf";
 import { InvoiceItemsRow } from "./InvoiceItemsRow";
 import { AdBanner, AdBannerPlaceholder } from "./AdBanner";
+import { PaymentQrModal } from "@/components/payments/PaymentQrModal";
 
 type DownloadState = { id: string; format: "xml" | "upo" | "pdf" | "email" } | null;
 
@@ -63,6 +64,39 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
   const [sortAsc, setSortAsc] = useState(false);
   const [downloading, setDownloading] = useState<DownloadState>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [qrInvoice, setQrInvoice] = useState<Invoice | null>(null);
+  const [qrIban, setQrIban] = useState<string>("");
+
+  const handleMarkPaid = async (invoice: Invoice) => {
+    const isPaid = invoice.payment_status === "paid";
+    const { error } = await supabase
+      .from("invoices")
+      .update({
+        payment_status: isPaid ? "unpaid" : "paid",
+        paid_at: isPaid ? null : new Date().toISOString(),
+      })
+      .eq("id", invoice.id);
+    if (error) toast.error("Błąd aktualizacji statusu");
+    else toast.success(isPaid ? "Oznaczono jako nieopłacone" : "Oznaczono jako opłacone");
+  };
+
+  const handleOpenQr = async (invoice: Invoice) => {
+    // Try to fetch IBAN from invoice XML
+    let iban = "";
+    if (invoice.ksef_number) {
+      try {
+        const { data } = await supabase.functions.invoke("ksef-download", {
+          body: { invoice_id: invoice.id, format: "xml" },
+        });
+        if (data?.xml) {
+          const m = data.xml.match(/<[^>]*NrRB[^>]*>([^<]+)<\/[^>]*NrRB[^>]*>/i);
+          if (m) iban = m[1].trim();
+        }
+      } catch {}
+    }
+    setQrIban(iban);
+    setQrInvoice(invoice);
+  };
 
   const sorted = [...invoices].sort((a, b) => {
     let cmp = 0;
@@ -296,12 +330,42 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                     {formatCurrency(invoice.gross_amount)}
                   </td>
                   <td className="px-5 py-3.5 text-center">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[invoice.status]}`}>
-                      {statusLabels[invoice.status]}
-                    </span>
+                    <div className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${statusStyles[invoice.status]}`}>
+                        {statusLabels[invoice.status]}
+                      </span>
+                      {invoice.payment_status === "paid" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-success/10 text-success">
+                          <CheckCircle2 className="h-2.5 w-2.5" /> Opłacone
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-warning/10 text-warning">
+                          Nieopłacone
+                        </span>
+                      )}
+                      {invoice.vat_whitelist_status === "verified" && (
+                        <span title="Biała lista VAT: zweryfikowano" className="text-success"><ShieldCheck className="h-3.5 w-3.5" /></span>
+                      )}
+                      {invoice.vat_whitelist_status === "invalid" && (
+                        <span title="Biała lista VAT: niezgodność" className="text-destructive"><ShieldAlert className="h-3.5 w-3.5" /></span>
+                      )}
+                      {invoice.vat_whitelist_status === "unknown" && (
+                        <span title="Biała lista VAT: brak danych" className="text-muted-foreground"><ShieldQuestion className="h-3.5 w-3.5" /></span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1.5">
+                    <div className="flex items-center justify-end gap-1">
+                      {invoice.invoice_type === "kosztowa" && (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-primary" title="Pokaż QR płatności" onClick={() => handleOpenQr(invoice)}>
+                            <QrCode className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-lg ${invoice.payment_status === "paid" ? "text-success" : "text-muted-foreground hover:text-success"}`} title={invoice.payment_status === "paid" ? "Cofnij oznaczenie" : "Oznacz jako opłacone"} onClick={() => handleMarkPaid(invoice)}>
+                            <CheckCircle2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -383,6 +447,17 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
           })}
         </tbody>
       </table>
+      {qrInvoice && (
+        <PaymentQrModal
+          open={!!qrInvoice}
+          onOpenChange={(v) => !v && setQrInvoice(null)}
+          vendorName={qrInvoice.vendor}
+          vendorNip={qrInvoice.nip}
+          iban={qrIban}
+          amount={qrInvoice.gross_amount}
+          title={qrInvoice.ksef_number || `Faktura ${qrInvoice.vendor}`}
+        />
+      )}
     </div>
   );
 }

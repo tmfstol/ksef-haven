@@ -1276,6 +1276,7 @@ export type Database = {
           invoice_type: string
           ksef_number: string | null
           nip: string
+          paid_at: string | null
           payment_due_date: string | null
           payment_status: string
           pdf_path: string | null
@@ -1284,6 +1285,9 @@ export type Database = {
           status: string
           tags: string[] | null
           updated_at: string
+          vat_whitelist_account: string | null
+          vat_whitelist_checked_at: string | null
+          vat_whitelist_status: string
           vendor: string
           xml_path: string | null
         }
@@ -1298,6 +1302,7 @@ export type Database = {
           invoice_type?: string
           ksef_number?: string | null
           nip: string
+          paid_at?: string | null
           payment_due_date?: string | null
           payment_status?: string
           pdf_path?: string | null
@@ -1306,6 +1311,9 @@ export type Database = {
           status?: string
           tags?: string[] | null
           updated_at?: string
+          vat_whitelist_account?: string | null
+          vat_whitelist_checked_at?: string | null
+          vat_whitelist_status?: string
           vendor: string
           xml_path?: string | null
         }
@@ -1320,6 +1328,7 @@ export type Database = {
           invoice_type?: string
           ksef_number?: string | null
           nip?: string
+          paid_at?: string | null
           payment_due_date?: string | null
           payment_status?: string
           pdf_path?: string | null
@@ -1328,6 +1337,9 @@ export type Database = {
           status?: string
           tags?: string[] | null
           updated_at?: string
+          vat_whitelist_account?: string | null
+          vat_whitelist_checked_at?: string | null
+          vat_whitelist_status?: string
           vendor?: string
           xml_path?: string | null
         }

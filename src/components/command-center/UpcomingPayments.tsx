@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Clock, AlertCircle, QrCode, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useState } from "react";
+import { PaymentQrModal } from "@/components/payments/PaymentQrModal";
 
 interface Payment {
   id: string;
@@ -32,17 +34,32 @@ function generateEpcQr(vendor: string, amount: number, _nip?: string): string {
 }
 
 export function UpcomingPayments({ payments, companyId }: { payments: Payment[]; companyId: string | null }) {
+  const [qrPayment, setQrPayment] = useState<Payment | null>(null);
+  const [qrIban, setQrIban] = useState<string>("");
+
   const handleMarkPaid = async (invoiceId: string) => {
     if (!companyId) return;
     const { error } = await supabase
       .from("invoices")
-      .update({ payment_status: "paid" })
+      .update({ payment_status: "paid", paid_at: new Date().toISOString() })
       .eq("id", invoiceId);
-    if (error) {
-      toast.error("Błąd aktualizacji statusu");
-    } else {
-      toast.success("Oznaczono jako opłacone");
+    if (error) toast.error("Błąd aktualizacji statusu");
+    else toast.success("Oznaczono jako opłacone");
+  };
+
+  const handleQr = async (p: Payment) => {
+    let iban = "";
+    if (p.ksef_number) {
+      try {
+        const { data } = await supabase.functions.invoke("ksef-download", { body: { invoice_id: p.id, format: "xml" } });
+        if (data?.xml) {
+          const m = data.xml.match(/<[^>]*NrRB[^>]*>([^<]+)<\/[^>]*NrRB[^>]*>/i);
+          if (m) iban = m[1].trim();
+        }
+      } catch {}
     }
+    setQrIban(iban);
+    setQrPayment(p);
   };
 
   const urgent = payments.filter((p) => p.days_until_due <= 7);
@@ -87,15 +104,12 @@ export function UpcomingPayments({ payments, companyId }: { payments: Payment[];
                     {p.payment_due_date && ` · ${formatDate(p.payment_due_date)}`}
                   </p>
                 </div>
-                <div className="text-right flex items-center gap-2">
+                <div className="text-right flex items-center gap-1">
                   <span className="text-sm font-semibold text-foreground">{formatPln(p.gross_amount)}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleMarkPaid(p.id)}
-                    title="Oznacz jako opłacone"
-                  >
+                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleQr(p)} title="QR płatności">
+                    <QrCode className="h-3.5 w-3.5 text-primary" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleMarkPaid(p.id)} title="Oznacz jako opłacone">
                     <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
                   </Button>
                 </div>
@@ -104,6 +118,16 @@ export function UpcomingPayments({ payments, companyId }: { payments: Payment[];
           )}
         </div>
       </CardContent>
+      {qrPayment && (
+        <PaymentQrModal
+          open={!!qrPayment}
+          onOpenChange={(v) => !v && setQrPayment(null)}
+          vendorName={qrPayment.vendor}
+          iban={qrIban}
+          amount={qrPayment.gross_amount}
+          title={qrPayment.ksef_number || `Faktura ${qrPayment.vendor}`}
+        />
+      )}
     </Card>
   );
 }
