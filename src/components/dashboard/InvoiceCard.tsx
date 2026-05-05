@@ -214,6 +214,22 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
     maxSwipe: 120,
   });
 
+  const displayItems = items && items.length > 0 ? items : fallbackItems ?? [];
+  const isHydrating = hydrateDetailsMutation.isPending;
+  const qrBlockReason = getPaymentQrBlockReason(paymentDetails);
+
+  const handleOpenQr = async () => {
+    if ((!paymentDetails.iban || paymentDetails.kind === "unknown") && invoice.ksef_number && !isHydrating) {
+      try {
+        const result = await hydrateDetailsMutation.mutateAsync();
+        setPaymentDetails(result.details);
+      } catch {
+        return;
+      }
+    }
+    setQrOpen(true);
+  };
+
   return (
     <div className="relative overflow-hidden rounded-xl">
       <div className="absolute inset-0 flex items-center justify-between px-6 pointer-events-none">
@@ -238,7 +254,13 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
         <button
           type="button"
           {...handlers}
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => {
+            const shouldOpen = !expanded;
+            setExpanded(shouldOpen);
+            if (shouldOpen && invoice.ksef_number && !hydrateDetailsMutation.isSuccess && !isHydrating) {
+              hydrateDetailsMutation.mutate();
+            }
+          }}
           style={{ touchAction: "pan-y" }}
           className="w-full text-left"
         >
