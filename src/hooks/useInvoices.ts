@@ -30,6 +30,8 @@ export function useInvoices(companyId?: string | null) {
         xml_path: row.xml_path,
         pdf_path: row.pdf_path,
         ksef_number: row.ksef_number,
+        project_id: row.project_id,
+        bookkeeper_note: row.bookkeeper_note,
         created_at: row.created_at,
         updated_at: row.updated_at,
       })) as Invoice[];
