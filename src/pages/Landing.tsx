@@ -525,16 +525,47 @@ const Landing = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-background/5 py-10">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5 text-sm text-background/30">
-            <img src={logoFacturo} alt="Facturo" className="h-6 w-6 rounded-md object-contain" />
-            <span>Facturo — platforma księgowa z AI</span>
+      <footer className="border-t border-background/5 py-12">
+        <div className="max-w-7xl mx-auto px-6 space-y-8">
+          {/* SEO internal links */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+            <div>
+              <h3 className="text-background/80 font-semibold mb-3">Produkt</h3>
+              <ul className="space-y-2 text-background/40">
+                <li><Link to="/program-do-faktur-ksef" className="hover:text-background/70">Program do faktur KSeF</Link></li>
+                <li><Link to="/darmowy-program-do-faktur" className="hover:text-background/70">Darmowy program do faktur</Link></li>
+                <li><Link to="/kosztorys-budowlany-online" className="hover:text-background/70">Kosztorys budowlany online</Link></li>
+                <li><Link to="/karty-pracy-online" className="hover:text-background/70">Karty pracy online</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-background/80 font-semibold mb-3">Firma</h3>
+              <ul className="space-y-2 text-background/40">
+                <li><Link to="/pricing" className="hover:text-background/70">Cennik</Link></li>
+                <li><Link to="/blog" className="hover:text-background/70">Blog</Link></li>
+                <li><Link to="/login" className="hover:text-background/70">Zaloguj się</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-background/80 font-semibold mb-3">Prawne</h3>
+              <ul className="space-y-2 text-background/40">
+                <li><Link to="/privacy" className="hover:text-background/70">Polityka prywatności</Link></li>
+                <li><Link to="/terms" className="hover:text-background/70">Regulamin</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-background/80 font-semibold mb-3">Kontakt</h3>
+              <ul className="space-y-2 text-background/40">
+                <li>kontakt@e-ksefai.pl</li>
+              </ul>
+            </div>
           </div>
-          <div className="flex items-center gap-6 text-xs text-background/20">
-            <a href="#" className="hover:text-background/50 transition-colors">Polityka prywatności</a>
-            <a href="#" className="hover:text-background/50 transition-colors">Regulamin</a>
-            <span>© {new Date().getFullYear()} Facturo</span>
+          <div className="pt-6 border-t border-background/5 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5 text-sm text-background/30">
+              <img src={logoFacturo} alt="Facturo" className="h-6 w-6 rounded-md object-contain" />
+              <span>Facturo — program do faktur KSeF z AI</span>
+            </div>
+            <span className="text-xs text-background/20">© {new Date().getFullYear()} Facturo</span>
           </div>
         </div>
       </footer>
