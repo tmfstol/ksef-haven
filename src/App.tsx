@@ -29,6 +29,10 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Pricing from "./pages/Pricing";
 import CheckoutReturn from "./pages/CheckoutReturn";
+import ProgramDoFakturKsef from "./pages/seo/ProgramDoFakturKsef";
+import DarmowyProgramDoFaktur from "./pages/seo/DarmowyProgramDoFaktur";
+import KosztorysBudowlanyOnline from "./pages/seo/KosztorysBudowlanyOnline";
+import KartyPracyOnline from "./pages/seo/KartyPracyOnline";
 import { Loader2 } from "lucide-react";
 import { VoiceAgentWidget } from "@/components/dashboard/VoiceAgentWidget";
 import { useCompanies } from "@/hooks/useCompanies";
@@ -90,6 +94,10 @@ const AppRoutes = () => {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/checkout/return" element={<CheckoutReturn />} />
+        <Route path="/program-do-faktur-ksef" element={<ProgramDoFakturKsef />} />
+        <Route path="/darmowy-program-do-faktur" element={<DarmowyProgramDoFaktur />} />
+        <Route path="/kosztorys-budowlany-online" element={<KosztorysBudowlanyOnline />} />
+        <Route path="/karty-pracy-online" element={<KartyPracyOnline />} />
         <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/invoices/new" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
