@@ -330,9 +330,29 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                     {formatCurrency(invoice.gross_amount)}
                   </td>
                   <td className="px-5 py-3.5 text-center">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[invoice.status]}`}>
-                      {statusLabels[invoice.status]}
-                    </span>
+                    <div className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${statusStyles[invoice.status]}`}>
+                        {statusLabels[invoice.status]}
+                      </span>
+                      {invoice.payment_status === "paid" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-success/10 text-success">
+                          <CheckCircle2 className="h-2.5 w-2.5" /> Opłacone
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-warning/10 text-warning">
+                          Nieopłacone
+                        </span>
+                      )}
+                      {invoice.vat_whitelist_status === "verified" && (
+                        <span title="Biała lista VAT: zweryfikowano" className="text-success"><ShieldCheck className="h-3.5 w-3.5" /></span>
+                      )}
+                      {invoice.vat_whitelist_status === "invalid" && (
+                        <span title="Biała lista VAT: niezgodność" className="text-destructive"><ShieldAlert className="h-3.5 w-3.5" /></span>
+                      )}
+                      {invoice.vat_whitelist_status === "unknown" && (
+                        <span title="Biała lista VAT: brak danych" className="text-muted-foreground"><ShieldQuestion className="h-3.5 w-3.5" /></span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1.5">
