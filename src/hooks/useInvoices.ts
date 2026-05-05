@@ -32,6 +32,11 @@ export function useInvoices(companyId?: string | null) {
         ksef_number: row.ksef_number,
         project_id: row.project_id,
         bookkeeper_note: row.bookkeeper_note,
+        payment_status: row.payment_status,
+        payment_due_date: row.payment_due_date,
+        paid_at: row.paid_at,
+        vat_whitelist_status: row.vat_whitelist_status,
+        vat_whitelist_checked_at: row.vat_whitelist_checked_at,
         created_at: row.created_at,
         updated_at: row.updated_at,
       })) as Invoice[];
