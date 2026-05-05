@@ -50,6 +50,29 @@ const BlogPost = () => {
       <PublicNav variant="light" />
       <div className="h-16" />
 
+      <Seo
+        title={`${post.title} — Facturo Blog`}
+        description={post.excerpt || post.title}
+        path={`/blog/${post.slug}`}
+        image={(post as any).cover_image_url || undefined}
+        keywords={`${post.category}, KSeF, faktury, kosztorysy, karty pracy, ${post.title}`}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "BlogPosting",
+          headline: post.title,
+          description: post.excerpt,
+          image: (post as any).cover_image_url || undefined,
+          datePublished: post.published_at,
+          author: { "@type": "Organization", name: "Facturo" },
+          publisher: {
+            "@type": "Organization",
+            name: "Facturo",
+            logo: { "@type": "ImageObject", url: "https://facturo.info/favicon.png" },
+          },
+          mainEntityOfPage: `https://facturo.info/blog/${post.slug}`,
+        }}
+      />
+
       {/* Cover image */}
       {(post as any).cover_image_url && (
         <div className="w-full max-h-[400px] overflow-hidden">
