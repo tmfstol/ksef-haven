@@ -8,6 +8,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { StripeEmbeddedCheckout } from "@/components/payments/StripeEmbeddedCheckout";
 import { PaymentTestModeBanner } from "@/components/payments/PaymentTestModeBanner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import Seo from "@/components/Seo";
 
 const PLAN = {
   priceId: "facturo_pro_monthly",
@@ -45,6 +46,19 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo
+        title="Cennik Facturo — 15 zł / mies. za pełen dostęp do KSeF i AI"
+        description="Jeden plan Facturo Pro: faktury KSeF FA(3), kosztorysy budowlane, karty pracy, CRM, asystent AI. 15 zł miesięcznie, anulujesz w każdej chwili."
+        keywords="cennik Facturo, cena programu do faktur, koszt KSeF, ile kosztuje program do faktur"
+        path="/pricing"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: "Facturo Pro",
+          description: "Program do faktur KSeF z asystentem AI",
+          offers: { "@type": "Offer", price: "15", priceCurrency: "PLN", availability: "https://schema.org/InStock" },
+        }}
+      />
       <PaymentTestModeBanner />
       <div className="max-w-3xl mx-auto px-6 py-16">
         <div className="text-center mb-12">
