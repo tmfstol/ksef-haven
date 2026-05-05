@@ -55,11 +55,10 @@ export function UpcomingPayments({ payments, companyId }: { payments: Payment[];
         const { data } = await supabase.functions.invoke("ksef-download", { body: { invoice_id: p.id, format: "xml" } });
         if (data?.xml) {
           details = extractPaymentDetailsFromXml(data.xml);
-          if (details.iban) {
-            supabase.from("invoices").update({ vat_whitelist_account: details.iban } as any).eq("id", p.id);
-          }
         }
-      } catch {}
+      } catch (error) {
+        console.warn("Nie udało się pobrać danych QR z XML:", error);
+      }
     }
     setQrDetails(details);
     setQrPayment(p);
