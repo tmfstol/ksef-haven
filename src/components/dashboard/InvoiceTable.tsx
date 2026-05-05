@@ -1,4 +1,4 @@
-import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight } from "lucide-react";
+import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { parseKsefXml, generateInvoicePdf, generateInvoicePdfBase64 } from "@/lib/invoice-pdf";
 import { InvoiceItemsRow } from "./InvoiceItemsRow";
 import { AdBanner, AdBannerPlaceholder } from "./AdBanner";
+import { PaymentQrModal } from "@/components/payments/PaymentQrModal";
 
 type DownloadState = { id: string; format: "xml" | "upo" | "pdf" | "email" } | null;
 
@@ -63,6 +64,39 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
   const [sortAsc, setSortAsc] = useState(false);
   const [downloading, setDownloading] = useState<DownloadState>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [qrInvoice, setQrInvoice] = useState<Invoice | null>(null);
+  const [qrIban, setQrIban] = useState<string>("");
+
+  const handleMarkPaid = async (invoice: Invoice) => {
+    const isPaid = invoice.payment_status === "paid";
+    const { error } = await supabase
+      .from("invoices")
+      .update({
+        payment_status: isPaid ? "unpaid" : "paid",
+        paid_at: isPaid ? null : new Date().toISOString(),
+      })
+      .eq("id", invoice.id);
+    if (error) toast.error("Błąd aktualizacji statusu");
+    else toast.success(isPaid ? "Oznaczono jako nieopłacone" : "Oznaczono jako opłacone");
+  };
+
+  const handleOpenQr = async (invoice: Invoice) => {
+    // Try to fetch IBAN from invoice XML
+    let iban = "";
+    if (invoice.ksef_number) {
+      try {
+        const { data } = await supabase.functions.invoke("ksef-download", {
+          body: { invoice_id: invoice.id, format: "xml" },
+        });
+        if (data?.xml) {
+          const m = data.xml.match(/<[^>]*NrRB[^>]*>([^<]+)<\/[^>]*NrRB[^>]*>/i);
+          if (m) iban = m[1].trim();
+        }
+      } catch {}
+    }
+    setQrIban(iban);
+    setQrInvoice(invoice);
+  };
 
   const sorted = [...invoices].sort((a, b) => {
     let cmp = 0;
