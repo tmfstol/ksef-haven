@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import PublicNav from "@/components/PublicNav";
+import Seo from "@/components/Seo";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -128,6 +129,12 @@ const Blog = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo
+        title="Blog Facturo — KSeF, podatki, kosztorysy i automatyzacja AI"
+        description="Praktyczne porady o KSeF, podatkach, kosztorysowaniu budowlanym, kartach pracy i automatyzacji księgowości. Aktualizacje co tydzień."
+        keywords="blog KSeF, blog księgowy, kosztorysy budowlane porady, karty pracy, automatyzacja księgowości, AI w księgowości"
+        path="/blog"
+      />
       <PublicNav variant="light" />
       <div className="h-16" />
 
