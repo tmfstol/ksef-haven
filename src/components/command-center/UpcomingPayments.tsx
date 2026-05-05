@@ -104,15 +104,12 @@ export function UpcomingPayments({ payments, companyId }: { payments: Payment[];
                     {p.payment_due_date && ` · ${formatDate(p.payment_due_date)}`}
                   </p>
                 </div>
-                <div className="text-right flex items-center gap-2">
+                <div className="text-right flex items-center gap-1">
                   <span className="text-sm font-semibold text-foreground">{formatPln(p.gross_amount)}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleMarkPaid(p.id)}
-                    title="Oznacz jako opłacone"
-                  >
+                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleQr(p)} title="QR płatności">
+                    <QrCode className="h-3.5 w-3.5 text-primary" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleMarkPaid(p.id)} title="Oznacz jako opłacone">
                     <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
                   </Button>
                 </div>
@@ -121,6 +118,16 @@ export function UpcomingPayments({ payments, companyId }: { payments: Payment[];
           )}
         </div>
       </CardContent>
+      {qrPayment && (
+        <PaymentQrModal
+          open={!!qrPayment}
+          onOpenChange={(v) => !v && setQrPayment(null)}
+          vendorName={qrPayment.vendor}
+          iban={qrIban}
+          amount={qrPayment.gross_amount}
+          title={qrPayment.ksef_number || `Faktura ${qrPayment.vendor}`}
+        />
+      )}
     </Card>
   );
 }
