@@ -100,9 +100,14 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
             <p className="text-sm font-semibold text-foreground truncate">{invoice.vendor}</p>
             <p className="text-xs text-muted-foreground font-mono">NIP: {invoice.nip}</p>
           </div>
-          <span className={`flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${statusStyles[invoice.status]}`}>
-            {statusLabels[invoice.status]}
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <span className={`flex-shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${statusStyles[invoice.status]}`}>
+              {statusLabels[invoice.status]}
+            </span>
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${invoice.payment_status === "paid" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
+              {invoice.payment_status === "paid" ? "Opłacone" : "Nieopłacone"}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center justify-between mb-3">
