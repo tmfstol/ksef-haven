@@ -19,6 +19,7 @@ export interface Invoice {
   paid_at?: string | null;
   vat_whitelist_status?: "not_checked" | "verified" | "invalid" | "unknown";
   vat_whitelist_checked_at?: string | null;
+  vat_whitelist_account?: string | null;
   created_at?: string;
   updated_at?: string;
 }
