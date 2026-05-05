@@ -135,7 +135,7 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
       }
 
       if (details.iban) {
-        supabase.from("invoices").update({ vat_whitelist_account: details.iban } as any).eq("id", invoice.id).then(() => {
+        supabase.from("invoices").update({ vat_whitelist_account: details.iban } as Record<string, string>).eq("id", invoice.id).then(() => {
           queryClient.invalidateQueries({ queryKey: ["invoices"] });
         });
       }
@@ -154,7 +154,7 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
       const trimmed = note.trim() || null;
       const { error } = await supabase
         .from("invoices")
-        .update({ bookkeeper_note: trimmed } as any)
+        .update({ bookkeeper_note: trimmed })
         .eq("id", invoice.id);
       if (error) throw error;
     },
