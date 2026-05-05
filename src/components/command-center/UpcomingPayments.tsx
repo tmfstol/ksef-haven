@@ -34,17 +34,32 @@ function generateEpcQr(vendor: string, amount: number, _nip?: string): string {
 }
 
 export function UpcomingPayments({ payments, companyId }: { payments: Payment[]; companyId: string | null }) {
+  const [qrPayment, setQrPayment] = useState<Payment | null>(null);
+  const [qrIban, setQrIban] = useState<string>("");
+
   const handleMarkPaid = async (invoiceId: string) => {
     if (!companyId) return;
     const { error } = await supabase
       .from("invoices")
-      .update({ payment_status: "paid" })
+      .update({ payment_status: "paid", paid_at: new Date().toISOString() })
       .eq("id", invoiceId);
-    if (error) {
-      toast.error("Błąd aktualizacji statusu");
-    } else {
-      toast.success("Oznaczono jako opłacone");
+    if (error) toast.error("Błąd aktualizacji statusu");
+    else toast.success("Oznaczono jako opłacone");
+  };
+
+  const handleQr = async (p: Payment) => {
+    let iban = "";
+    if (p.ksef_number) {
+      try {
+        const { data } = await supabase.functions.invoke("ksef-download", { body: { invoice_id: p.id, format: "xml" } });
+        if (data?.xml) {
+          const m = data.xml.match(/<[^>]*NrRB[^>]*>([^<]+)<\/[^>]*NrRB[^>]*>/i);
+          if (m) iban = m[1].trim();
+        }
+      } catch {}
     }
+    setQrIban(iban);
+    setQrPayment(p);
   };
 
   const urgent = payments.filter((p) => p.days_until_due <= 7);
