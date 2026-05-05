@@ -206,42 +206,68 @@ export function ImportPrzedmiarDialog({ open, onOpenChange, estimateId, companyI
 
   const handleManualPick = (idx: number, catId: string) => {
     const cat = catalog.find((c) => c.id === catId) ?? null;
-    setRows((prev) => prev.map((r, i) => i === idx ? { ...r, catalog_id: catId, catalog: cat, confidence: "high" } : r));
+    setRows((prev) => prev.map((r, i) => i === idx ? { ...r, catalog_id: catId, catalog: cat, confidence: "high", override_r: undefined, override_m: undefined } : r));
   };
 
-  const totalValue = rows.reduce((sum, r) => {
-    if (!r.catalog) return sum;
-    return sum + calcRMS(r.catalog, r.ilosc).total;
-  }, 0);
+  const handleOverride = (idx: number, field: "override_r" | "override_m", value: string) => {
+    const num = parseFloat(value.replace(",", "."));
+    setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: isFinite(num) ? num : undefined } : r));
+  };
+
+  const totalValue = rows.reduce((sum, r) => sum + calcRowValue(r).total, 0);
+
+  const usableCount = rows.filter((r) => r.catalog || r.override_r !== undefined || r.override_m !== undefined).length;
 
   const handleImport = async () => {
-    const usable = rows.filter((r) => r.catalog);
-    if (usable.length === 0) { toast.error("Brak dopasowanych pozycji"); return; }
+    const usable = rows.filter((r) => r.catalog || r.override_r !== undefined || r.override_m !== undefined);
+    if (usable.length === 0) { toast.error("Brak pozycji do dodania"); return; }
     setLoading(true);
     try {
       let ord = startOrdinal;
       for (const r of usable) {
-        const cat = r.catalog!;
-        const v = calcRMS(cat, r.ilosc);
-        await addItem.mutateAsync({
-          estimate_id: estimateId,
-          stage_id: stageId,
-          catalog_id: cat.id,
-          ordinal: ord++,
-          nazwa: cat.nazwa,
-          jednostka: cat.jednostka,
-          ilosc: r.ilosc,
-          cena_mat: cat.cena_zakupu_materialu,
-          cena_rob: cat.cena_robocizny_netto,
-          cena_sprz: cat.cena_sprzetu_netto,
-          knr_number: cat.knr_number,
-          opis_pelny: cat.opis_pelny,
-          naklad_robocizny: cat.naklad_robocizny,
-          naklad_materialu: cat.naklad_materialu,
-          naklad_sprzetu: cat.naklad_sprzetu,
-          stawka_rg: cat.stawka_rg,
-          wartosc_r: v.r, wartosc_m: v.m, wartosc_s: v.s,
-        } as Partial<EstimateItem> & { estimate_id: string });
+        const v = calcRowValue(r);
+        const hasOverride = r.override_r !== undefined || r.override_m !== undefined;
+        if (hasOverride && !r.catalog) {
+          // Pozycja ręczna bez KNR
+          await addItem.mutateAsync({
+            estimate_id: estimateId,
+            stage_id: stageId,
+            catalog_id: null,
+            ordinal: ord++,
+            nazwa: r.nazwa,
+            jednostka: r.jednostka || "szt",
+            ilosc: r.ilosc,
+            cena_mat: r.override_m ?? 0,
+            cena_rob: r.override_r ?? 0,
+            cena_sprz: 0,
+            naklad_robocizny: 1,
+            naklad_materialu: 1,
+            naklad_sprzetu: 0,
+            stawka_rg: r.override_r ?? 0,
+            wartosc_r: v.r, wartosc_m: v.m, wartosc_s: 0,
+          } as Partial<EstimateItem> & { estimate_id: string });
+        } else {
+          const cat = r.catalog!;
+          await addItem.mutateAsync({
+            estimate_id: estimateId,
+            stage_id: stageId,
+            catalog_id: cat.id,
+            ordinal: ord++,
+            nazwa: cat.nazwa,
+            jednostka: cat.jednostka,
+            ilosc: r.ilosc,
+            cena_mat: hasOverride ? (r.override_m ?? 0) : cat.cena_zakupu_materialu,
+            cena_rob: hasOverride ? (r.override_r ?? 0) : cat.cena_robocizny_netto,
+            cena_sprz: hasOverride ? 0 : cat.cena_sprzetu_netto,
+            knr_number: cat.knr_number,
+            opis_pelny: cat.opis_pelny,
+            naklad_robocizny: hasOverride ? 1 : cat.naklad_robocizny,
+            naklad_materialu: hasOverride ? 1 : cat.naklad_materialu,
+            naklad_sprzetu: hasOverride ? 0 : cat.naklad_sprzetu,
+            stawka_rg: hasOverride ? (r.override_r ?? 0) : cat.stawka_rg,
+            wartosc_r: v.r, wartosc_m: v.m, wartosc_s: v.s,
+          } as Partial<EstimateItem> & { estimate_id: string });
+        }
       }
       toast.success(`Dodano ${usable.length} pozycji do kosztorysu`);
       reset();
