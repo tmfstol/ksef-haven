@@ -66,9 +66,83 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
   const [qrOpen, setQrOpen] = useState(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(invoice.bookkeeper_note ?? "");
+  const [fallbackItems, setFallbackItems] = useState<ReturnType<typeof mapXmlItems> | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<InvoicePaymentDetails>(() =>
+    buildInvoicePaymentDetails({ iban: invoice.vat_whitelist_account })
+  );
 
   const { data: projects } = useProjects(invoice.company_id);
   const assignMutation = useAssignInvoiceToProject();
+
+  const { data: items, isLoading: isLoadingItems } = useQuery({
+    queryKey: ["invoice-items", invoice.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoice_items")
+        .select("id, ordinal, name, quantity, unit, unit_price_net, net_amount, vat_rate, gross_amount")
+        .eq("invoice_id", invoice.id)
+        .order("ordinal", { ascending: true });
+      if (error) throw error;
+      return (data || []).map((row) => ({
+        id: row.id,
+        ordinal: Number(row.ordinal),
+        name: row.name,
+        quantity: Number(row.quantity),
+        unit: row.unit || "szt.",
+        unit_price_net: Number(row.unit_price_net),
+        net_amount: Number(row.net_amount),
+        vat_rate: row.vat_rate || "—",
+        gross_amount: Number(row.gross_amount),
+      }));
+    },
+    enabled: expanded,
+  });
+
+  const hydrateDetailsMutation = useMutation({
+    mutationFn: async () => {
+      if (!invoice.ksef_number) throw new Error("Faktura nie ma numeru KSeF");
+      const { data, error } = await supabase.functions.invoke("ksef-download", {
+        body: { invoice_id: invoice.id, format: "xml" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.xml) throw new Error("Brak danych XML faktury");
+
+      const downloadedItems = mapXmlItems(data.xml, invoice.id, invoice.ksef_number);
+      const details = extractPaymentDetailsFromXml(data.xml);
+
+      if (downloadedItems.length > 0 && (!items || items.length === 0)) {
+        await supabase.from("invoice_items").insert(
+          downloadedItems.map(({ id, ...item }) => ({
+            invoice_id: invoice.id,
+            ordinal: item.ordinal,
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price_net: item.unit_price_net,
+            net_amount: item.net_amount,
+            vat_rate: item.vat_rate,
+            vat_amount: Math.max(item.gross_amount - item.net_amount, 0),
+            gross_amount: item.gross_amount,
+          }))
+        );
+        queryClient.invalidateQueries({ queryKey: ["invoice-items", invoice.id] });
+      }
+
+      if (details.iban) {
+        supabase.from("invoices").update({ vat_whitelist_account: details.iban } as any).eq("id", invoice.id).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["invoices"] });
+        });
+      }
+
+      return { downloadedItems, details };
+    },
+    onSuccess: ({ downloadedItems, details }) => {
+      setFallbackItems(downloadedItems);
+      setPaymentDetails(details);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Nie udało się pobrać treści faktury"),
+  });
 
   const saveNoteMutation = useMutation({
     mutationFn: async (note: string) => {
