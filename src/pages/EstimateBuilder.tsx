@@ -58,6 +58,7 @@ const EstimateBuilder = () => {
 
   const [search, setSearch] = useState("");
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     if (stages.length && !activeStageId) setActiveStageId(stages[0].id);
