@@ -293,7 +293,15 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
         </AnimatePresence>
       </div>
 
-      <PaymentQrModal open={qrOpen} onOpenChange={setQrOpen} invoice={invoice} iban="" />
+      <PaymentQrModal
+        open={qrOpen}
+        onOpenChange={setQrOpen}
+        vendorName={invoice.vendor}
+        vendorNip={invoice.nip}
+        iban={null}
+        amount={invoice.gross_amount}
+        title={invoice.ksef_number || invoice.vendor}
+      />
     </div>
   );
 }
