@@ -355,8 +355,17 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Button
+                    <div className="flex items-center justify-end gap-1">
+                      {invoice.invoice_type === "kosztowa" && (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-primary" title="Pokaż QR płatności" onClick={() => handleOpenQr(invoice)}>
+                            <QrCode className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-lg ${invoice.payment_status === "paid" ? "text-success" : "text-muted-foreground hover:text-success"}`} title={invoice.payment_status === "paid" ? "Cofnij oznaczenie" : "Oznacz jako opłacone"} onClick={() => handleMarkPaid(invoice)}>
+                            <CheckCircle2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                         variant="ghost"
                         size="sm"
                         className="h-8 px-3 text-xs rounded-lg gap-1.5 text-muted-foreground hover:text-foreground"
