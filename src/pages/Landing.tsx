@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import PublicNav from "@/components/PublicNav";
+import Seo from "@/components/Seo";
 import logoFacturo from "@/assets/logo-facturo.png";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -137,6 +138,40 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-foreground overflow-hidden">
+      <Seo
+        title="Facturo — Program do faktur KSeF, kosztorysy i karty pracy online"
+        description="Faktury KSeF (FA(3)), kosztorysy budowlane, karty pracy pracowników, CRM i asystent AI. Wszystko w jednym panelu od 15 zł / mies."
+        keywords="program do faktur KSeF, faktury online, kosztorys budowlany online, karty pracy online, harmonogram pracowników, KSeF, FA(3), darmowy program do faktur"
+        path="/"
+        jsonLd={[
+          {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: "Facturo",
+            url: "https://facturo.info",
+            applicationCategory: "BusinessApplication",
+            operatingSystem: "Web",
+            offers: { "@type": "Offer", price: "15", priceCurrency: "PLN" },
+            aggregateRating: { "@type": "AggregateRating", ratingValue: "4.9", reviewCount: "47" },
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: "Facturo",
+            url: "https://facturo.info",
+            logo: "https://facturo.info/favicon.png",
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faqs.map((f) => ({
+              "@type": "Question",
+              name: f.q,
+              acceptedAnswer: { "@type": "Answer", text: f.a },
+            })),
+          },
+        ]}
+      />
       <PublicNav variant="dark" />
 
       {/* Hero */}
