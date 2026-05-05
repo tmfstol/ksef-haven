@@ -118,12 +118,28 @@ serve(async (req) => {
     }
 
     const aiJson = await aiRes.json();
-    const toolCall = aiJson?.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("AI nie zwróciło struktury.");
+    const msg = aiJson?.choices?.[0]?.message;
+    const toolCall = msg?.tool_calls?.[0];
 
-    const parsed = JSON.parse(toolCall.function.arguments);
+    let parsed: { matches?: any[] } = {};
+    if (toolCall?.function?.arguments) {
+      try { parsed = JSON.parse(toolCall.function.arguments); } catch (_) { /* fallthrough */ }
+    }
+    // Fallback: model zwrócił JSON w treści zamiast tool_call
+    if (!parsed.matches && typeof msg?.content === "string") {
+      const txt = msg.content;
+      const jsonStr = txt.match(/```json\s*([\s\S]*?)```/)?.[1]
+        ?? txt.match(/\{[\s\S]*"matches"[\s\S]*\}/)?.[0];
+      if (jsonStr) {
+        try { parsed = JSON.parse(jsonStr); } catch (_) { /* ignore */ }
+      }
+    }
+    if (!parsed.matches) {
+      console.error("AI response without structure:", JSON.stringify(aiJson).slice(0, 1000));
+      throw new Error("AI nie zwróciło struktury — spróbuj ponownie lub zmniejsz liczbę pozycji.");
+    }
 
-    return new Response(JSON.stringify({ matches: parsed.matches ?? [] }), {
+    return new Response(JSON.stringify({ matches: parsed.matches }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
