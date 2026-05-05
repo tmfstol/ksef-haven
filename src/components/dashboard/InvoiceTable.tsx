@@ -447,6 +447,17 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
           })}
         </tbody>
       </table>
+      {qrInvoice && (
+        <PaymentQrModal
+          open={!!qrInvoice}
+          onOpenChange={(v) => !v && setQrInvoice(null)}
+          vendorName={qrInvoice.vendor}
+          vendorNip={qrInvoice.nip}
+          iban={qrIban}
+          amount={qrInvoice.gross_amount}
+          title={qrInvoice.ksef_number || `Faktura ${qrInvoice.vendor}`}
+        />
+      )}
     </div>
   );
 }
