@@ -705,7 +705,17 @@ async function syncCompany(
 
       // Step 8: Upsert invoices
       let upsertedCount = 0;
+      let processedCount = 0;
+      let skippedCompleteCount = 0;
+      let deferredXmlCount = 0;
+      let xmlFetches = 0;
+      const processingStartedAt = Date.now();
       for (const ref of allRefs) {
+        if (!onlyKsefNumber && Date.now() - processingStartedAt > MAX_SYNC_RUNTIME_MS) {
+          console.log(`[ksef-sync] Stopping early before edge timeout after ${processedCount} invoices and ${xmlFetches} XML fetches`);
+          break;
+        }
+
         const ksefNumber =
           ref.ksefNumber ||
           ref.ksefReferenceNumber ||
@@ -733,9 +743,18 @@ async function syncCompany(
               existing.payment_due_date &&
               existing.payment_status &&
               count && count > 0;
-            if (hasCompletePayment && !onlyKsefNumber) continue;
+            if (hasCompletePayment && !onlyKsefNumber) {
+              skippedCompleteCount++;
+              continue;
+            }
+
+            if (!onlyKsefNumber && xmlFetches >= MAX_XML_FETCHES_PER_SYNC) {
+              deferredXmlCount++;
+              continue;
+            }
 
             try {
+              xmlFetches++;
               const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
               const parsed = parseInvoiceXml(xml);
               const instantPayment = isInstantPaymentMethod(parsed.paymentMethod);
@@ -797,6 +816,7 @@ async function syncCompany(
           let dataZaplaty: string | null = null;
 
           try {
+            xmlFetches++;
             const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
             const parsed = parseInvoiceXml(xml);
             if (parsed.vendor) vendor = parsed.vendor;
@@ -866,6 +886,7 @@ async function syncCompany(
               }
             }
           }
+          processedCount++;
         } catch (invErr) {
           console.error(`[ksef-sync] Error processing ${ksefNumber}:`, invErr);
         }
@@ -876,6 +897,10 @@ async function syncCompany(
         companyNip: company.nip,
         totalFound: allRefs.length,
         newInvoices: upsertedCount,
+        processedInvoices: processedCount,
+        skippedComplete: skippedCompleteCount,
+        deferredXml: deferredXmlCount,
+        xmlFetches,
       };
     } catch (err) {
       console.log(`[ksef-sync] Candidate ${ci} failed: ${err instanceof Error ? err.message.substring(0, 100) : String(err)}`);
