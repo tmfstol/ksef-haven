@@ -517,6 +517,10 @@ function parseInvoiceXml(xml: string) {
     const paymentMethod = normalizePaymentMethod(rawPaymentMethod);
 
     let paymentDueDate = inPayment("TerminPlatnosci") || getTag("TerminPlatnosci") || getTag("P_22A") || null;
+    if (paymentDueDate) {
+      const m = paymentDueDate.match(/(\d{4}-\d{2}-\d{2})/);
+      paymentDueDate = m ? m[1] : null;
+    }
     if (!paymentDueDate && date) {
       const d = new Date(date);
       if (!isNaN(d.getTime())) {
@@ -526,7 +530,11 @@ function parseInvoiceXml(xml: string) {
     }
 
     const zaplaconoFlag = inPayment("Zaplacono") || getTag("Zaplacono") || getTag("P_18") || null;
-    const dataZaplaty = inPayment("DataZaplaty") || getTag("DataZaplaty") || getTag("P_18A") || null;
+    let dataZaplaty = inPayment("DataZaplaty") || getTag("DataZaplaty") || getTag("P_18A") || null;
+    if (dataZaplaty) {
+      const dm = dataZaplaty.match(/(\d{4}-\d{2}-\d{2})/);
+      dataZaplaty = dm ? dm[1] : null;
+    }
     const isPaidInXml = zaplaconoFlag === "1" || zaplaconoFlag?.toLowerCase() === "true" || !!dataZaplaty;
 
     console.log("[ksef-cron-sync][XML]", JSON.stringify({
