@@ -98,6 +98,41 @@ Deno.serve(async (req) => {
       case "customer.subscription.deleted":
         await handleSubscriptionDeleted(event.data.object, env);
         break;
+      case "checkout.session.completed": {
+        const session = event.data.object;
+        console.log("Checkout completed:", session.id, "userId:", session.metadata?.userId);
+        // Subscription created event will follow and populate row
+        break;
+      }
+      case "invoice.payment_succeeded": {
+        const inv = event.data.object;
+        const subId = inv.subscription;
+        if (subId) {
+          await getSupabase()
+            .from("subscriptions")
+            .update({ status: "active", updated_at: new Date().toISOString() })
+            .eq("stripe_subscription_id", subId)
+            .eq("environment", env);
+        }
+        break;
+      }
+      case "invoice.payment_failed": {
+        const inv = event.data.object;
+        const subId = inv.subscription;
+        if (subId) {
+          await getSupabase()
+            .from("subscriptions")
+            .update({ status: "past_due", updated_at: new Date().toISOString() })
+            .eq("stripe_subscription_id", subId)
+            .eq("environment", env);
+        }
+        break;
+      }
+      case "setup_intent.created":
+      case "setup_intent.succeeded":
+      case "setup_intent.setup_failed":
+        console.log("SetupIntent event:", event.type);
+        break;
       default:
         console.log("Unhandled event:", event.type);
     }
