@@ -1,4 +1,4 @@
-import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X, RefreshCcw, ReceiptText, Send } from "lucide-react";
+import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X, RefreshCcw, ReceiptText, Send, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { useState } from "react";
@@ -315,7 +315,14 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
           transform: `translateX(${offset}px)`,
           transition: offset === 0 ? "transform 200ms ease-out" : "none",
         }}
-        className={`glass-panel-elevated rounded-xl p-4 ${isNew ? "border-l-2 border-l-primary" : ""}`}
+        className={`glass-panel-elevated rounded-xl p-4 ${(() => {
+          if (invoice.payment_status !== "paid" && invoice.invoice_type === "kosztowa" && invoice.payment_due_date) {
+            const d = new Date(invoice.payment_due_date); d.setHours(0,0,0,0);
+            const n = new Date(); n.setHours(0,0,0,0);
+            if (d.getTime() < n.getTime()) return "border-l-2 border-l-destructive bg-destructive/5";
+          }
+          return isNew ? "border-l-2 border-l-primary" : "";
+        })()}`}
       >
         {/* Tappable header — opens details */}
         <button
@@ -340,9 +347,29 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
               <span className={`flex-shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${statusStyles[invoice.status]}`}>
                 {statusLabels[invoice.status]}
               </span>
-              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${invoice.payment_status === "paid" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
-                {invoice.payment_status === "paid" ? "Opłacone" : "Nieopłacone"}
-              </span>
+              {(() => {
+                const isPaid = invoice.payment_status === "paid";
+                let overdue = 0;
+                if (!isPaid && invoice.invoice_type === "kosztowa" && invoice.payment_due_date) {
+                  const d = new Date(invoice.payment_due_date); d.setHours(0,0,0,0);
+                  const n = new Date(); n.setHours(0,0,0,0);
+                  const diff = Math.round((d.getTime() - n.getTime()) / 86400000);
+                  if (diff < 0) overdue = Math.abs(diff);
+                }
+                if (isPaid) return (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-success/10 text-success inline-flex items-center gap-1">
+                    <CheckCircle2 className="h-2.5 w-2.5" /> Opłacone
+                  </span>
+                );
+                if (overdue > 0) return (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-destructive/15 text-destructive inline-flex items-center gap-1 animate-pulse">
+                    <AlertTriangle className="h-2.5 w-2.5" /> {overdue}d po terminie
+                  </span>
+                );
+                return (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning">Nieopłacone</span>
+                );
+              })()}
               {invoice.sent_to_portal_at && (
                 <span
                   title={`Wysłano do portalu: ${new Date(invoice.sent_to_portal_at).toLocaleString("pl-PL")}`}
