@@ -453,92 +453,136 @@ async function getInvoice(baseUrl: string, accessToken: string, ksefNumber: stri
   throw new Error(`Get invoice ${ksefNumber} failed after retries`);
 }
 
-// Parse invoice XML to extract key fields
+// Namespace-agnostic XML parsing using DOMParser
 function parseInvoiceXml(xml: string) {
-  const getTag = (tag: string) => {
-    const match = xml.match(new RegExp(`<[^>]*${tag}[^>]*>([^<]+)<`, "i"));
-    return match ? match[1].trim() : null;
-  };
-  const getAmount = (tag: string) => {
-    const val = getTag(tag);
-    return val ? parseFloat(val) : 0;
-  };
+  try {
+    const doc = new DOMParser().parseFromString(xml, "text/html");
+    if (!doc) throw new Error("DOMParser returned null");
 
-  const vendor = getTag("Nazwa") || "Nieznany kontrahent";
-  const nip = getTag("NrNIP") || getTag("NIP") || "";
-  const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
-  const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
-  const paymentMethod = normalizePaymentMethod(
-    getTag("FormaPlatnosci") ||
-    getTag("SposobPlatnosci") ||
-    getTag("RodzajPlatnosci") ||
-    getTag("MetodaPlatnosci") ||
-    getTag("OpisPlatnosci") ||
-    null
-  );
-  let paymentDueDate = getTag("TerminPlatnosci") || getTag("P_22A") || null;
-  if (!paymentDueDate && date) {
-    const d = new Date(date);
-    if (!isNaN(d.getTime())) {
-      d.setDate(d.getDate() + 14);
-      paymentDueDate = d.toISOString().split("T")[0];
+    const allEls: Element[] = [];
+    const walk = (node: any) => {
+      if (node && node.nodeType === 1) allEls.push(node as Element);
+      const children = node?.childNodes;
+      if (children) for (const c of children) walk(c);
+    };
+    walk(doc);
+
+    const localName = (el: Element) => {
+      const n = (el as any).localName || el.tagName || "";
+      const idx = n.indexOf(":");
+      return (idx >= 0 ? n.slice(idx + 1) : n).toLowerCase();
+    };
+    const findAll = (tag: string): Element[] => {
+      const t = tag.toLowerCase();
+      return allEls.filter((el) => localName(el) === t);
+    };
+    const findFirst = (tag: string): Element | null => {
+      const t = tag.toLowerCase();
+      return allEls.find((el) => localName(el) === t) || null;
+    };
+    const getTag = (tag: string): string | null => {
+      const v = findFirst(tag)?.textContent?.trim();
+      return v || null;
+    };
+    const getAmount = (tag: string) => {
+      const v = getTag(tag);
+      return v ? parseFloat(v.replace(",", ".")) : 0;
+    };
+
+    const vendor = getTag("Nazwa") || "Nieznany kontrahent";
+    const nip = getTag("NrNIP") || getTag("NIP") || "";
+    const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
+    const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
+
+    const platnoscEl = findFirst("Platnosc");
+    const inPayment = (tag: string): string | null => {
+      if (!platnoscEl) return null;
+      const t = tag.toLowerCase();
+      const stack: any[] = [platnoscEl];
+      while (stack.length) {
+        const cur = stack.pop();
+        if (cur && cur.nodeType === 1 && localName(cur as Element) === t) {
+          const v = (cur as Element).textContent?.trim();
+          if (v) return v;
+        }
+        if (cur?.childNodes) for (const c of cur.childNodes) stack.push(c);
+      }
+      return null;
+    };
+
+    const rawPaymentMethod =
+      inPayment("FormaPlatnosci") ||
+      getTag("FormaPlatnosci") || getTag("SposobPlatnosci") ||
+      getTag("RodzajPlatnosci") || getTag("MetodaPlatnosci") || getTag("OpisPlatnosci");
+    const paymentMethod = normalizePaymentMethod(rawPaymentMethod);
+
+    let paymentDueDate = inPayment("TerminPlatnosci") || getTag("TerminPlatnosci") || getTag("P_22A") || null;
+    if (!paymentDueDate && date) {
+      const d = new Date(date);
+      if (!isNaN(d.getTime())) {
+        d.setDate(d.getDate() + 14);
+        paymentDueDate = d.toISOString().split("T")[0];
+      }
     }
-  }
-  const zaplaconoFlag = getTag("Zaplacono") || getTag("P_18") || null;
-  const dataZaplaty = getTag("DataZaplaty") || getTag("P_18A") || null;
-  const isPaidInXml = zaplaconoFlag === "1" || zaplaconoFlag === "true" || !!dataZaplaty;
 
-  // Parse line items (FA(3) format: <FaWiersz> elements)
-  const items: Array<{
-    ordinal: number;
-    name: string;
-    quantity: number;
-    unit: string;
-    unit_price_net: number;
-    net_amount: number;
-    vat_rate: string;
-    vat_amount: number;
-    gross_amount: number;
-  }> = [];
+    const zaplaconoFlag = inPayment("Zaplacono") || getTag("Zaplacono") || getTag("P_18") || null;
+    const dataZaplaty = inPayment("DataZaplaty") || getTag("DataZaplaty") || getTag("P_18A") || null;
+    const isPaidInXml = zaplaconoFlag === "1" || zaplaconoFlag?.toLowerCase() === "true" || !!dataZaplaty;
 
-  const lineRegex = /<[^>]*FaWiersz[^>]*>([\s\S]*?)<\/[^>]*FaWiersz[^>]*>/gi;
-  let lineMatch;
-  let ordinal = 1;
-  while ((lineMatch = lineRegex.exec(xml)) !== null) {
-    const block = lineMatch[1];
-    const getField = (tag: string) => {
-      const m = block.match(new RegExp(`<[^>]*${tag}[^>]*>([^<]+)<`, "i"));
-      return m ? m[1].trim() : null;
+    console.log("[ksef-cron-sync][XML]", JSON.stringify({
+      vendor, nip, date, grossAmount,
+      rawPaymentMethod, paymentMethod, paymentDueDate, zaplaconoFlag, dataZaplaty, isPaidInXml,
+    }));
+
+    const items: Array<any> = [];
+    const wiersze = findAll("FaWiersz");
+    let ordinal = 1;
+    for (const w of wiersze) {
+      const sub: Element[] = [];
+      const walkSub = (n: any) => {
+        if (n && n.nodeType === 1) sub.push(n as Element);
+        if (n?.childNodes) for (const c of n.childNodes) walkSub(c);
+      };
+      walkSub(w);
+      const getF = (tag: string) => {
+        const t = tag.toLowerCase();
+        return sub.find((e) => localName(e) === t)?.textContent?.trim() || null;
+      };
+      const getN = (tag: string) => {
+        const v = getF(tag);
+        return v ? parseFloat(v.replace(",", ".")) : 0;
+      };
+
+      const name = getF("P_7") || getF("NazwaTowaru") || getF("Opis") || "";
+      const quantity = getN("P_8B") || getN("Ilosc") || 1;
+      const unit = getF("P_8A") || getF("JednostkaMiary") || "szt.";
+      const unitPriceNet = getN("P_9A") || getN("CenaJednostkowa") || 0;
+      const netAmount = getN("P_11") || getN("WartoscNetto") || 0;
+      const vatRateNum = getN("P_12") || 23;
+      const vatRate = vatRateNum === -1 ? "zw." : `${vatRateNum}%`;
+      const vatAmount = getN("P_11A") || (netAmount * (vatRateNum > 0 ? vatRateNum / 100 : 0));
+      const itemGross = netAmount + vatAmount;
+
+      items.push({
+        ordinal: ordinal++,
+        name, quantity, unit,
+        unit_price_net: unitPriceNet,
+        net_amount: netAmount,
+        vat_rate: vatRate,
+        vat_amount: vatAmount,
+        gross_amount: itemGross,
+      });
+    }
+
+    return { vendor, nip, date, grossAmount, paymentMethod, paymentDueDate, isPaidInXml, dataZaplaty, items };
+  } catch (err) {
+    console.error("[ksef-cron-sync][XML] Parse error:", err instanceof Error ? err.message : err);
+    return {
+      vendor: "Nieznany kontrahent", nip: "", date: new Date().toISOString().split("T")[0],
+      grossAmount: 0, items: [], paymentMethod: null, paymentDueDate: null,
+      isPaidInXml: false, dataZaplaty: null,
     };
-    const getNum = (tag: string) => {
-      const v = getField(tag);
-      return v ? parseFloat(v) : 0;
-    };
-
-    const name = getField("P_7") || getField("NazwaTowaru") || getField("Opis") || "";
-    const quantity = getNum("P_8B") || getNum("Ilosc") || 1;
-    const unit = getField("P_8A") || getField("JednostkaMiary") || "szt.";
-    const unitPriceNet = getNum("P_9A") || getNum("CenaJednostkowa") || 0;
-    const netAmount = getNum("P_11") || getNum("WartoscNetto") || 0;
-    const vatRateNum = getNum("P_12") || 23;
-    const vatRate = vatRateNum === -1 ? "zw." : `${vatRateNum}%`;
-    const vatAmount = getNum("P_11A") || (netAmount * (vatRateNum > 0 ? vatRateNum / 100 : 0));
-    const itemGross = netAmount + vatAmount;
-
-    items.push({
-      ordinal: ordinal++,
-      name,
-      quantity,
-      unit,
-      unit_price_net: unitPriceNet,
-      net_amount: netAmount,
-      vat_rate: vatRate,
-      vat_amount: vatAmount,
-      gross_amount: itemGross,
-    });
   }
-
-  return { vendor, nip, date, grossAmount, paymentMethod, paymentDueDate, isPaidInXml, dataZaplaty, items };
 }
 
 // Main sync for single company
