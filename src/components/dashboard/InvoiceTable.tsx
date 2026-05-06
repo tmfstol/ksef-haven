@@ -1,4 +1,4 @@
-import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion, Mail, AlertTriangle } from "lucide-react";
+import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion, Mail, AlertTriangle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { motion, AnimatePresence } from "framer-motion";
