@@ -519,7 +519,8 @@ async function syncCompany(
   company: { id: string; nip: string; ksef_token: string },
   ksefEnv: string,
   dateFrom?: string,
-  dateTo?: string
+  dateTo?: string,
+  onlyKsefNumber?: string | null
 ) {
   const baseUrl = KSEF_URLS[ksefEnv] || KSEF_URLS.prod;
 
@@ -583,7 +584,11 @@ async function syncCompany(
       // Tag each invoice ref with its type
       const kosztowe = (queryResult2?.invoices || []).map((r: any) => ({ ...r, _invoiceType: "kosztowa" }));
       const przychodowe = (queryResult1?.invoices || []).map((r: any) => ({ ...r, _invoiceType: "przychodowa" }));
-      const allRefs = [...kosztowe, ...przychodowe];
+      const allRefs = [...kosztowe, ...przychodowe].filter((ref: any) => {
+        if (!onlyKsefNumber) return true;
+        const number = ref.ksefNumber || ref.ksefReferenceNumber || ref.invoiceReferenceNumber || ref.referenceNumber;
+        return number === onlyKsefNumber;
+      });
 
       console.log(`[ksef-sync] Found ${kosztowe.length} kosztowych, ${przychodowe.length} przychodowych`);
 
@@ -807,6 +812,7 @@ Deno.serve(async (req) => {
     const ksefEnv = body.ksef_env || "prod";
     const dateFrom = body.date_from || null;
     const dateTo = body.date_to || null;
+    const onlyKsefNumber = typeof body.ksef_number === "string" ? body.ksef_number : null;
 
     const [{ data: ownedCompanies, error: ownedCompaniesError }, { data: companyRoles, error: companyRolesError }] = await Promise.all([
       supabase.from("companies").select("id").eq("user_id", userId),
@@ -865,7 +871,7 @@ Deno.serve(async (req) => {
 
     for (const company of validCompanies) {
       try {
-        const result = await syncCompany(supabase, company, ksefEnv, dateFrom, dateTo);
+        const result = await syncCompany(supabase, company, ksefEnv, dateFrom, dateTo, onlyKsefNumber);
         results.push(result);
       } catch (err) {
         console.error(`[ksef-sync] Error syncing ${company.nip}:`, err);
