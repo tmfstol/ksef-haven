@@ -12,6 +12,7 @@ import { InvoiceItemsRow } from "./InvoiceItemsRow";
 import { AdBanner, AdBannerPlaceholder } from "./AdBanner";
 import { PaymentQrModal } from "@/components/payments/PaymentQrModal";
 import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrBlockReason, type InvoicePaymentDetails } from "@/lib/invoice-payment";
+import { isInvoiceNew } from "@/lib/invoice-new";
 
 type DownloadState = { id: string; format: "xml" | "upo" | "pdf" | "email" } | null;
 
@@ -326,7 +327,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
             const isDownloadingUpo = downloading?.id === invoice.id && downloading?.format === "upo";
             const isSendingEmail = downloading?.id === invoice.id && downloading?.format === "email";
             const isAnyDownloading = downloading !== null;
-            const isNew = lastSeenTimestamp && invoice.created_at && invoice.created_at > lastSeenTimestamp;
+            const isNew = isInvoiceNew(invoice, lastSeenTimestamp);
             const isExpanded = expandedId === invoice.id;
 
             const overdueDays = getOverdueDays(invoice);

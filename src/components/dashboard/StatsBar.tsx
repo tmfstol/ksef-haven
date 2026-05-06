@@ -1,5 +1,6 @@
 import { FileText, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import type { Invoice } from "@/types/invoice";
+import { isInvoiceNew } from "@/lib/invoice-new";
 
 interface StatsBarProps {
   invoices: Invoice[];
@@ -9,9 +10,7 @@ interface StatsBarProps {
 export function StatsBar({ invoices, lastSeenTimestamp }: StatsBarProps) {
   const total = invoices.length;
   const processed = invoices.filter((i) => i.status === "processed").length;
-  const newCount = lastSeenTimestamp
-    ? invoices.filter((i) => i.created_at && i.created_at > lastSeenTimestamp).length
-    : 0;
+  const newCount = invoices.filter((i) => isInvoiceNew(i, lastSeenTimestamp)).length;
   const errors = invoices.filter((i) => i.status === "error").length;
 
   const stats = [
