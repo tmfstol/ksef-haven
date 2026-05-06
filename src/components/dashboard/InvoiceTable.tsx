@@ -69,6 +69,8 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [qrInvoice, setQrInvoice] = useState<Invoice | null>(null);
   const [qrPaymentDetails, setQrPaymentDetails] = useState<InvoicePaymentDetails>(buildInvoicePaymentDetails({}));
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const handleMarkPaid = async (invoice: Invoice) => {
     const isPaid = invoice.payment_status === "paid";
