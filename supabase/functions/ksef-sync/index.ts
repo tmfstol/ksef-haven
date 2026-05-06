@@ -407,17 +407,27 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string, 
 
 // Get single invoice
 async function getInvoice(baseUrl: string, accessToken: string, ksefNumber: string) {
-  const res = await fetchWithRetry(`${baseUrl}/api/v2/invoices/ksef/${ksefNumber}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/octet-stream, application/json",
-    },
-  });
-  if (!res.ok) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetchWithRetry(`${baseUrl}/api/v2/invoices/ksef/${ksefNumber}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/octet-stream, application/json",
+      },
+    });
+    if (res.ok) return await res.text();
+
     const text = await res.text();
+    if (res.status === 429 && attempt < 2) {
+      const retryAfter = Number(res.headers.get("retry-after"));
+      const secondsFromBody = Number(text.match(/po\s+(\d+)\s+sekund/i)?.[1]);
+      const waitSeconds = Math.min(65, Math.max(5, retryAfter || secondsFromBody || 30));
+      console.log(`[ksef-sync] Rate limited while fetching ${ksefNumber}, waiting ${waitSeconds}s`);
+      await new Promise((r) => setTimeout(r, waitSeconds * 1000));
+      continue;
+    }
     throw new Error(`Get invoice ${ksefNumber} failed (${res.status}): ${text}`);
   }
-  return await res.text();
+  throw new Error(`Get invoice ${ksefNumber} failed after retries`);
 }
 
 // Parse invoice XML to extract key fields
