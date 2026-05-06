@@ -407,17 +407,27 @@ async function queryInvoices(baseUrl: string, accessToken: string, nip: string, 
 
 // Get single invoice
 async function getInvoice(baseUrl: string, accessToken: string, ksefNumber: string) {
-  const res = await fetchWithRetry(`${baseUrl}/api/v2/invoices/ksef/${ksefNumber}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/octet-stream, application/json",
-    },
-  });
-  if (!res.ok) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetchWithRetry(`${baseUrl}/api/v2/invoices/ksef/${ksefNumber}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/octet-stream, application/json",
+      },
+    });
+    if (res.ok) return await res.text();
+
     const text = await res.text();
+    if (res.status === 429 && attempt < 2) {
+      const retryAfter = Number(res.headers.get("retry-after"));
+      const secondsFromBody = Number(text.match(/po\s+(\d+)\s+sekund/i)?.[1]);
+      const waitSeconds = Math.min(65, Math.max(5, retryAfter || secondsFromBody || 30));
+      console.log(`[ksef-sync] Rate limited while fetching ${ksefNumber}, waiting ${waitSeconds}s`);
+      await new Promise((r) => setTimeout(r, waitSeconds * 1000));
+      continue;
+    }
     throw new Error(`Get invoice ${ksefNumber} failed (${res.status}): ${text}`);
   }
-  return await res.text();
+  throw new Error(`Get invoice ${ksefNumber} failed after retries`);
 }
 
 // Parse invoice XML to extract key fields
@@ -435,6 +445,18 @@ function parseInvoiceXml(xml: string) {
   const nip = getTag("NrNIP") || getTag("NIP") || "";
   const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
   const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
+  const paymentMethod = getTag("FormaPlatnosci") || null;
+  let paymentDueDate = getTag("TerminPlatnosci") || getTag("P_22A") || null;
+  if (!paymentDueDate && date) {
+    const d = new Date(date);
+    if (!isNaN(d.getTime())) {
+      d.setDate(d.getDate() + 14);
+      paymentDueDate = d.toISOString().split("T")[0];
+    }
+  }
+  const zaplaconoFlag = getTag("Zaplacono") || getTag("P_18") || null;
+  const dataZaplaty = getTag("DataZaplaty") || getTag("P_18A") || null;
+  const isPaidInXml = zaplaconoFlag === "1" || zaplaconoFlag === "true" || !!dataZaplaty;
 
   // Parse line items (FA(3) format: <FaWiersz> elements)
   const items: Array<{
@@ -486,7 +508,7 @@ function parseInvoiceXml(xml: string) {
     });
   }
 
-  return { vendor, nip, date, grossAmount, items };
+  return { vendor, nip, date, grossAmount, paymentMethod, paymentDueDate, isPaidInXml, dataZaplaty, items };
 }
 
 // Main sync for single company
@@ -495,7 +517,8 @@ export async function syncCompany(
   company: { id: string; nip: string; ksef_token: string },
   ksefEnv: string,
   dateFrom?: string,
-  dateTo?: string
+  dateTo?: string,
+  onlyKsefNumber?: string | null
 ) {
   const baseUrl = KSEF_URLS[ksefEnv] || KSEF_URLS.prod;
 
@@ -559,7 +582,11 @@ export async function syncCompany(
       // Tag each invoice ref with its type
       const kosztowe = (queryResult2?.invoices || []).map((r: any) => ({ ...r, _invoiceType: "kosztowa" }));
       const przychodowe = (queryResult1?.invoices || []).map((r: any) => ({ ...r, _invoiceType: "przychodowa" }));
-      const allRefs = [...kosztowe, ...przychodowe];
+      const allRefs = [...kosztowe, ...przychodowe].filter((ref: any) => {
+        if (!onlyKsefNumber) return true;
+        const number = ref.ksefNumber || ref.ksefReferenceNumber || ref.invoiceReferenceNumber || ref.referenceNumber;
+        return number === onlyKsefNumber;
+      });
 
       console.log(`[ksef-sync] Found ${kosztowe.length} kosztowych, ${przychodowe.length} przychodowych`);
 
@@ -576,7 +603,7 @@ export async function syncCompany(
         try {
           const { data: existing } = await supabase
             .from("invoices")
-            .select("id")
+            .select("id, paid_at")
             .eq("ksef_number", ksefNumber)
             .eq("company_id", company.id)
             .maybeSingle();
@@ -587,11 +614,30 @@ export async function syncCompany(
               .select("id", { count: "exact", head: true })
               .eq("invoice_id", existing.id);
 
-            if (count && count > 0) continue;
-
             try {
               const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
               const parsed = parseInvoiceXml(xml);
+              const instantPayment = parsed.paymentMethod !== null && ["1", "2", "3", "4", "7"].includes(parsed.paymentMethod);
+              const xmlPaid = instantPayment || parsed.isPaidInXml;
+              const paymentUpdate: Record<string, string | null> = {};
+
+              if (parsed.paymentMethod !== null) paymentUpdate.payment_method = parsed.paymentMethod;
+              if (parsed.paymentDueDate) paymentUpdate.payment_due_date = parsed.paymentDueDate;
+              if (xmlPaid) {
+                paymentUpdate.payment_status = "paid";
+                paymentUpdate.paid_at = parsed.dataZaplaty
+                  ? new Date(parsed.dataZaplaty).toISOString()
+                  : existing.paid_at || new Date().toISOString();
+              }
+
+              if (Object.keys(paymentUpdate).length > 0) {
+                const { error: updateError } = await supabase.from("invoices").update(paymentUpdate).eq("id", existing.id);
+                if (updateError) console.error(`[ksef-sync] Payment backfill error for ${ksefNumber}:`, updateError);
+                else upsertedCount++;
+              }
+
+              if (count && count > 0) continue;
+
               if (parsed.items.length > 0) {
                 const itemRows = parsed.items.map(item => ({
                   invoice_id: existing.id,
@@ -621,6 +667,10 @@ export async function syncCompany(
           const invoiceType = ref._invoiceType || "kosztowa";
 
           let parsedItems: any[] = [];
+          let paymentMethod: string | null = null;
+          let paymentDueDate: string | null = null;
+          let isPaidInXml = false;
+          let dataZaplaty: string | null = null;
 
           try {
             const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
@@ -630,9 +680,27 @@ export async function syncCompany(
             if (parsed.date) date = parsed.date;
             if (parsed.grossAmount) grossAmount = parsed.grossAmount;
             parsedItems = parsed.items || [];
+            paymentMethod = parsed.paymentMethod;
+            paymentDueDate = parsed.paymentDueDate;
+            isPaidInXml = parsed.isPaidInXml;
+            dataZaplaty = parsed.dataZaplaty;
           } catch (xmlErr) {
             console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
           }
+
+          if (!paymentDueDate && date) {
+            const d = new Date(date);
+            if (!isNaN(d.getTime())) {
+              d.setDate(d.getDate() + 14);
+              paymentDueDate = d.toISOString().split("T")[0];
+            }
+          }
+
+          const isCash = paymentMethod !== null && ["1", "2", "3", "4", "7"].includes(paymentMethod);
+          const isPaid = isCash || isPaidInXml;
+          const paidAt = isPaid
+            ? (dataZaplaty ? new Date(dataZaplaty).toISOString() : new Date().toISOString())
+            : null;
 
           const { data: inserted, error: insertError } = await supabase.from("invoices").insert({
             company_id: company.id,
@@ -643,6 +711,10 @@ export async function syncCompany(
             ksef_number: ksefNumber,
             status: "new",
             invoice_type: invoiceType,
+            payment_method: paymentMethod,
+            payment_due_date: paymentDueDate,
+            payment_status: isPaid ? "paid" : "unpaid",
+            paid_at: paidAt,
           }).select("id").single();
 
           if (insertError) {
@@ -722,6 +794,7 @@ Deno.serve(async (req) => {
     const ksefEnv = body.ksef_env || "prod";
     const dateFrom = body.date_from || null;
     const dateTo = body.date_to || null;
+    const onlyKsefNumber = typeof body.ksef_number === "string" ? body.ksef_number : null;
 
     console.log(`[ksef-cron-sync] Starting cron sync (env=${ksefEnv})`);
 
@@ -749,7 +822,8 @@ Deno.serve(async (req) => {
           company as { id: string; nip: string; ksef_token: string },
           ksefEnv,
           dateFrom,
-          dateTo
+          dateTo,
+          onlyKsefNumber
         );
         results.push(result);
         console.log(`[ksef-cron-sync] OK ${company.nip}: ${result.newInvoices} new invoices`);
