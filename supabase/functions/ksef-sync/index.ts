@@ -720,6 +720,14 @@ async function syncCompany(
               .select("id", { count: "exact", head: true })
               .eq("invoice_id", existing.id);
 
+            // Skip XML re-fetch if invoice already has complete payment data + items
+            const hasCompletePayment =
+              existing.payment_method &&
+              existing.payment_due_date &&
+              existing.payment_status &&
+              count && count > 0;
+            if (hasCompletePayment && !onlyKsefNumber) continue;
+
             try {
               const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
               const parsed = parseInvoiceXml(xml);
