@@ -82,7 +82,20 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
       })
       .eq("id", invoice.id);
     if (error) toast.error("Błąd aktualizacji statusu");
-    else toast.success(isPaid ? "Oznaczono jako nieopłacone" : "Oznaczono jako opłacone");
+    else {
+      toast.success(isPaid ? "Oznaczono jako nieopłacone" : "Oznaczono jako opłacone");
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    }
+  };
+
+  const getOverdueDays = (inv: Invoice): number | null => {
+    if (inv.payment_status === "paid" || !inv.payment_due_date || inv.invoice_type !== "kosztowa") return null;
+    const d = new Date(inv.payment_due_date);
+    const now = new Date();
+    d.setHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
+    const diff = Math.round((d.getTime() - now.getTime()) / 86400000);
+    return diff < 0 ? Math.abs(diff) : null;
   };
 
   const handleOpenQr = async (invoice: Invoice) => {
