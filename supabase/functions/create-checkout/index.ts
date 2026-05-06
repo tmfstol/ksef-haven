@@ -29,8 +29,6 @@ Deno.serve(async (req) => {
       mode: isRecurring ? "subscription" : "payment",
       ui_mode: "embedded_page",
       return_url: returnUrl,
-      // Automatycznie pokaż wszystkie aktywne metody (BLIK, karty, Apple/Google Pay, P24)
-      automatic_payment_methods: { enabled: true },
       ...(customerEmail && { customer_email: customerEmail }),
       ...(userId && {
         metadata: { userId },
