@@ -29,10 +29,11 @@ Deno.serve(async (req) => {
       mode: isRecurring ? "subscription" : "payment",
       ui_mode: "embedded_page",
       return_url: returnUrl,
-      managed_payments: { enabled: true },
+      // Automatycznie pokaż wszystkie aktywne metody (BLIK, karty, Apple/Google Pay, P24)
+      automatic_payment_methods: { enabled: true },
       ...(customerEmail && { customer_email: customerEmail }),
       ...(userId && {
-        metadata: { userId, managed_payments: "true" },
+        metadata: { userId },
         ...(isRecurring && { subscription_data: { metadata: { userId } } }),
       }),
     });
