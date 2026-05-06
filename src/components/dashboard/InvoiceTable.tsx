@@ -89,16 +89,30 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
     }
   };
 
-  const getOverdueDays = (inv: Invoice): number | null => {
+  const isTransfer = (inv: Invoice): boolean => {
+    const m = (inv.payment_method || "").toString().toLowerCase().trim();
+    return m === "6" || m.includes("przelew") || m.includes("transfer") || m.includes("bank");
+  };
+
+  const getDaysToDue = (inv: Invoice): number | null => {
     if (inv.payment_status === "paid" || inv.invoice_type !== "kosztowa") return null;
-    const due = inv.payment_due_date || inv.date;
-    if (!due) return null;
-    const d = new Date(due);
+    if (!inv.payment_due_date) return null;
+    const d = new Date(inv.payment_due_date);
     const now = new Date();
     d.setHours(0, 0, 0, 0);
     now.setHours(0, 0, 0, 0);
-    const diff = Math.round((d.getTime() - now.getTime()) / 86400000);
+    return Math.round((d.getTime() - now.getTime()) / 86400000);
+  };
+
+  const getOverdueDays = (inv: Invoice): number | null => {
+    const diff = getDaysToDue(inv);
+    if (diff === null) return null;
     return diff < 0 ? Math.abs(diff) : null;
+  };
+
+  const formatDueDate = (iso: string): string => {
+    const d = new Date(iso);
+    return d.toLocaleDateString("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric" });
   };
 
   const handleOpenQr = async (invoice: Invoice) => {
