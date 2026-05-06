@@ -167,7 +167,7 @@ export function VoiceAgentWidget() {
           throw new Error("Brak zgody na mikrofon. Kliknij ikonę kłódki w pasku adresu i zezwól.");
         }
         if (mediaErr?.name === "NotFoundError") {
-          throw new Error("Nie znaleziono mikrofonu. Otwórz aplikację w nowej karcie (nie w podglądzie Lovable) i sprawdź urządzenia audio.");
+          throw new Error("Nie znaleziono mikrofonu. Otwórz aplikację w nowej karcie i sprawdź urządzenia audio.");
         }
         if (mediaErr?.name === "NotReadableError") {
           throw new Error("Mikrofon jest używany przez inną aplikację.");
