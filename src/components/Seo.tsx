@@ -11,7 +11,7 @@ interface SeoProps {
 }
 
 const SITE_URL = "https://facturo.info";
-const DEFAULT_IMAGE = `${SITE_URL}/favicon.png`;
+const DEFAULT_IMAGE = `${SITE_URL}/og-image.jpg`;
 
 export default function Seo({
   title,
