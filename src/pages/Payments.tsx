@@ -102,7 +102,11 @@ const Payments = () => {
     });
   }, [enriched, filter]);
 
-  const handleMarkPaid = async (inv: Invoice) => {
+  const handleMarkPaid = async (inv: Invoice & { _isCash?: boolean }) => {
+    if (inv._isCash) {
+      toast.info("Faktura gotówkowa jest zawsze opłacona");
+      return;
+    }
     setBusyId(inv.id);
     const isPaid = inv.payment_status === "paid";
     const { error } = await supabase
