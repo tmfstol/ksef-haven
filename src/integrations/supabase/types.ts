@@ -1283,6 +1283,8 @@ export type Database = {
           payment_status: string
           pdf_path: string | null
           project_id: string | null
+          sent_to_portal_at: string | null
+          sent_to_portal_by: string | null
           source: string
           status: string
           tags: string[] | null
@@ -1311,6 +1313,8 @@ export type Database = {
           payment_status?: string
           pdf_path?: string | null
           project_id?: string | null
+          sent_to_portal_at?: string | null
+          sent_to_portal_by?: string | null
           source?: string
           status?: string
           tags?: string[] | null
@@ -1339,6 +1343,8 @@ export type Database = {
           payment_status?: string
           pdf_path?: string | null
           project_id?: string | null
+          sent_to_portal_at?: string | null
+          sent_to_portal_by?: string | null
           source?: string
           status?: string
           tags?: string[] | null
