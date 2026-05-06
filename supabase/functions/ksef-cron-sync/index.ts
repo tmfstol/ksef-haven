@@ -13,6 +13,28 @@ const KSEF_URLS: Record<string, string> = {
   demo: "https://api-demo.ksef.mf.gov.pl",
 };
 
+const INSTANT_PAYMENT_METHODS = new Set(["1", "2", "3", "4", "7"]);
+
+function normalizePaymentMethod(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const raw = value.trim();
+  if (!raw) return null;
+  if (["1", "2", "3", "4", "5", "6", "7"].includes(raw)) return raw;
+  const text = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (text.includes("gotow") || text.includes("cash")) return "1";
+  if (text.includes("karta") || text.includes("card") || text.includes("platnicz")) return "2";
+  if (text.includes("bon") || text.includes("voucher")) return "3";
+  if (text.includes("czek") || text.includes("check")) return "4";
+  if (text.includes("mobil") || text.includes("blik")) return "7";
+  if (text.includes("przelew") || text.includes("transfer") || text.includes("bank")) return "6";
+  return raw;
+}
+
+function isInstantPaymentMethod(value: string | null | undefined): boolean {
+  const method = normalizePaymentMethod(value);
+  return method !== null && INSTANT_PAYMENT_METHODS.has(method);
+}
+
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
