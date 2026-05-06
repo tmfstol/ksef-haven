@@ -339,9 +339,17 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {invoice?.bookkeeper_note || <span className="italic text-muted-foreground/60">Kliknij ołówek, aby dodać opis</span>}
-                    </p>
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        {invoice?.bookkeeper_note || <span className="italic text-muted-foreground/60">Kliknij ołówek, aby dodać opis</span>}
+                      </p>
+                      {invoice?.bookkeeper_note && noteAuthorName && (
+                        <p className="text-[10px] text-muted-foreground/70 mt-1">
+                          Opisał(a): <span className="font-medium text-foreground/70">{noteAuthorName}</span>
+                          {noteAt && <> · {noteAt}</>}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
