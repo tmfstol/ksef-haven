@@ -1,10 +1,10 @@
-import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X, RefreshCcw, ReceiptText } from "lucide-react";
+import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X, RefreshCcw, ReceiptText, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { parseKsefXml, generateInvoicePdf } from "@/lib/invoice-pdf";
+import { parseKsefXml, generateInvoicePdf, generateInvoicePdfBase64 } from "@/lib/invoice-pdf";
 import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrBlockReason, type InvoicePaymentDetails } from "@/lib/invoice-payment";
 import { useSwipeable } from "@/hooks/useSwipeable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -201,6 +201,53 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
       toast.success(`Pobrano ${format.toUpperCase()}`);
     } catch (err) {
       toast.error(`Błąd: ${err instanceof Error ? err.message : "Nieznany"}`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const handleSendToPortal = async () => {
+    if (!invoice.ksef_number) {
+      toast.error("Faktura nie ma numeru KSeF");
+      return;
+    }
+    setDownloading("email");
+    try {
+      const { data: xmlData, error: xmlError } = await supabase.functions.invoke("ksef-download", {
+        body: { invoice_id: invoice.id, format: "xml" },
+      });
+      if (xmlError) throw xmlError;
+      if (xmlData?.error) throw new Error(xmlData.error);
+      if (!xmlData?.xml) throw new Error("Brak XML faktury");
+
+      const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number || "");
+      const pdfBase64 = await generateInvoicePdfBase64(parsed, xmlData.xml);
+      const pdfFilename = `${invoice.ksef_number || invoice.vendor}.pdf`;
+
+      try {
+        const cleaned = pdfBase64.replace(/^data:application\/pdf;base64,/i, "").replace(/\s+/g, "");
+        const binary = atob(cleaned);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        const storagePath = `${invoice.company_id}/${invoice.id}/${pdfFilename}`;
+        await supabase.storage.from("invoice-uploads").upload(storagePath, blob, {
+          upsert: true,
+          contentType: "application/pdf",
+        });
+        await supabase.from("invoices").update({ pdf_path: storagePath }).eq("id", invoice.id);
+      } catch (storageErr) {
+        console.warn("Failed to store PDF:", storageErr);
+      }
+
+      const { data, error } = await supabase.functions.invoke("send-invoice-make", {
+        body: { invoiceId: invoice.id, pdfBase64, pdfFilename },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("Faktura wysłana do portalu");
+    } catch (err) {
+      toast.error(`Błąd wysyłki: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
     } finally {
       setDownloading(null);
     }
@@ -443,6 +490,16 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
                       <Button variant="ghost" size="sm" className="min-h-[44px] text-xs gap-1.5" disabled={!!downloading} onClick={() => handleDownload("pdf")}>
                         {downloading === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                         PDF
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-[44px] text-xs gap-1.5 col-span-2 text-primary border-primary/40 hover:bg-primary/10"
+                        disabled={!!downloading}
+                        onClick={handleSendToPortal}
+                      >
+                        {downloading === "email" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Wyślij do portalu
                       </Button>
                     </>
                   )}
