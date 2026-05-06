@@ -362,6 +362,14 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                       {invoice.vat_whitelist_status === "unknown" && (
                         <span title="Biała lista VAT: brak danych" className="text-muted-foreground"><ShieldQuestion className="h-3.5 w-3.5" /></span>
                       )}
+                      {invoice.sent_to_portal_at && (
+                        <span
+                          title={`Wysłano do portalu: ${new Date(invoice.sent_to_portal_at).toLocaleString("pl-PL")}`}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary"
+                        >
+                          <Mail className="h-2.5 w-2.5" /> Wysłano
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
