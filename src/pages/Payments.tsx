@@ -326,7 +326,7 @@ const Payments = () => {
                     {inv._isCash && (
                       <span className="h-8 px-2 md:px-3 text-xs gap-1 inline-flex items-center text-success font-medium">
                         <CheckCircle2 className="h-3.5 w-3.5" />
-                        <span className="hidden md:inline">Gotówka</span>
+                        <span className="hidden md:inline">{inv._cashLabel}</span>
                       </span>
                     )}
                   </div>
