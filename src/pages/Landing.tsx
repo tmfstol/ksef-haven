@@ -551,18 +551,22 @@ const Landing = () => {
               <ul className="space-y-2 text-background/40">
                 <li><Link to="/privacy" className="hover:text-background/70">Polityka prywatności</Link></li>
                 <li><Link to="/terms" className="hover:text-background/70">Regulamin</Link></li>
+                <li><Link to="/bezpieczenstwo" className="hover:text-background/70">Bezpieczeństwo & RODO</Link></li>
+                <li><Link to="/status" className="hover:text-background/70">Status systemu</Link></li>
               </ul>
             </div>
             <div>
               <h3 className="text-background/80 font-semibold mb-3">Kontakt</h3>
               <ul className="space-y-2 text-background/40">
-                <li>kontakt@e-ksefai.pl</li>
+                <li>e-mail: kontakt@e-ksefai.pl</li>
+                <li>NIP: uzupełnij w ustawieniach</li>
+                <li>Adres: uzupełnij w ustawieniach</li>
               </ul>
             </div>
           </div>
           <div className="pt-6 border-t border-background/5 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5 text-sm text-background/30">
-              <img src={logoFacturo} alt="Facturo" className="h-6 w-6 rounded-md object-contain" />
+              <img src={logoFacturo} alt="Facturo" className="h-6 w-6 rounded-md object-contain" loading="lazy" />
               <span>Facturo — program do faktur KSeF z AI</span>
             </div>
             <span className="text-xs text-background/20">© {new Date().getFullYear()} Facturo</span>
