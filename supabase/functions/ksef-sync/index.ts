@@ -15,6 +15,9 @@ const KSEF_URLS: Record<string, string> = {
 };
 
 const INSTANT_PAYMENT_METHODS = new Set(["1", "2", "3", "4", "7"]);
+const MAX_XML_FETCHES_PER_SYNC = 15;
+const MAX_SYNC_RUNTIME_MS = 105_000;
+const MAX_RATE_LIMIT_WAIT_SECONDS = 10;
 
 function normalizePaymentMethod(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -443,7 +446,11 @@ async function getInvoice(baseUrl: string, accessToken: string, ksefNumber: stri
     if (res.status === 429 && attempt < 2) {
       const retryAfter = Number(res.headers.get("retry-after"));
       const secondsFromBody = Number(text.match(/po\s+(\d+)\s+sekund/i)?.[1]);
-      const waitSeconds = Math.min(65, Math.max(5, retryAfter || secondsFromBody || 30));
+      const requestedWait = retryAfter || secondsFromBody || 30;
+      if (requestedWait > MAX_RATE_LIMIT_WAIT_SECONDS) {
+        throw new Error(`KSeF rate limit for ${ksefNumber}: retry after ${requestedWait}s`);
+      }
+      const waitSeconds = Math.min(MAX_RATE_LIMIT_WAIT_SECONDS, Math.max(3, requestedWait));
       console.log(`[ksef-sync] Rate limited while fetching ${ksefNumber}, waiting ${waitSeconds}s`);
       await new Promise((r) => setTimeout(r, waitSeconds * 1000));
       continue;
@@ -698,7 +705,17 @@ async function syncCompany(
 
       // Step 8: Upsert invoices
       let upsertedCount = 0;
+      let processedCount = 0;
+      let skippedCompleteCount = 0;
+      let deferredXmlCount = 0;
+      let xmlFetches = 0;
+      const processingStartedAt = Date.now();
       for (const ref of allRefs) {
+        if (!onlyKsefNumber && Date.now() - processingStartedAt > MAX_SYNC_RUNTIME_MS) {
+          console.log(`[ksef-sync] Stopping early before edge timeout after ${processedCount} invoices and ${xmlFetches} XML fetches`);
+          break;
+        }
+
         const ksefNumber =
           ref.ksefNumber ||
           ref.ksefReferenceNumber ||
@@ -726,9 +743,18 @@ async function syncCompany(
               existing.payment_due_date &&
               existing.payment_status &&
               count && count > 0;
-            if (hasCompletePayment && !onlyKsefNumber) continue;
+            if (hasCompletePayment && !onlyKsefNumber) {
+              skippedCompleteCount++;
+              continue;
+            }
+
+            if (!onlyKsefNumber && xmlFetches >= MAX_XML_FETCHES_PER_SYNC) {
+              deferredXmlCount++;
+              continue;
+            }
 
             try {
+              xmlFetches++;
               const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
               const parsed = parseInvoiceXml(xml);
               const instantPayment = isInstantPaymentMethod(parsed.paymentMethod);
@@ -789,20 +815,25 @@ async function syncCompany(
           let isPaidInXml = false;
           let dataZaplaty: string | null = null;
 
-          try {
-            const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
-            const parsed = parseInvoiceXml(xml);
-            if (parsed.vendor) vendor = parsed.vendor;
-            if (parsed.nip) nip = parsed.nip;
-            if (parsed.date) date = parsed.date;
-            if (parsed.grossAmount) grossAmount = parsed.grossAmount;
-            parsedItems = parsed.items || [];
-            paymentMethod = parsed.paymentMethod;
-            paymentDueDate = parsed.paymentDueDate;
-            isPaidInXml = parsed.isPaidInXml;
-            dataZaplaty = parsed.dataZaplaty;
-          } catch (xmlErr) {
-            console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
+          if (!onlyKsefNumber && xmlFetches >= MAX_XML_FETCHES_PER_SYNC) {
+            deferredXmlCount++;
+          } else {
+            try {
+              xmlFetches++;
+              const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
+              const parsed = parseInvoiceXml(xml);
+              if (parsed.vendor) vendor = parsed.vendor;
+              if (parsed.nip) nip = parsed.nip;
+              if (parsed.date) date = parsed.date;
+              if (parsed.grossAmount) grossAmount = parsed.grossAmount;
+              parsedItems = parsed.items || [];
+              paymentMethod = parsed.paymentMethod;
+              paymentDueDate = parsed.paymentDueDate;
+              isPaidInXml = parsed.isPaidInXml;
+              dataZaplaty = parsed.dataZaplaty;
+            } catch (xmlErr) {
+              console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
+            }
           }
 
           // Fallback termin płatności: data wystawienia + 14 dni jeśli brak w XML
@@ -859,6 +890,7 @@ async function syncCompany(
               }
             }
           }
+          processedCount++;
         } catch (invErr) {
           console.error(`[ksef-sync] Error processing ${ksefNumber}:`, invErr);
         }
@@ -869,6 +901,10 @@ async function syncCompany(
         companyNip: company.nip,
         totalFound: allRefs.length,
         newInvoices: upsertedCount,
+        processedInvoices: processedCount,
+        skippedComplete: skippedCompleteCount,
+        deferredXml: deferredXmlCount,
+        xmlFetches,
       };
     } catch (err) {
       console.log(`[ksef-sync] Candidate ${ci} failed: ${err instanceof Error ? err.message.substring(0, 100) : String(err)}`);
