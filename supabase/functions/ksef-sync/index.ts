@@ -436,6 +436,19 @@ function parseInvoiceXml(xml: string) {
   const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
   const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
   const paymentMethod = getTag("FormaPlatnosci") || null;
+  // Termin płatności (FA(3): <TerminPlatnosci> lub P_22A); fallback: data wystawienia + 14 dni
+  let paymentDueDate = getTag("TerminPlatnosci") || getTag("P_22A") || null;
+  if (!paymentDueDate && date) {
+    const d = new Date(date);
+    if (!isNaN(d.getTime())) {
+      d.setDate(d.getDate() + 14);
+      paymentDueDate = d.toISOString().split("T")[0];
+    }
+  }
+  // Znacznik zapłaty: P_18 = "1" lub <Zaplacono>1</Zaplacono> oznacza opłaconą fakturę
+  const zaplaconoFlag = getTag("Zaplacono") || getTag("P_18") || null;
+  const dataZaplaty = getTag("DataZaplaty") || getTag("P_18A") || null;
+  const isPaidInXml = zaplaconoFlag === "1" || zaplaconoFlag === "true" || !!dataZaplaty;
 
   // Parse line items (FA(3) format: <FaWiersz> elements)
   const items: Array<{
@@ -487,7 +500,7 @@ function parseInvoiceXml(xml: string) {
     });
   }
 
-  return { vendor, nip, date, grossAmount, items, paymentMethod };
+  return { vendor, nip, date, grossAmount, items, paymentMethod, paymentDueDate, isPaidInXml, dataZaplaty };
 }
 
 // Main sync for single company
@@ -623,6 +636,9 @@ async function syncCompany(
 
           let parsedItems: any[] = [];
           let paymentMethod: string | null = null;
+          let paymentDueDate: string | null = null;
+          let isPaidInXml = false;
+          let dataZaplaty: string | null = null;
 
           try {
             const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
@@ -633,12 +649,28 @@ async function syncCompany(
             if (parsed.grossAmount) grossAmount = parsed.grossAmount;
             parsedItems = parsed.items || [];
             paymentMethod = parsed.paymentMethod;
+            paymentDueDate = parsed.paymentDueDate;
+            isPaidInXml = parsed.isPaidInXml;
+            dataZaplaty = parsed.dataZaplaty;
           } catch (xmlErr) {
             console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
           }
 
+          // Fallback termin płatności: data wystawienia + 14 dni jeśli brak w XML
+          if (!paymentDueDate && date) {
+            const d = new Date(date);
+            if (!isNaN(d.getTime())) {
+              d.setDate(d.getDate() + 14);
+              paymentDueDate = d.toISOString().split("T")[0];
+            }
+          }
+
           // Natychmiastowe formy płatności = zawsze opłacone (gotówka, karta, bon, czek, płatność mobilna)
           const isCash = paymentMethod !== null && ["1", "2", "3", "4", "7"].includes(paymentMethod);
+          const isPaid = isCash || isPaidInXml;
+          const paidAt = isPaid
+            ? (dataZaplaty ? new Date(dataZaplaty).toISOString() : new Date().toISOString())
+            : null;
 
           const { data: inserted, error: insertError } = await supabase.from("invoices").insert({
             company_id: company.id,
@@ -650,8 +682,9 @@ async function syncCompany(
             status: "new",
             invoice_type: invoiceType,
             payment_method: paymentMethod,
-            payment_status: isCash ? "paid" : "unpaid",
-            paid_at: isCash ? new Date().toISOString() : null,
+            payment_due_date: paymentDueDate,
+            payment_status: isPaid ? "paid" : "unpaid",
+            paid_at: paidAt,
           }).select("id").single();
 
           if (insertError) {
