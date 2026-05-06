@@ -206,6 +206,53 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
     }
   };
 
+  const handleSendToPortal = async () => {
+    if (!invoice.ksef_number) {
+      toast.error("Faktura nie ma numeru KSeF");
+      return;
+    }
+    setDownloading("email");
+    try {
+      const { data: xmlData, error: xmlError } = await supabase.functions.invoke("ksef-download", {
+        body: { invoice_id: invoice.id, format: "xml" },
+      });
+      if (xmlError) throw xmlError;
+      if (xmlData?.error) throw new Error(xmlData.error);
+      if (!xmlData?.xml) throw new Error("Brak XML faktury");
+
+      const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number || "");
+      const pdfBase64 = await generateInvoicePdfBase64(parsed, xmlData.xml);
+      const pdfFilename = `${invoice.ksef_number || invoice.vendor}.pdf`;
+
+      try {
+        const cleaned = pdfBase64.replace(/^data:application\/pdf;base64,/i, "").replace(/\s+/g, "");
+        const binary = atob(cleaned);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        const storagePath = `${invoice.company_id}/${invoice.id}/${pdfFilename}`;
+        await supabase.storage.from("invoice-uploads").upload(storagePath, blob, {
+          upsert: true,
+          contentType: "application/pdf",
+        });
+        await supabase.from("invoices").update({ pdf_path: storagePath }).eq("id", invoice.id);
+      } catch (storageErr) {
+        console.warn("Failed to store PDF:", storageErr);
+      }
+
+      const { data, error } = await supabase.functions.invoke("send-invoice-make", {
+        body: { invoiceId: invoice.id, pdfBase64, pdfFilename },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("Faktura wysłana do portalu");
+    } catch (err) {
+      toast.error(`Błąd wysyłki: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   const { handlers, offset } = useSwipeable({
     onSwipeLeft: () => handleDownload("pdf"),
     onSwipeRight: () => handleDownload("xml"),
