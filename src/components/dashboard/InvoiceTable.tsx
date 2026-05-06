@@ -326,7 +326,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
             const isDownloadingUpo = downloading?.id === invoice.id && downloading?.format === "upo";
             const isSendingEmail = downloading?.id === invoice.id && downloading?.format === "email";
             const isAnyDownloading = downloading !== null;
-            const isNew = lastSeenTimestamp && invoice.created_at && invoice.created_at > lastSeenTimestamp;
+            const isNew = isInvoiceNew(invoice, lastSeenTimestamp);
             const isExpanded = expandedId === invoice.id;
 
             const overdueDays = getOverdueDays(invoice);
