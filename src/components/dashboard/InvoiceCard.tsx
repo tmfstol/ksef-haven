@@ -146,9 +146,14 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
   const saveNoteMutation = useMutation({
     mutationFn: async (note: string) => {
       const trimmed = note.trim() || null;
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("invoices")
-        .update({ bookkeeper_note: trimmed })
+        .update({
+          bookkeeper_note: trimmed,
+          bookkeeper_note_by: trimmed ? user?.id ?? null : null,
+          bookkeeper_note_at: trimmed ? new Date().toISOString() : null,
+        } as any)
         .eq("id", invoice.id);
       if (error) throw error;
     },
