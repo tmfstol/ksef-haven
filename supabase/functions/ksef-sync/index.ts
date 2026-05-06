@@ -467,7 +467,14 @@ function parseInvoiceXml(xml: string) {
   const nip = getTag("NrNIP") || getTag("NIP") || "";
   const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
   const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
-  const paymentMethod = getTag("FormaPlatnosci") || null;
+  const paymentMethod = normalizePaymentMethod(
+    getTag("FormaPlatnosci") ||
+    getTag("SposobPlatnosci") ||
+    getTag("RodzajPlatnosci") ||
+    getTag("MetodaPlatnosci") ||
+    getTag("OpisPlatnosci") ||
+    null
+  );
   // Termin płatności (FA(3): <TerminPlatnosci> lub P_22A); fallback: data wystawienia + 14 dni
   let paymentDueDate = getTag("TerminPlatnosci") || getTag("P_22A") || null;
   if (!paymentDueDate && date) {
@@ -641,7 +648,7 @@ async function syncCompany(
             try {
               const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
               const parsed = parseInvoiceXml(xml);
-              const instantPayment = parsed.paymentMethod !== null && ["1", "2", "3", "4", "7"].includes(parsed.paymentMethod);
+              const instantPayment = isInstantPaymentMethod(parsed.paymentMethod);
               const xmlPaid = instantPayment || parsed.isPaidInXml;
               const paymentUpdate: Record<string, string | null> = {};
 
@@ -725,7 +732,7 @@ async function syncCompany(
           }
 
           // Natychmiastowe formy płatności = zawsze opłacone (gotówka, karta, bon, czek, płatność mobilna)
-          const isCash = paymentMethod !== null && ["1", "2", "3", "4", "7"].includes(paymentMethod);
+          const isCash = isInstantPaymentMethod(paymentMethod);
           const isPaid = isCash || isPaidInXml;
           const paidAt = isPaid
             ? (dataZaplaty ? new Date(dataZaplaty).toISOString() : new Date().toISOString())
