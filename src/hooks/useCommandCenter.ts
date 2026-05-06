@@ -51,6 +51,14 @@ interface Contact {
   payment_reliability: string;
 }
 
+function isInstantPaymentMethod(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const raw = value.trim();
+  if (["1", "2", "3", "4", "7"].includes(raw)) return true;
+  const text = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return text.includes("gotow") || text.includes("cash") || text.includes("karta") || text.includes("card") || text.includes("platnicz") || text.includes("bon") || text.includes("voucher") || text.includes("czek") || text.includes("check") || text.includes("mobil") || text.includes("blik");
+}
+
 export function useCommandCenter(companyId: string | null) {
   const { data: invoices, isLoading: invoicesLoading } = useQuery({
     queryKey: ["cc-invoices", companyId],
@@ -287,7 +295,7 @@ export function useCommandCenter(companyId: string | null) {
     if (!invoices) return [];
     const today = new Date();
     return invoices
-      .filter((i) => i.payment_status !== "paid" && !["1","2","3","4","7"].includes(i.payment_method || "") && i.invoice_type === "kosztowa")
+      .filter((i) => i.payment_status !== "paid" && !isInstantPaymentMethod(i.payment_method) && i.invoice_type === "kosztowa")
       .map((i) => {
         const dueDate = i.payment_due_date ? new Date(i.payment_due_date) : new Date(i.date);
         const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
