@@ -104,9 +104,9 @@ const Payments = () => {
     });
   }, [enriched, filter]);
 
-  const handleMarkPaid = async (inv: Invoice & { _isCash?: boolean }) => {
+  const handleMarkPaid = async (inv: Invoice & { _isCash?: boolean; _cashLabel?: string | null }) => {
     if (inv._isCash) {
-      toast.info("Faktura gotówkowa jest zawsze opłacona");
+      toast.info(`Płatność: ${inv._cashLabel || "natychmiastowa"} — faktura jest zawsze opłacona`);
       return;
     }
     setBusyId(inv.id);
