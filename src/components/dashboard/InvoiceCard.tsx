@@ -461,9 +461,17 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-foreground whitespace-pre-wrap min-h-[20px]">
-                      {invoice.bookkeeper_note || <span className="italic text-muted-foreground/60">Kliknij ołówek, aby dodać</span>}
-                    </p>
+                    <>
+                      <p className="text-sm text-foreground whitespace-pre-wrap min-h-[20px]">
+                        {invoice.bookkeeper_note || <span className="italic text-muted-foreground/60">Kliknij ołówek, aby dodać</span>}
+                      </p>
+                      {invoice.bookkeeper_note && noteAuthorName && (
+                        <p className="text-[10px] text-muted-foreground/70 mt-1">
+                          Opisał(a): <span className="font-medium text-foreground/80">{noteAuthorName}</span>
+                          {noteAt && <> · {noteAt}</>}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
