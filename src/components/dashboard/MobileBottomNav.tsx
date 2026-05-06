@@ -1,4 +1,4 @@
-import { Home, Receipt, FilePlus, MoreHorizontal, CalendarRange, FolderOpen, Calculator, ScanLine, Users, BarChart3, LayoutGrid, LayoutDashboard, Settings, LogOut, FileText } from "lucide-react";
+import { Home, Receipt, FilePlus, MoreHorizontal, CalendarRange, FolderOpen, Calculator, ScanLine, Users, BarChart3, LayoutGrid, LayoutDashboard, Settings, LogOut, FileText, Wallet } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -7,12 +7,13 @@ import { cn } from "@/lib/utils";
 
 const primaryItems = [
   { icon: Home, label: "Faktury", path: "/dashboard" },
-  { icon: FilePlus, label: "Nowa", path: "/invoices/new" },
+  { icon: Wallet, label: "Płatności", path: "/payments" },
   { icon: LayoutDashboard, label: "Pulse", path: "/command-center" },
   { icon: Receipt, label: "Wydatki", path: "/expenses" },
 ];
 
 const moreItems = [
+  { icon: FilePlus, label: "Nowa faktura", path: "/invoices/new" },
   { icon: CalendarRange, label: "Harmonogram", path: "/schedule" },
   { icon: FolderOpen, label: "Projekty", path: "/projects" },
   { icon: Calculator, label: "Kosztorysy", path: "/estimates" },

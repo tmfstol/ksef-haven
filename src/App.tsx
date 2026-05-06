@@ -22,6 +22,7 @@ import Estimates from "./pages/Estimates";
 import EstimateBuilder from "./pages/EstimateBuilder";
 import Catalog from "./pages/Catalog";
 import Timesheets from "./pages/Timesheets";
+import Payments from "./pages/Payments";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
@@ -112,6 +113,7 @@ const AppRoutes = () => {
         <Route path="/estimates/:id" element={<ProtectedRoute><EstimateBuilder /></ProtectedRoute>} />
         <Route path="/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
         <Route path="/timesheets" element={<ProtectedRoute><Timesheets /></ProtectedRoute>} />
+        <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
         <Route path="/onboarding" element={<ProtectedRoute><Settings isOnboarding /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
