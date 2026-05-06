@@ -528,6 +528,10 @@ function parseInvoiceXml(xml: string) {
       getTag("TerminPlatnosci") ||
       getTag("P_22A") ||
       null;
+    if (paymentDueDate) {
+      const m = paymentDueDate.match(/(\d{4}-\d{2}-\d{2})/);
+      paymentDueDate = m ? m[1] : null;
+    }
     if (!paymentDueDate && date) {
       const d = new Date(date);
       if (!isNaN(d.getTime())) {
@@ -538,8 +542,13 @@ function parseInvoiceXml(xml: string) {
 
     const zaplaconoFlag =
       inPayment("Zaplacono") || getTag("Zaplacono") || getTag("P_18") || null;
-    const dataZaplaty =
+    let dataZaplaty =
       inPayment("DataZaplaty") || getTag("DataZaplaty") || getTag("P_18A") || null;
+    if (dataZaplaty) {
+      const dm = dataZaplaty.match(/(\d{4}-\d{2}-\d{2})/);
+      dataZaplaty = dm ? dm[1] : null;
+    }
+    // P_18="1" = paid, "2" = not paid. Only "1"/"true"/realna data zaplaty oznacza zapłaconą.
     const isPaidInXml =
       zaplaconoFlag === "1" || zaplaconoFlag?.toLowerCase() === "true" || !!dataZaplaty;
 
