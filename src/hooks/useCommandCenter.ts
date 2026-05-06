@@ -287,7 +287,7 @@ export function useCommandCenter(companyId: string | null) {
     if (!invoices) return [];
     const today = new Date();
     return invoices
-      .filter((i) => i.payment_status !== "paid" && i.invoice_type === "kosztowa")
+      .filter((i) => i.payment_status !== "paid" && i.payment_method !== "1" && i.invoice_type === "kosztowa")
       .map((i) => {
         const dueDate = i.payment_due_date ? new Date(i.payment_due_date) : new Date(i.date);
         const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
