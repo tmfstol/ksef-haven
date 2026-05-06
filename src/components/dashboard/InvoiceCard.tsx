@@ -343,6 +343,14 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
               <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${invoice.payment_status === "paid" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
                 {invoice.payment_status === "paid" ? "Opłacone" : "Nieopłacone"}
               </span>
+              {invoice.sent_to_portal_at && (
+                <span
+                  title={`Wysłano do portalu: ${new Date(invoice.sent_to_portal_at).toLocaleString("pl-PL")}`}
+                  className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary"
+                >
+                  <Send className="h-2.5 w-2.5" /> Wysłano
+                </span>
+              )}
             </div>
           </div>
 
