@@ -59,7 +59,9 @@ const Payments = () => {
     return (invoices || [])
       .filter((i) => i.invoice_type === "kosztowa")
       .map((inv) => {
-        const isCash = inv.payment_method === "1";
+        const instantMethods: Record<string, string> = { "1": "Gotówka", "2": "Karta", "3": "Bon", "4": "Czek", "7": "Płatność mobilna" };
+        const isCash = !!inv.payment_method && inv.payment_method in instantMethods;
+        const cashLabel = isCash ? instantMethods[inv.payment_method as string] : null;
         const effectivePaymentStatus = isCash ? "paid" : inv.payment_status;
         const due = inv.payment_due_date || inv.date;
         const days = daysUntil(due);
@@ -69,7 +71,7 @@ const Payments = () => {
         else if (days < 0) bucket = "overdue";
         else if (days === 0) bucket = "today";
         else if (days <= 7) bucket = "soon";
-        return { ...inv, payment_status: effectivePaymentStatus, _isCash: isCash, _due: due, _days: days, _bucket: bucket };
+        return { ...inv, payment_status: effectivePaymentStatus, _isCash: isCash, _cashLabel: cashLabel, _due: due, _days: days, _bucket: bucket };
       });
   }, [invoices]);
 
@@ -102,9 +104,9 @@ const Payments = () => {
     });
   }, [enriched, filter]);
 
-  const handleMarkPaid = async (inv: Invoice & { _isCash?: boolean }) => {
+  const handleMarkPaid = async (inv: Invoice & { _isCash?: boolean; _cashLabel?: string | null }) => {
     if (inv._isCash) {
-      toast.info("Faktura gotówkowa jest zawsze opłacona");
+      toast.info(`Płatność: ${inv._cashLabel || "natychmiastowa"} — faktura jest zawsze opłacona`);
       return;
     }
     setBusyId(inv.id);
@@ -279,7 +281,7 @@ const Payments = () => {
                         <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium hidden md:inline">KSeF</span>
                       )}
                       {inv._isCash && (
-                        <span className="text-[10px] bg-success/10 text-success px-1.5 py-0.5 rounded font-medium">Gotówka</span>
+                        <span className="text-[10px] bg-success/10 text-success px-1.5 py-0.5 rounded font-medium">{inv._cashLabel}</span>
                       )}
                     </div>
                     <p className="text-[11px] text-muted-foreground truncate">
@@ -324,7 +326,7 @@ const Payments = () => {
                     {inv._isCash && (
                       <span className="h-8 px-2 md:px-3 text-xs gap-1 inline-flex items-center text-success font-medium">
                         <CheckCircle2 className="h-3.5 w-3.5" />
-                        <span className="hidden md:inline">Gotówka</span>
+                        <span className="hidden md:inline">{inv._cashLabel}</span>
                       </span>
                     )}
                   </div>
