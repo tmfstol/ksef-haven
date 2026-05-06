@@ -58,7 +58,7 @@ export function useCommandCenter(companyId: string | null) {
       if (!companyId) return [];
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, date, vendor, nip, gross_amount, status, invoice_type, ksef_number, project_id, created_at, source, payment_status, payment_due_date, category, tags")
+        .select("id, date, vendor, nip, gross_amount, status, invoice_type, ksef_number, project_id, created_at, source, payment_status, payment_method, payment_due_date, category, tags")
         .eq("company_id", companyId)
         .order("date", { ascending: false });
       if (error) throw error;
