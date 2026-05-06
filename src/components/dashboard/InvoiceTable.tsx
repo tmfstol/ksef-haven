@@ -1,4 +1,4 @@
-import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion, Mail, AlertTriangle } from "lucide-react";
+import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion, Mail, AlertTriangle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { motion, AnimatePresence } from "framer-motion";
@@ -89,16 +89,30 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
     }
   };
 
-  const getOverdueDays = (inv: Invoice): number | null => {
+  const isTransfer = (inv: Invoice): boolean => {
+    const m = (inv.payment_method || "").toString().toLowerCase().trim();
+    return m === "6" || m.includes("przelew") || m.includes("transfer") || m.includes("bank");
+  };
+
+  const getDaysToDue = (inv: Invoice): number | null => {
     if (inv.payment_status === "paid" || inv.invoice_type !== "kosztowa") return null;
-    const due = inv.payment_due_date || inv.date;
-    if (!due) return null;
-    const d = new Date(due);
+    if (!inv.payment_due_date) return null;
+    const d = new Date(inv.payment_due_date);
     const now = new Date();
     d.setHours(0, 0, 0, 0);
     now.setHours(0, 0, 0, 0);
-    const diff = Math.round((d.getTime() - now.getTime()) / 86400000);
+    return Math.round((d.getTime() - now.getTime()) / 86400000);
+  };
+
+  const getOverdueDays = (inv: Invoice): number | null => {
+    const diff = getDaysToDue(inv);
+    if (diff === null) return null;
     return diff < 0 ? Math.abs(diff) : null;
+  };
+
+  const formatDueDate = (iso: string): string => {
+    const d = new Date(iso);
+    return d.toLocaleDateString("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric" });
   };
 
   const handleOpenQr = async (invoice: Invoice) => {
@@ -383,6 +397,17 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
                           Nieopłacone
                         </span>
                       )}
+                      {invoice.payment_status !== "paid" && invoice.invoice_type === "kosztowa" && isTransfer(invoice) && invoice.payment_due_date && (() => {
+                        const days = getDaysToDue(invoice);
+                        if (days === null || days < 0) return null;
+                        const tone = days <= 3 ? "bg-warning/15 text-warning" : "bg-primary/10 text-primary";
+                        const label = days === 0 ? "Termin dziś" : days === 1 ? "Termin jutro" : `Termin za ${days} dni`;
+                        return (
+                          <span title={`Termin płatności: ${formatDueDate(invoice.payment_due_date)}`} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${tone}`}>
+                            <Clock className="h-2.5 w-2.5" /> {label}
+                          </span>
+                        );
+                      })()}
                       {invoice.vat_whitelist_status === "verified" && (
                         <span title="Biała lista VAT: zweryfikowano" className="text-success"><ShieldCheck className="h-3.5 w-3.5" /></span>
                       )}

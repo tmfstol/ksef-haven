@@ -1,4 +1,4 @@
-import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X, RefreshCcw, ReceiptText, Send, AlertTriangle } from "lucide-react";
+import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X, RefreshCcw, ReceiptText, Send, AlertTriangle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { useState } from "react";
@@ -355,24 +355,33 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
               )}
               {(() => {
                 const isPaid = invoice.payment_status === "paid";
-                let overdue = 0;
-                const due = invoice.payment_due_date || invoice.date;
-                if (!isPaid && invoice.invoice_type === "kosztowa" && due) {
-                  const d = new Date(due); d.setHours(0,0,0,0);
+                const method = (invoice.payment_method || "").toString().toLowerCase().trim();
+                const isTransfer = method === "6" || method.includes("przelew") || method.includes("transfer") || method.includes("bank");
+                let diffDays: number | null = null;
+                if (!isPaid && invoice.invoice_type === "kosztowa" && invoice.payment_due_date) {
+                  const d = new Date(invoice.payment_due_date); d.setHours(0,0,0,0);
                   const n = new Date(); n.setHours(0,0,0,0);
-                  const diff = Math.round((d.getTime() - n.getTime()) / 86400000);
-                  if (diff < 0) overdue = Math.abs(diff);
+                  diffDays = Math.round((d.getTime() - n.getTime()) / 86400000);
                 }
                 if (isPaid) return (
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-success/10 text-success inline-flex items-center gap-1">
                     <CheckCircle2 className="h-2.5 w-2.5" /> Opłacone
                   </span>
                 );
-                if (overdue > 0) return (
+                if (diffDays !== null && diffDays < 0) return (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-destructive/15 text-destructive inline-flex items-center gap-1 animate-pulse">
-                    <AlertTriangle className="h-2.5 w-2.5" /> {overdue}d po terminie
+                    <AlertTriangle className="h-2.5 w-2.5" /> {Math.abs(diffDays)}d po terminie
                   </span>
                 );
+                if (isTransfer && diffDays !== null && diffDays >= 0) {
+                  const tone = diffDays <= 3 ? "bg-warning/15 text-warning" : "bg-primary/10 text-primary";
+                  const label = diffDays === 0 ? "Termin dziś" : diffDays === 1 ? "Termin jutro" : `Termin za ${diffDays} dni`;
+                  return (
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${tone}`}>
+                      <Clock className="h-2.5 w-2.5" /> {label}
+                    </span>
+                  );
+                }
                 return (
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning">Nieopłacone</span>
                 );
