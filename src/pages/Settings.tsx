@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import TeamManagement from "@/components/settings/TeamManagement";
 import { SubscriptionPanel } from "@/components/settings/SubscriptionPanel";
+import { SuperAdminPanel } from "@/components/settings/SuperAdminPanel";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCompanies, useAddCompany, useUpdateCompany, useDeleteCompany } from "@/hooks/useCompanies";
@@ -456,6 +457,9 @@ const Settings = ({ isOnboarding = false }: SettingsPageProps) => {
 
           {/* Subskrypcja */}
           <SubscriptionPanel />
+
+          {/* Super-admin (tylko dla właściciela aplikacji) */}
+          <SuperAdminPanel />
 
           {/* Zarządzanie zespołem */}
           <TeamManagement />
