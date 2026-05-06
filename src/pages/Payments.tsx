@@ -59,15 +59,17 @@ const Payments = () => {
     return (invoices || [])
       .filter((i) => i.invoice_type === "kosztowa")
       .map((inv) => {
+        const isCash = inv.payment_method === "1";
+        const effectivePaymentStatus = isCash ? "paid" : inv.payment_status;
         const due = inv.payment_due_date || inv.date;
         const days = daysUntil(due);
         let bucket: Bucket = "later";
-        if (inv.payment_status === "paid") bucket = "paid";
+        if (effectivePaymentStatus === "paid") bucket = "paid";
         else if (days === null) bucket = "later";
         else if (days < 0) bucket = "overdue";
         else if (days === 0) bucket = "today";
         else if (days <= 7) bucket = "soon";
-        return { ...inv, _due: due, _days: days, _bucket: bucket };
+        return { ...inv, payment_status: effectivePaymentStatus, _isCash: isCash, _due: due, _days: days, _bucket: bucket };
       });
   }, [invoices]);
 
@@ -100,7 +102,11 @@ const Payments = () => {
     });
   }, [enriched, filter]);
 
-  const handleMarkPaid = async (inv: Invoice) => {
+  const handleMarkPaid = async (inv: Invoice & { _isCash?: boolean }) => {
+    if (inv._isCash) {
+      toast.info("Faktura gotówkowa jest zawsze opłacona");
+      return;
+    }
     setBusyId(inv.id);
     const isPaid = inv.payment_status === "paid";
     const { error } = await supabase
@@ -272,6 +278,9 @@ const Payments = () => {
                       {inv.ksef_number && (
                         <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium hidden md:inline">KSeF</span>
                       )}
+                      {inv._isCash && (
+                        <span className="text-[10px] bg-success/10 text-success px-1.5 py-0.5 rounded font-medium">Gotówka</span>
+                      )}
                     </div>
                     <p className="text-[11px] text-muted-foreground truncate">
                       {isPaid && inv.paid_at
@@ -300,16 +309,24 @@ const Payments = () => {
                     >
                       <QrCode className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant={isPaid ? "ghost" : "default"}
-                      size="sm"
-                      className={`h-8 px-2 md:px-3 text-xs gap-1 ${isPaid ? "text-success hover:text-success" : ""}`}
-                      disabled={busyId === inv.id}
-                      onClick={() => handleMarkPaid(inv)}
-                    >
-                      {busyId === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                      <span className="hidden md:inline">{isPaid ? "Cofnij" : "Opłacone"}</span>
-                    </Button>
+                    {!inv._isCash && (
+                      <Button
+                        variant={isPaid ? "ghost" : "default"}
+                        size="sm"
+                        className={`h-8 px-2 md:px-3 text-xs gap-1 ${isPaid ? "text-success hover:text-success" : ""}`}
+                        disabled={busyId === inv.id}
+                        onClick={() => handleMarkPaid(inv)}
+                      >
+                        {busyId === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                        <span className="hidden md:inline">{isPaid ? "Cofnij" : "Opłacone"}</span>
+                      </Button>
+                    )}
+                    {inv._isCash && (
+                      <span className="h-8 px-2 md:px-3 text-xs gap-1 inline-flex items-center text-success font-medium">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span className="hidden md:inline">Gotówka</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               );

@@ -37,6 +37,7 @@ export function useInvoices(companyId?: string | null) {
         sent_to_portal_at: row.sent_to_portal_at,
         sent_to_portal_by: row.sent_to_portal_by,
         payment_status: row.payment_status,
+        payment_method: row.payment_method,
         payment_due_date: row.payment_due_date,
         paid_at: row.paid_at,
         vat_whitelist_status: row.vat_whitelist_status,

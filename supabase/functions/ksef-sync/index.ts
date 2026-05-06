@@ -435,6 +435,7 @@ function parseInvoiceXml(xml: string) {
   const nip = getTag("NrNIP") || getTag("NIP") || "";
   const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
   const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
+  const paymentMethod = getTag("FormaPlatnosci") || null;
 
   // Parse line items (FA(3) format: <FaWiersz> elements)
   const items: Array<{
@@ -486,7 +487,7 @@ function parseInvoiceXml(xml: string) {
     });
   }
 
-  return { vendor, nip, date, grossAmount, items };
+  return { vendor, nip, date, grossAmount, items, paymentMethod };
 }
 
 // Main sync for single company
@@ -621,6 +622,7 @@ async function syncCompany(
           const invoiceType = ref._invoiceType || "kosztowa";
 
           let parsedItems: any[] = [];
+          let paymentMethod: string | null = null;
 
           try {
             const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
@@ -630,9 +632,12 @@ async function syncCompany(
             if (parsed.date) date = parsed.date;
             if (parsed.grossAmount) grossAmount = parsed.grossAmount;
             parsedItems = parsed.items || [];
+            paymentMethod = parsed.paymentMethod;
           } catch (xmlErr) {
             console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
           }
+
+          const isCash = paymentMethod === "1";
 
           const { data: inserted, error: insertError } = await supabase.from("invoices").insert({
             company_id: company.id,
@@ -643,6 +648,9 @@ async function syncCompany(
             ksef_number: ksefNumber,
             status: "new",
             invoice_type: invoiceType,
+            payment_method: paymentMethod,
+            payment_status: isCash ? "paid" : "unpaid",
+            paid_at: isCash ? new Date().toISOString() : null,
           }).select("id").single();
 
           if (insertError) {

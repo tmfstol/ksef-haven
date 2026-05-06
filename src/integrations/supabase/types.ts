@@ -1280,6 +1280,7 @@ export type Database = {
           nip: string
           paid_at: string | null
           payment_due_date: string | null
+          payment_method: string | null
           payment_status: string
           pdf_path: string | null
           project_id: string | null
@@ -1310,6 +1311,7 @@ export type Database = {
           nip: string
           paid_at?: string | null
           payment_due_date?: string | null
+          payment_method?: string | null
           payment_status?: string
           pdf_path?: string | null
           project_id?: string | null
@@ -1340,6 +1342,7 @@ export type Database = {
           nip?: string
           paid_at?: string | null
           payment_due_date?: string | null
+          payment_method?: string | null
           payment_status?: string
           pdf_path?: string | null
           project_id?: string | null

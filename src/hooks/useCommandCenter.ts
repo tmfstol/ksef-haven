@@ -58,7 +58,7 @@ export function useCommandCenter(companyId: string | null) {
       if (!companyId) return [];
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, date, vendor, nip, gross_amount, status, invoice_type, ksef_number, project_id, created_at, source, payment_status, payment_due_date, category, tags")
+        .select("id, date, vendor, nip, gross_amount, status, invoice_type, ksef_number, project_id, created_at, source, payment_status, payment_method, payment_due_date, category, tags")
         .eq("company_id", companyId)
         .order("date", { ascending: false });
       if (error) throw error;
@@ -287,7 +287,7 @@ export function useCommandCenter(companyId: string | null) {
     if (!invoices) return [];
     const today = new Date();
     return invoices
-      .filter((i) => i.payment_status !== "paid" && i.invoice_type === "kosztowa")
+      .filter((i) => i.payment_status !== "paid" && i.payment_method !== "1" && i.invoice_type === "kosztowa")
       .map((i) => {
         const dueDate = i.payment_due_date ? new Date(i.payment_due_date) : new Date(i.date);
         const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
