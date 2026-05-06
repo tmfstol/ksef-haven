@@ -45,7 +45,7 @@ interface InvoiceFiltersProps {
 }
 
 const statusOptions: { value: Invoice["status"]; label: string }[] = [
-  { value: "new", label: "Nowa" },
+  { value: "new", label: "Do sprawdzenia" },
   { value: "processed", label: "Przetworzona" },
   { value: "error", label: "Błąd" },
 ];
