@@ -81,6 +81,16 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
   const [noteText, setNoteText] = useState(invoice?.bookkeeper_note ?? "");
   const [splitOpen, setSplitOpen] = useState(false);
 
+  const { user: currentUser } = useAuth();
+  const { data: profileNames } = useProfileNames([invoice?.bookkeeper_note_by]);
+  const noteAuthorId = invoice?.bookkeeper_note_by ?? null;
+  const noteAuthorName = noteAuthorId
+    ? (noteAuthorId === currentUser?.id ? "Ty" : profileNames?.[noteAuthorId] || "Inny użytkownik")
+    : null;
+  const noteAt = invoice?.bookkeeper_note_at
+    ? new Date(invoice.bookkeeper_note_at).toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" })
+    : null;
+
   const { data: projects } = useProjects(companyId);
   const assignMutation = useAssignInvoiceToProject();
   const { data: existingSplits } = useInvoiceProjectCosts(invoiceId);
