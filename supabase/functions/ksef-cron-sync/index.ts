@@ -702,7 +702,7 @@ export async function syncCompany(
         try {
           const { data: existing } = await supabase
             .from("invoices")
-            .select("id, paid_at")
+            .select("id, payment_method, payment_due_date, payment_status, paid_at")
             .eq("ksef_number", ksefNumber)
             .eq("company_id", company.id)
             .maybeSingle();
