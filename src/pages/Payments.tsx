@@ -309,16 +309,24 @@ const Payments = () => {
                     >
                       <QrCode className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant={isPaid ? "ghost" : "default"}
-                      size="sm"
-                      className={`h-8 px-2 md:px-3 text-xs gap-1 ${isPaid ? "text-success hover:text-success" : ""}`}
-                      disabled={busyId === inv.id}
-                      onClick={() => handleMarkPaid(inv)}
-                    >
-                      {busyId === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                      <span className="hidden md:inline">{isPaid ? "Cofnij" : "Opłacone"}</span>
-                    </Button>
+                    {!inv._isCash && (
+                      <Button
+                        variant={isPaid ? "ghost" : "default"}
+                        size="sm"
+                        className={`h-8 px-2 md:px-3 text-xs gap-1 ${isPaid ? "text-success hover:text-success" : ""}`}
+                        disabled={busyId === inv.id}
+                        onClick={() => handleMarkPaid(inv)}
+                      >
+                        {busyId === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                        <span className="hidden md:inline">{isPaid ? "Cofnij" : "Opłacone"}</span>
+                      </Button>
+                    )}
+                    {inv._isCash && (
+                      <span className="h-8 px-2 md:px-3 text-xs gap-1 inline-flex items-center text-success font-medium">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span className="hidden md:inline">Gotówka</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               );
