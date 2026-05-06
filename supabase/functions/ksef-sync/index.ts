@@ -815,21 +815,25 @@ async function syncCompany(
           let isPaidInXml = false;
           let dataZaplaty: string | null = null;
 
-          try {
-            xmlFetches++;
-            const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
-            const parsed = parseInvoiceXml(xml);
-            if (parsed.vendor) vendor = parsed.vendor;
-            if (parsed.nip) nip = parsed.nip;
-            if (parsed.date) date = parsed.date;
-            if (parsed.grossAmount) grossAmount = parsed.grossAmount;
-            parsedItems = parsed.items || [];
-            paymentMethod = parsed.paymentMethod;
-            paymentDueDate = parsed.paymentDueDate;
-            isPaidInXml = parsed.isPaidInXml;
-            dataZaplaty = parsed.dataZaplaty;
-          } catch (xmlErr) {
-            console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
+          if (!onlyKsefNumber && xmlFetches >= MAX_XML_FETCHES_PER_SYNC) {
+            deferredXmlCount++;
+          } else {
+            try {
+              xmlFetches++;
+              const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
+              const parsed = parseInvoiceXml(xml);
+              if (parsed.vendor) vendor = parsed.vendor;
+              if (parsed.nip) nip = parsed.nip;
+              if (parsed.date) date = parsed.date;
+              if (parsed.grossAmount) grossAmount = parsed.grossAmount;
+              parsedItems = parsed.items || [];
+              paymentMethod = parsed.paymentMethod;
+              paymentDueDate = parsed.paymentDueDate;
+              isPaidInXml = parsed.isPaidInXml;
+              dataZaplaty = parsed.dataZaplaty;
+            } catch (xmlErr) {
+              console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
+            }
           }
 
           // Fallback termin płatności: data wystawienia + 14 dni jeśli brak w XML
