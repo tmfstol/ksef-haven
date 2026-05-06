@@ -36,18 +36,16 @@ const Index = () => {
   const { data: companies, isLoading: companiesLoading } = useCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const { data: invoices, isLoading, isError, refetch } = useInvoices(activeCompanyId);
-  const syncMutation = useSync(activeCompanyId);
+  const [latestSyncStartedAt, setLatestSyncStartedAt] = useState<string | null>(null);
+  const syncMutation = useSync(activeCompanyId, {
+    onSyncStart: (startedAt) => setLatestSyncStartedAt(startedAt),
+  });
   const syncAllMutation = useSyncAllCompanies();
   const [selectedNip, setSelectedNip] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<InvoiceFiltersState>(EMPTY_FILTERS);
   const [activeTab, setActiveTab] = useState<InvoiceType>("kosztowa");
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [lastSeenTimestamp] = useState<string | null>(() => {
-    const prev = localStorage.getItem("ksef_last_seen");
-    localStorage.setItem("ksef_last_seen", new Date().toISOString());
-    return prev;
-  });
 
   useEffect(() => {
     if (!companiesLoading && (!companies || companies.length === 0)) {
@@ -222,7 +220,7 @@ const Index = () => {
               <>
                 <InvoiceFilters filters={filters} onChange={setFilters} vendors={vendors} />
                 <PaymentReminderBanner invoices={tabInvoices} />
-                <StatsBar invoices={filteredInvoices} lastSeenTimestamp={lastSeenTimestamp} />
+                <StatsBar invoices={filteredInvoices} latestSyncStartedAt={latestSyncStartedAt} />
 
                 {isMobile ? (
                   <div className="grid grid-cols-1 gap-3">
@@ -230,12 +228,12 @@ const Index = () => {
                       <InvoiceCard
                         key={invoice.id}
                         invoice={invoice}
-                        isNew={isInvoiceNew(invoice, lastSeenTimestamp)}
+                        isNew={isInvoiceNew(invoice, latestSyncStartedAt)}
                       />
                     ))}
                   </div>
                 ) : (
-                  <InvoiceTable invoices={filteredInvoices} lastSeenTimestamp={lastSeenTimestamp} clientPortalEmail={activeCompany?.client_portal_email} />
+                  <InvoiceTable invoices={filteredInvoices} latestSyncStartedAt={latestSyncStartedAt} clientPortalEmail={activeCompany?.client_portal_email} />
                 )}
               </>
             )}
