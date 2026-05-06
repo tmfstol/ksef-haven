@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { StatsBar } from "@/components/dashboard/StatsBar";
 import { InvoiceFilters, applyFilters, type InvoiceFiltersState } from "@/components/dashboard/InvoiceFilters";
 import { PaymentReminderBanner } from "@/components/dashboard/PaymentReminderBanner";
+import { isInvoiceNew } from "@/lib/invoice-new";
 
 import { InvoiceCard } from "@/components/dashboard/InvoiceCard";
 import { UploadInvoiceModal } from "@/components/dashboard/UploadInvoiceModal";
