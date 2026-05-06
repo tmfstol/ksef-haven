@@ -31,7 +31,7 @@ const statusStyles: Record<Invoice["status"], string> = {
 };
 
 const statusLabels: Record<Invoice["status"], string> = {
-  new: "Nowa",
+  new: "Do sprawdzenia",
   processed: "Przetworzona",
   error: "Błąd",
 };
