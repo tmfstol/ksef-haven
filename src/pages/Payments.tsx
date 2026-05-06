@@ -59,7 +59,9 @@ const Payments = () => {
     return (invoices || [])
       .filter((i) => i.invoice_type === "kosztowa")
       .map((inv) => {
-        const isCash = inv.payment_method === "1";
+        const instantMethods: Record<string, string> = { "1": "Gotówka", "2": "Karta", "3": "Bon", "4": "Czek", "7": "Płatność mobilna" };
+        const isCash = !!inv.payment_method && inv.payment_method in instantMethods;
+        const cashLabel = isCash ? instantMethods[inv.payment_method as string] : null;
         const effectivePaymentStatus = isCash ? "paid" : inv.payment_status;
         const due = inv.payment_due_date || inv.date;
         const days = daysUntil(due);
