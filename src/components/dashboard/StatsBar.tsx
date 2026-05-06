@@ -4,13 +4,13 @@ import { isInvoiceNew } from "@/lib/invoice-new";
 
 interface StatsBarProps {
   invoices: Invoice[];
-  lastSeenTimestamp?: string | null;
+  latestSyncStartedAt?: string | null;
 }
 
-export function StatsBar({ invoices, lastSeenTimestamp }: StatsBarProps) {
+export function StatsBar({ invoices, latestSyncStartedAt }: StatsBarProps) {
   const total = invoices.length;
   const processed = invoices.filter((i) => i.status === "processed").length;
-  const newCount = invoices.filter((i) => isInvoiceNew(i, lastSeenTimestamp)).length;
+  const newCount = invoices.filter((i) => isInvoiceNew(i, latestSyncStartedAt)).length;
   const errors = invoices.filter((i) => i.status === "error").length;
 
   const stats = [

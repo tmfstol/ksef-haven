@@ -23,7 +23,7 @@ const statusStyles: Record<Invoice["status"], string> = {
 };
 
 const statusLabels: Record<Invoice["status"], string> = {
-  new: "Nowa",
+  new: "Do sprawdzenia",
   processed: "Przetworzona",
   error: "Błąd",
 };
@@ -348,6 +348,11 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
               <span className={`flex-shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${statusStyles[invoice.status]}`}>
                 {statusLabels[invoice.status]}
               </span>
+              {isNew && (
+                <span className="flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                  Nowa
+                </span>
+              )}
               {(() => {
                 const isPaid = invoice.payment_status === "paid";
                 let overdue = 0;

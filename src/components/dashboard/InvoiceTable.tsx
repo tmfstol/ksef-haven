@@ -18,7 +18,7 @@ type DownloadState = { id: string; format: "xml" | "upo" | "pdf" | "email" } | n
 
 interface InvoiceTableProps {
   invoices: Invoice[];
-  lastSeenTimestamp?: string | null;
+  latestSyncStartedAt?: string | null;
   clientPortalEmail?: string | null;
 }
 
@@ -31,7 +31,7 @@ const statusStyles: Record<Invoice["status"], string> = {
 };
 
 const statusLabels: Record<Invoice["status"], string> = {
-  new: "Nowa",
+  new: "Do sprawdzenia",
   processed: "Przetworzona",
   error: "Błąd",
 };
@@ -63,7 +63,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail }: InvoiceTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
   const [downloading, setDownloading] = useState<DownloadState>(null);
@@ -327,7 +327,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
             const isDownloadingUpo = downloading?.id === invoice.id && downloading?.format === "upo";
             const isSendingEmail = downloading?.id === invoice.id && downloading?.format === "email";
             const isAnyDownloading = downloading !== null;
-            const isNew = isInvoiceNew(invoice, lastSeenTimestamp);
+            const isNew = isInvoiceNew(invoice, latestSyncStartedAt);
             const isExpanded = expandedId === invoice.id;
 
             const overdueDays = getOverdueDays(invoice);
@@ -365,6 +365,11 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${statusStyles[invoice.status]}`}>
                         {statusLabels[invoice.status]}
                       </span>
+                      {isNew && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">
+                          Nowa
+                        </span>
+                      )}
                       {invoice.payment_status === "paid" ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-success/10 text-success">
                           <CheckCircle2 className="h-2.5 w-2.5" /> Opłacone
