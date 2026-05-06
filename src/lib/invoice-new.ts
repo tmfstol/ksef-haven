@@ -1,13 +1,23 @@
 import type { Invoice } from "@/types/invoice";
 
-// Faktura jest "nowa" tylko gdy:
-// 1. Została zaimportowana po ostatniej wizycie użytkownika
-// 2. Data wystawienia jest z ostatnich 14 dni (żeby stare faktury z KSeF nie świeciły się jako nowe)
-export function isInvoiceNew(invoice: Invoice, lastSeenTimestamp?: string | null): boolean {
-  if (!lastSeenTimestamp || !invoice.created_at) return false;
-  if (invoice.created_at <= lastSeenTimestamp) return false;
-  if (!invoice.date) return false;
-  const invoiceDate = new Date(invoice.date).getTime();
-  const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
-  return invoiceDate >= cutoff;
+const NEW_INVOICE_VISIBLE_DAYS = 3;
+const SYNC_CLOCK_TOLERANCE_MS = 60 * 1000;
+
+function toTime(value?: string | null) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+// Krótkie oznaczenie "Nowa" dotyczy tylko faktur z ostatniego importu KSeF
+// i wygasa po kilku dniach. Status roboczy faktury `new` jest obsługiwany osobno w UI.
+export function isInvoiceNew(invoice: Invoice, latestSyncStartedAt?: string | null): boolean {
+  const importedAt = toTime(invoice.created_at);
+  const syncStartedAt = toTime(latestSyncStartedAt);
+  if (!importedAt || !syncStartedAt) return false;
+
+  const visibleUntil = importedAt + NEW_INVOICE_VISIBLE_DAYS * 24 * 60 * 60 * 1000;
+  if (Date.now() > visibleUntil) return false;
+
+  return importedAt >= syncStartedAt - SYNC_CLOCK_TOLERANCE_MS;
 }
