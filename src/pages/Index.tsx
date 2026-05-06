@@ -9,6 +9,7 @@ import { InvoiceTable } from "@/components/dashboard/InvoiceTable";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { StatsBar } from "@/components/dashboard/StatsBar";
 import { InvoiceFilters, applyFilters, type InvoiceFiltersState } from "@/components/dashboard/InvoiceFilters";
+import { PaymentReminderBanner } from "@/components/dashboard/PaymentReminderBanner";
 
 import { InvoiceCard } from "@/components/dashboard/InvoiceCard";
 import { UploadInvoiceModal } from "@/components/dashboard/UploadInvoiceModal";
@@ -219,6 +220,7 @@ const Index = () => {
             ) : (
               <>
                 <InvoiceFilters filters={filters} onChange={setFilters} vendors={vendors} />
+                <PaymentReminderBanner invoices={tabInvoices} />
                 <StatsBar invoices={filteredInvoices} lastSeenTimestamp={lastSeenTimestamp} />
 
                 {isMobile ? (
