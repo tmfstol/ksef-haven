@@ -30,6 +30,21 @@ function daysUntil(date: string | null | undefined): number | null {
   return Math.round((d.getTime() - now.getTime()) / 86400000);
 }
 
+const instantMethods: Record<string, string> = { "1": "Gotówka", "2": "Karta", "3": "Bon", "4": "Czek", "7": "Płatność mobilna" };
+
+function normalizePaymentMethod(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const raw = value.trim();
+  if (raw in instantMethods) return raw;
+  const text = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (text.includes("gotow") || text.includes("cash")) return "1";
+  if (text.includes("karta") || text.includes("card") || text.includes("platnicz")) return "2";
+  if (text.includes("bon") || text.includes("voucher")) return "3";
+  if (text.includes("czek") || text.includes("check")) return "4";
+  if (text.includes("mobil") || text.includes("blik")) return "7";
+  return null;
+}
+
 type Bucket = "overdue" | "today" | "soon" | "later" | "paid";
 
 const Payments = () => {
@@ -59,9 +74,9 @@ const Payments = () => {
     return (invoices || [])
       .filter((i) => i.invoice_type === "kosztowa")
       .map((inv) => {
-        const instantMethods: Record<string, string> = { "1": "Gotówka", "2": "Karta", "3": "Bon", "4": "Czek", "7": "Płatność mobilna" };
-        const isCash = !!inv.payment_method && inv.payment_method in instantMethods;
-        const cashLabel = isCash ? instantMethods[inv.payment_method as string] : null;
+        const normalizedPaymentMethod = normalizePaymentMethod(inv.payment_method);
+        const isCash = !!normalizedPaymentMethod;
+        const cashLabel = normalizedPaymentMethod ? instantMethods[normalizedPaymentMethod] : null;
         const effectivePaymentStatus = isCash ? "paid" : inv.payment_status;
         const due = inv.payment_due_date || inv.date;
         const days = daysUntil(due);
