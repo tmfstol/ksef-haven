@@ -436,6 +436,19 @@ function parseInvoiceXml(xml: string) {
   const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
   const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
   const paymentMethod = getTag("FormaPlatnosci") || null;
+  // Termin płatności (FA(3): <TerminPlatnosci> lub P_22A); fallback: data wystawienia + 14 dni
+  let paymentDueDate = getTag("TerminPlatnosci") || getTag("P_22A") || null;
+  if (!paymentDueDate && date) {
+    const d = new Date(date);
+    if (!isNaN(d.getTime())) {
+      d.setDate(d.getDate() + 14);
+      paymentDueDate = d.toISOString().split("T")[0];
+    }
+  }
+  // Znacznik zapłaty: P_18 = "1" lub <Zaplacono>1</Zaplacono> oznacza opłaconą fakturę
+  const zaplaconoFlag = getTag("Zaplacono") || getTag("P_18") || null;
+  const dataZaplaty = getTag("DataZaplaty") || getTag("P_18A") || null;
+  const isPaidInXml = zaplaconoFlag === "1" || zaplaconoFlag === "true" || !!dataZaplaty;
 
   // Parse line items (FA(3) format: <FaWiersz> elements)
   const items: Array<{
