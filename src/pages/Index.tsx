@@ -229,7 +229,7 @@ const Index = () => {
                       <InvoiceCard
                         key={invoice.id}
                         invoice={invoice}
-                        isNew={!!(lastSeenTimestamp && invoice.created_at && invoice.created_at > lastSeenTimestamp)}
+                        isNew={isInvoiceNew(invoice, lastSeenTimestamp)}
                       />
                     ))}
                   </div>
