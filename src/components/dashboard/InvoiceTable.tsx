@@ -397,6 +397,17 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
                           Nieopłacone
                         </span>
                       )}
+                      {invoice.payment_status !== "paid" && invoice.invoice_type === "kosztowa" && isTransfer(invoice) && invoice.payment_due_date && (() => {
+                        const days = getDaysToDue(invoice);
+                        if (days === null || days < 0) return null;
+                        const tone = days <= 3 ? "bg-warning/15 text-warning" : "bg-primary/10 text-primary";
+                        const label = days === 0 ? "Termin dziś" : days === 1 ? "Termin jutro" : `Termin za ${days} dni`;
+                        return (
+                          <span title={`Termin płatności: ${formatDueDate(invoice.payment_due_date)}`} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${tone}`}>
+                            <Clock className="h-2.5 w-2.5" /> {label}
+                          </span>
+                        );
+                      })()}
                       {invoice.vat_whitelist_status === "verified" && (
                         <span title="Biała lista VAT: zweryfikowano" className="text-success"><ShieldCheck className="h-3.5 w-3.5" /></span>
                       )}
