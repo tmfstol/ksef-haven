@@ -278,6 +278,9 @@ const Payments = () => {
                       {inv.ksef_number && (
                         <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium hidden md:inline">KSeF</span>
                       )}
+                      {inv._isCash && (
+                        <span className="text-[10px] bg-success/10 text-success px-1.5 py-0.5 rounded font-medium">Gotówka</span>
+                      )}
                     </div>
                     <p className="text-[11px] text-muted-foreground truncate">
                       {isPaid && inv.paid_at
