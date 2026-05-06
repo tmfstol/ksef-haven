@@ -1,4 +1,4 @@
-import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X, RefreshCcw, ReceiptText } from "lucide-react";
+import { FileText, FileCode, Loader2, ChevronDown, CheckCircle2, QrCode, FolderOpen, StickyNote, Pencil, Check, X, RefreshCcw, ReceiptText, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { useState } from "react";
