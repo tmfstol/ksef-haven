@@ -491,6 +491,16 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
                         {downloading === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                         PDF
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-[44px] text-xs gap-1.5 col-span-2 text-primary border-primary/40 hover:bg-primary/10"
+                        disabled={!!downloading}
+                        onClick={handleSendToPortal}
+                      >
+                        {downloading === "email" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Wyślij do portalu
+                      </Button>
                     </>
                   )}
                 </div>
