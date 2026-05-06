@@ -435,6 +435,7 @@ function parseInvoiceXml(xml: string) {
   const nip = getTag("NrNIP") || getTag("NIP") || "";
   const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
   const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
+  const paymentMethod = getTag("FormaPlatnosci") || null;
 
   // Parse line items (FA(3) format: <FaWiersz> elements)
   const items: Array<{
