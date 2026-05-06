@@ -249,6 +249,11 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      await supabase
+        .from("invoices")
+        .update({ sent_to_portal_at: new Date().toISOString(), sent_to_portal_by: user?.id ?? null })
+        .eq("id", invoice.id);
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Faktura wysłana do portalu przez Make");
     } catch (err) {
       console.error("Email send error:", err);
