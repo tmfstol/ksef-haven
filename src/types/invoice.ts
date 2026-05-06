@@ -19,6 +19,7 @@ export interface Invoice {
   sent_to_portal_at?: string | null;
   sent_to_portal_by?: string | null;
   payment_status?: string;
+  payment_method?: string | null;
   payment_due_date?: string | null;
   paid_at?: string | null;
   vat_whitelist_status?: "not_checked" | "verified" | "invalid" | "unknown";
