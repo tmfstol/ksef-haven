@@ -89,8 +89,10 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
   };
 
   const getOverdueDays = (inv: Invoice): number | null => {
-    if (inv.payment_status === "paid" || !inv.payment_due_date || inv.invoice_type !== "kosztowa") return null;
-    const d = new Date(inv.payment_due_date);
+    if (inv.payment_status === "paid" || inv.invoice_type !== "kosztowa") return null;
+    const due = inv.payment_due_date || inv.date;
+    if (!due) return null;
+    const d = new Date(due);
     const now = new Date();
     d.setHours(0, 0, 0, 0);
     now.setHours(0, 0, 0, 0);

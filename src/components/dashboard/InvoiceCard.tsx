@@ -316,8 +316,9 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
           transition: offset === 0 ? "transform 200ms ease-out" : "none",
         }}
         className={`glass-panel-elevated rounded-xl p-4 ${(() => {
-          if (invoice.payment_status !== "paid" && invoice.invoice_type === "kosztowa" && invoice.payment_due_date) {
-            const d = new Date(invoice.payment_due_date); d.setHours(0,0,0,0);
+          const due = invoice.payment_due_date || invoice.date;
+          if (invoice.payment_status !== "paid" && invoice.invoice_type === "kosztowa" && due) {
+            const d = new Date(due); d.setHours(0,0,0,0);
             const n = new Date(); n.setHours(0,0,0,0);
             if (d.getTime() < n.getTime()) return "border-l-2 border-l-destructive bg-destructive/5";
           }
@@ -350,8 +351,9 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
               {(() => {
                 const isPaid = invoice.payment_status === "paid";
                 let overdue = 0;
-                if (!isPaid && invoice.invoice_type === "kosztowa" && invoice.payment_due_date) {
-                  const d = new Date(invoice.payment_due_date); d.setHours(0,0,0,0);
+                const due = invoice.payment_due_date || invoice.date;
+                if (!isPaid && invoice.invoice_type === "kosztowa" && due) {
+                  const d = new Date(due); d.setHours(0,0,0,0);
                   const n = new Date(); n.setHours(0,0,0,0);
                   const diff = Math.round((d.getTime() - n.getTime()) / 86400000);
                   if (diff < 0) overdue = Math.abs(diff);

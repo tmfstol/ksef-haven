@@ -34,7 +34,7 @@ export function PaymentReminderBanner({ invoices }: Props) {
     for (const inv of invoices) {
       if (inv.invoice_type !== "kosztowa") continue;
       if (inv.payment_status === "paid") continue;
-      const d = daysUntil(inv.payment_due_date);
+      const d = daysUntil(inv.payment_due_date || inv.date);
       if (d === null) continue;
       if (d < 0) overdue.push({ ...inv, _days: d });
       else if (d <= 3) dueSoon.push({ ...inv, _days: d });
