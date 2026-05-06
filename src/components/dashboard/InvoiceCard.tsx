@@ -9,6 +9,8 @@ import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrB
 import { useSwipeable } from "@/hooks/useSwipeable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useProjects, useAssignInvoiceToProject } from "@/hooks/useProjects";
+import { useProfileNames } from "@/hooks/useProfileNames";
+import { useAuth } from "@/hooks/useAuth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PaymentQrModal } from "@/components/payments/PaymentQrModal";
