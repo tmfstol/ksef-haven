@@ -794,6 +794,7 @@ Deno.serve(async (req) => {
     const ksefEnv = body.ksef_env || "prod";
     const dateFrom = body.date_from || null;
     const dateTo = body.date_to || null;
+    const onlyKsefNumber = typeof body.ksef_number === "string" ? body.ksef_number : null;
 
     console.log(`[ksef-cron-sync] Starting cron sync (env=${ksefEnv})`);
 
@@ -821,7 +822,8 @@ Deno.serve(async (req) => {
           company as { id: string; nip: string; ksef_token: string },
           ksefEnv,
           dateFrom,
-          dateTo
+          dateTo,
+          onlyKsefNumber
         );
         results.push(result);
         console.log(`[ksef-cron-sync] OK ${company.nip}: ${result.newInvoices} new invoices`);
