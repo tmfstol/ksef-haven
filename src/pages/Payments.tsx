@@ -59,15 +59,17 @@ const Payments = () => {
     return (invoices || [])
       .filter((i) => i.invoice_type === "kosztowa")
       .map((inv) => {
+        const isCash = inv.payment_method === "1";
+        const effectivePaymentStatus = isCash ? "paid" : inv.payment_status;
         const due = inv.payment_due_date || inv.date;
         const days = daysUntil(due);
         let bucket: Bucket = "later";
-        if (inv.payment_status === "paid") bucket = "paid";
+        if (effectivePaymentStatus === "paid") bucket = "paid";
         else if (days === null) bucket = "later";
         else if (days < 0) bucket = "overdue";
         else if (days === 0) bucket = "today";
         else if (days <= 7) bucket = "soon";
-        return { ...inv, _due: due, _days: days, _bucket: bucket };
+        return { ...inv, payment_status: effectivePaymentStatus, _isCash: isCash, _due: due, _days: days, _bucket: bucket };
       });
   }, [invoices]);
 
