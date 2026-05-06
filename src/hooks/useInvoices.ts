@@ -32,6 +32,8 @@ export function useInvoices(companyId?: string | null) {
         ksef_number: row.ksef_number,
         project_id: row.project_id,
         bookkeeper_note: row.bookkeeper_note,
+        bookkeeper_note_by: row.bookkeeper_note_by,
+        bookkeeper_note_at: row.bookkeeper_note_at,
         payment_status: row.payment_status,
         payment_due_date: row.payment_due_date,
         paid_at: row.paid_at,
