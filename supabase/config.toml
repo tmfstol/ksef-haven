@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.payments-webhook]
 verify_jwt = false
+
+[functions.grant-pro]
+verify_jwt = false
