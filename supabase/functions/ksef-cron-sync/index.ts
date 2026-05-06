@@ -517,7 +517,8 @@ export async function syncCompany(
   company: { id: string; nip: string; ksef_token: string },
   ksefEnv: string,
   dateFrom?: string,
-  dateTo?: string
+  dateTo?: string,
+  onlyKsefNumber?: string | null
 ) {
   const baseUrl = KSEF_URLS[ksefEnv] || KSEF_URLS.prod;
 
@@ -581,7 +582,11 @@ export async function syncCompany(
       // Tag each invoice ref with its type
       const kosztowe = (queryResult2?.invoices || []).map((r: any) => ({ ...r, _invoiceType: "kosztowa" }));
       const przychodowe = (queryResult1?.invoices || []).map((r: any) => ({ ...r, _invoiceType: "przychodowa" }));
-      const allRefs = [...kosztowe, ...przychodowe];
+      const allRefs = [...kosztowe, ...przychodowe].filter((ref: any) => {
+        if (!onlyKsefNumber) return true;
+        const number = ref.ksefNumber || ref.ksefReferenceNumber || ref.invoiceReferenceNumber || ref.referenceNumber;
+        return number === onlyKsefNumber;
+      });
 
       console.log(`[ksef-sync] Found ${kosztowe.length} kosztowych, ${przychodowe.length} przychodowych`);
 
@@ -598,7 +603,7 @@ export async function syncCompany(
         try {
           const { data: existing } = await supabase
             .from("invoices")
-            .select("id")
+            .select("id, paid_at")
             .eq("ksef_number", ksefNumber)
             .eq("company_id", company.id)
             .maybeSingle();
@@ -609,11 +614,30 @@ export async function syncCompany(
               .select("id", { count: "exact", head: true })
               .eq("invoice_id", existing.id);
 
-            if (count && count > 0) continue;
-
             try {
               const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
               const parsed = parseInvoiceXml(xml);
+              const instantPayment = parsed.paymentMethod !== null && ["1", "2", "3", "4", "7"].includes(parsed.paymentMethod);
+              const xmlPaid = instantPayment || parsed.isPaidInXml;
+              const paymentUpdate: Record<string, string | null> = {};
+
+              if (parsed.paymentMethod !== null) paymentUpdate.payment_method = parsed.paymentMethod;
+              if (parsed.paymentDueDate) paymentUpdate.payment_due_date = parsed.paymentDueDate;
+              if (xmlPaid) {
+                paymentUpdate.payment_status = "paid";
+                paymentUpdate.paid_at = parsed.dataZaplaty
+                  ? new Date(parsed.dataZaplaty).toISOString()
+                  : existing.paid_at || new Date().toISOString();
+              }
+
+              if (Object.keys(paymentUpdate).length > 0) {
+                const { error: updateError } = await supabase.from("invoices").update(paymentUpdate).eq("id", existing.id);
+                if (updateError) console.error(`[ksef-sync] Payment backfill error for ${ksefNumber}:`, updateError);
+                else upsertedCount++;
+              }
+
+              if (count && count > 0) continue;
+
               if (parsed.items.length > 0) {
                 const itemRows = parsed.items.map(item => ({
                   invoice_id: existing.id,
