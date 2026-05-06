@@ -500,7 +500,7 @@ function parseInvoiceXml(xml: string) {
     });
   }
 
-  return { vendor, nip, date, grossAmount, items, paymentMethod };
+  return { vendor, nip, date, grossAmount, items, paymentMethod, paymentDueDate, isPaidInXml, dataZaplaty };
 }
 
 // Main sync for single company
