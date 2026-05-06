@@ -636,6 +636,9 @@ async function syncCompany(
 
           let parsedItems: any[] = [];
           let paymentMethod: string | null = null;
+          let paymentDueDate: string | null = null;
+          let isPaidInXml = false;
+          let dataZaplaty: string | null = null;
 
           try {
             const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
@@ -646,12 +649,28 @@ async function syncCompany(
             if (parsed.grossAmount) grossAmount = parsed.grossAmount;
             parsedItems = parsed.items || [];
             paymentMethod = parsed.paymentMethod;
+            paymentDueDate = parsed.paymentDueDate;
+            isPaidInXml = parsed.isPaidInXml;
+            dataZaplaty = parsed.dataZaplaty;
           } catch (xmlErr) {
             console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
           }
 
+          // Fallback termin płatności: data wystawienia + 14 dni jeśli brak w XML
+          if (!paymentDueDate && date) {
+            const d = new Date(date);
+            if (!isNaN(d.getTime())) {
+              d.setDate(d.getDate() + 14);
+              paymentDueDate = d.toISOString().split("T")[0];
+            }
+          }
+
           // Natychmiastowe formy płatności = zawsze opłacone (gotówka, karta, bon, czek, płatność mobilna)
           const isCash = paymentMethod !== null && ["1", "2", "3", "4", "7"].includes(paymentMethod);
+          const isPaid = isCash || isPaidInXml;
+          const paidAt = isPaid
+            ? (dataZaplaty ? new Date(dataZaplaty).toISOString() : new Date().toISOString())
+            : null;
 
           const { data: inserted, error: insertError } = await supabase.from("invoices").insert({
             company_id: company.id,
@@ -663,8 +682,9 @@ async function syncCompany(
             status: "new",
             invoice_type: invoiceType,
             payment_method: paymentMethod,
-            payment_status: isCash ? "paid" : "unpaid",
-            paid_at: isCash ? new Date().toISOString() : null,
+            payment_due_date: paymentDueDate,
+            payment_status: isPaid ? "paid" : "unpaid",
+            paid_at: paidAt,
           }).select("id").single();
 
           if (insertError) {
