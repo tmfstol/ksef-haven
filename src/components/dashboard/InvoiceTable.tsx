@@ -12,6 +12,7 @@ import { InvoiceItemsRow } from "./InvoiceItemsRow";
 import { AdBanner, AdBannerPlaceholder } from "./AdBanner";
 import { PaymentQrModal } from "@/components/payments/PaymentQrModal";
 import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrBlockReason, type InvoicePaymentDetails } from "@/lib/invoice-payment";
+import { isInvoiceNew } from "@/lib/invoice-new";
 
 type DownloadState = { id: string; format: "xml" | "upo" | "pdf" | "email" } | null;
 
