@@ -15,6 +15,9 @@ const KSEF_URLS: Record<string, string> = {
 };
 
 const INSTANT_PAYMENT_METHODS = new Set(["1", "2", "3", "4", "7"]);
+const MAX_XML_FETCHES_PER_SYNC = 15;
+const MAX_SYNC_RUNTIME_MS = 105_000;
+const MAX_RATE_LIMIT_WAIT_SECONDS = 10;
 
 function normalizePaymentMethod(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -443,7 +446,11 @@ async function getInvoice(baseUrl: string, accessToken: string, ksefNumber: stri
     if (res.status === 429 && attempt < 2) {
       const retryAfter = Number(res.headers.get("retry-after"));
       const secondsFromBody = Number(text.match(/po\s+(\d+)\s+sekund/i)?.[1]);
-      const waitSeconds = Math.min(65, Math.max(5, retryAfter || secondsFromBody || 30));
+      const requestedWait = retryAfter || secondsFromBody || 30;
+      if (requestedWait > MAX_RATE_LIMIT_WAIT_SECONDS) {
+        throw new Error(`KSeF rate limit for ${ksefNumber}: retry after ${requestedWait}s`);
+      }
+      const waitSeconds = Math.min(MAX_RATE_LIMIT_WAIT_SECONDS, Math.max(3, requestedWait));
       console.log(`[ksef-sync] Rate limited while fetching ${ksefNumber}, waiting ${waitSeconds}s`);
       await new Promise((r) => setTimeout(r, waitSeconds * 1000));
       continue;
