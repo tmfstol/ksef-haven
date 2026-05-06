@@ -51,11 +51,16 @@ export function useInvoices(companyId?: string | null) {
   });
 }
 
-export function useSync(companyId?: string | null) {
+export function useSync(
+  companyId?: string | null,
+  options?: { onSyncStart?: (startedAt: string) => void }
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params?: { dateFrom?: string; dateTo?: string }) => {
+      const syncStartedAt = new Date().toISOString();
+      options?.onSyncStart?.(syncStartedAt);
       const { data, error } = await supabase.functions.invoke("ksef-sync", {
         body: {
           company_id: companyId,
