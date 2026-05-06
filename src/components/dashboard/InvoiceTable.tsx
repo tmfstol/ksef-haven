@@ -365,6 +365,11 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${statusStyles[invoice.status]}`}>
                         {statusLabels[invoice.status]}
                       </span>
+                      {isNew && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">
+                          Nowa
+                        </span>
+                      )}
                       {invoice.payment_status === "paid" ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-success/10 text-success">
                           <CheckCircle2 className="h-2.5 w-2.5" /> Opłacone
