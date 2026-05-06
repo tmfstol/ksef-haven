@@ -681,7 +681,17 @@ export async function syncCompany(
 
       // Step 8: Upsert invoices
       let upsertedCount = 0;
+      let processedCount = 0;
+      let skippedCompleteCount = 0;
+      let deferredXmlCount = 0;
+      let xmlFetches = 0;
+      const processingStartedAt = Date.now();
       for (const ref of allRefs) {
+        if (!onlyKsefNumber && Date.now() - processingStartedAt > MAX_SYNC_RUNTIME_MS) {
+          console.log(`[ksef-cron-sync] Stopping early before edge timeout after ${processedCount} invoices and ${xmlFetches} XML fetches`);
+          break;
+        }
+
         const ksefNumber =
           ref.ksefNumber ||
           ref.ksefReferenceNumber ||
@@ -703,7 +713,23 @@ export async function syncCompany(
               .select("id", { count: "exact", head: true })
               .eq("invoice_id", existing.id);
 
+            const hasCompletePayment =
+              existing.payment_method &&
+              existing.payment_due_date &&
+              existing.payment_status &&
+              count && count > 0;
+            if (hasCompletePayment && !onlyKsefNumber) {
+              skippedCompleteCount++;
+              continue;
+            }
+
+            if (!onlyKsefNumber && xmlFetches >= MAX_XML_FETCHES_PER_SYNC) {
+              deferredXmlCount++;
+              continue;
+            }
+
             try {
+              xmlFetches++;
               const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
               const parsed = parseInvoiceXml(xml);
               const instantPayment = isInstantPaymentMethod(parsed.paymentMethod);
@@ -761,20 +787,25 @@ export async function syncCompany(
           let isPaidInXml = false;
           let dataZaplaty: string | null = null;
 
-          try {
-            const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
-            const parsed = parseInvoiceXml(xml);
-            if (parsed.vendor) vendor = parsed.vendor;
-            if (parsed.nip) nip = parsed.nip;
-            if (parsed.date) date = parsed.date;
-            if (parsed.grossAmount) grossAmount = parsed.grossAmount;
-            parsedItems = parsed.items || [];
-            paymentMethod = parsed.paymentMethod;
-            paymentDueDate = parsed.paymentDueDate;
-            isPaidInXml = parsed.isPaidInXml;
-            dataZaplaty = parsed.dataZaplaty;
-          } catch (xmlErr) {
-            console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
+          if (!onlyKsefNumber && xmlFetches >= MAX_XML_FETCHES_PER_SYNC) {
+            deferredXmlCount++;
+          } else {
+            try {
+              xmlFetches++;
+              const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
+              const parsed = parseInvoiceXml(xml);
+              if (parsed.vendor) vendor = parsed.vendor;
+              if (parsed.nip) nip = parsed.nip;
+              if (parsed.date) date = parsed.date;
+              if (parsed.grossAmount) grossAmount = parsed.grossAmount;
+              parsedItems = parsed.items || [];
+              paymentMethod = parsed.paymentMethod;
+              paymentDueDate = parsed.paymentDueDate;
+              isPaidInXml = parsed.isPaidInXml;
+              dataZaplaty = parsed.dataZaplaty;
+            } catch (xmlErr) {
+              console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
+            }
           }
 
           if (!paymentDueDate && date) {
@@ -829,6 +860,7 @@ export async function syncCompany(
               }
             }
           }
+          processedCount++;
         } catch (invErr) {
           console.error(`[ksef-sync] Error processing ${ksefNumber}:`, invErr);
         }
@@ -839,6 +871,10 @@ export async function syncCompany(
         companyNip: company.nip,
         totalFound: allRefs.length,
         newInvoices: upsertedCount,
+        processedInvoices: processedCount,
+        skippedComplete: skippedCompleteCount,
+        deferredXml: deferredXmlCount,
+        xmlFetches,
       };
     } catch (err) {
       console.log(`[ksef-sync] Candidate ${ci} failed: ${err instanceof Error ? err.message.substring(0, 100) : String(err)}`);
