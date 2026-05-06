@@ -16,6 +16,8 @@ export interface Invoice {
   bookkeeper_note?: string | null;
   bookkeeper_note_by?: string | null;
   bookkeeper_note_at?: string | null;
+  sent_to_portal_at?: string | null;
+  sent_to_portal_by?: string | null;
   payment_status?: string;
   payment_due_date?: string | null;
   paid_at?: string | null;
