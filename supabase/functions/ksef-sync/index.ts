@@ -637,7 +637,8 @@ async function syncCompany(
             console.log(`[ksef-sync] Could not fetch XML for ${ksefNumber}: ${xmlErr}`);
           }
 
-          const isCash = paymentMethod === "1";
+          // Natychmiastowe formy płatności = zawsze opłacone (gotówka, karta, bon, czek, płatność mobilna)
+          const isCash = paymentMethod !== null && ["1", "2", "3", "4", "7"].includes(paymentMethod);
 
           const { data: inserted, error: insertError } = await supabase.from("invoices").insert({
             company_id: company.id,
