@@ -73,6 +73,15 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
 
   const { data: projects } = useProjects(invoice.company_id);
   const assignMutation = useAssignInvoiceToProject();
+  const { user: currentUser } = useAuth();
+  const { data: profileNames } = useProfileNames([invoice.bookkeeper_note_by]);
+  const noteAuthorId = invoice.bookkeeper_note_by ?? null;
+  const noteAuthorName = noteAuthorId
+    ? (noteAuthorId === currentUser?.id ? "Ty" : profileNames?.[noteAuthorId] || "Inny użytkownik")
+    : null;
+  const noteAt = invoice.bookkeeper_note_at
+    ? new Date(invoice.bookkeeper_note_at).toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" })
+    : null;
 
   const { data: items, isLoading: isLoadingItems } = useQuery({
     queryKey: ["invoice-items", invoice.id],
