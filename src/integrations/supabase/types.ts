@@ -1267,6 +1267,8 @@ export type Database = {
       invoices: {
         Row: {
           bookkeeper_note: string | null
+          bookkeeper_note_at: string | null
+          bookkeeper_note_by: string | null
           category: string | null
           company_id: string
           created_at: string
@@ -1293,6 +1295,8 @@ export type Database = {
         }
         Insert: {
           bookkeeper_note?: string | null
+          bookkeeper_note_at?: string | null
+          bookkeeper_note_by?: string | null
           category?: string | null
           company_id: string
           created_at?: string
@@ -1319,6 +1323,8 @@ export type Database = {
         }
         Update: {
           bookkeeper_note?: string | null
+          bookkeeper_note_at?: string | null
+          bookkeeper_note_by?: string | null
           category?: string | null
           company_id?: string
           created_at?: string
