@@ -71,7 +71,7 @@ const Payments = () => {
         else if (days < 0) bucket = "overdue";
         else if (days === 0) bucket = "today";
         else if (days <= 7) bucket = "soon";
-        return { ...inv, payment_status: effectivePaymentStatus, _isCash: isCash, _due: due, _days: days, _bucket: bucket };
+        return { ...inv, payment_status: effectivePaymentStatus, _isCash: isCash, _cashLabel: cashLabel, _due: due, _days: days, _bucket: bucket };
       });
   }, [invoices]);
 
