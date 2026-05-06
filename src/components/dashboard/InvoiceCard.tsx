@@ -9,6 +9,8 @@ import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrB
 import { useSwipeable } from "@/hooks/useSwipeable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useProjects, useAssignInvoiceToProject } from "@/hooks/useProjects";
+import { useProfileNames } from "@/hooks/useProfileNames";
+import { useAuth } from "@/hooks/useAuth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PaymentQrModal } from "@/components/payments/PaymentQrModal";
@@ -73,6 +75,15 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
 
   const { data: projects } = useProjects(invoice.company_id);
   const assignMutation = useAssignInvoiceToProject();
+  const { user: currentUser } = useAuth();
+  const { data: profileNames } = useProfileNames([invoice.bookkeeper_note_by]);
+  const noteAuthorId = invoice.bookkeeper_note_by ?? null;
+  const noteAuthorName = noteAuthorId
+    ? (noteAuthorId === currentUser?.id ? "Ty" : profileNames?.[noteAuthorId] || "Inny użytkownik")
+    : null;
+  const noteAt = invoice.bookkeeper_note_at
+    ? new Date(invoice.bookkeeper_note_at).toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" })
+    : null;
 
   const { data: items, isLoading: isLoadingItems } = useQuery({
     queryKey: ["invoice-items", invoice.id],
@@ -146,9 +157,14 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
   const saveNoteMutation = useMutation({
     mutationFn: async (note: string) => {
       const trimmed = note.trim() || null;
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("invoices")
-        .update({ bookkeeper_note: trimmed })
+        .update({
+          bookkeeper_note: trimmed,
+          bookkeeper_note_by: trimmed ? user?.id ?? null : null,
+          bookkeeper_note_at: trimmed ? new Date().toISOString() : null,
+        } as any)
         .eq("id", invoice.id);
       if (error) throw error;
     },
@@ -456,9 +472,17 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-foreground whitespace-pre-wrap min-h-[20px]">
-                      {invoice.bookkeeper_note || <span className="italic text-muted-foreground/60">Kliknij ołówek, aby dodać</span>}
-                    </p>
+                    <>
+                      <p className="text-sm text-foreground whitespace-pre-wrap min-h-[20px]">
+                        {invoice.bookkeeper_note || <span className="italic text-muted-foreground/60">Kliknij ołówek, aby dodać</span>}
+                      </p>
+                      {invoice.bookkeeper_note && noteAuthorName && (
+                        <p className="text-[10px] text-muted-foreground/70 mt-1">
+                          Opisał(a): <span className="font-medium text-foreground/80">{noteAuthorName}</span>
+                          {noteAt && <> · {noteAt}</>}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 

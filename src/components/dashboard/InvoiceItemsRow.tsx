@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import type { Invoice } from "@/types/invoice";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useProfileNames } from "@/hooks/useProfileNames";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Select,
   SelectContent,
@@ -79,6 +81,16 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
   const [noteText, setNoteText] = useState(invoice?.bookkeeper_note ?? "");
   const [splitOpen, setSplitOpen] = useState(false);
 
+  const { user: currentUser } = useAuth();
+  const { data: profileNames } = useProfileNames([invoice?.bookkeeper_note_by]);
+  const noteAuthorId = invoice?.bookkeeper_note_by ?? null;
+  const noteAuthorName = noteAuthorId
+    ? (noteAuthorId === currentUser?.id ? "Ty" : profileNames?.[noteAuthorId] || "Inny użytkownik")
+    : null;
+  const noteAt = invoice?.bookkeeper_note_at
+    ? new Date(invoice.bookkeeper_note_at).toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" })
+    : null;
+
   const { data: projects } = useProjects(companyId);
   const assignMutation = useAssignInvoiceToProject();
   const { data: existingSplits } = useInvoiceProjectCosts(invoiceId);
@@ -87,9 +99,14 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
   const saveNoteMutation = useMutation({
     mutationFn: async (note: string) => {
       const trimmed = note.trim() || null;
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("invoices")
-        .update({ bookkeeper_note: trimmed } as any)
+        .update({
+          bookkeeper_note: trimmed,
+          bookkeeper_note_by: trimmed ? user?.id ?? null : null,
+          bookkeeper_note_at: trimmed ? new Date().toISOString() : null,
+        } as any)
         .eq("id", invoiceId);
       if (error) throw error;
       return trimmed;
@@ -322,9 +339,17 @@ export function InvoiceItemsRow({ invoiceId, colSpan, invoice, companyId }: Invo
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {invoice?.bookkeeper_note || <span className="italic text-muted-foreground/60">Kliknij ołówek, aby dodać opis</span>}
-                    </p>
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        {invoice?.bookkeeper_note || <span className="italic text-muted-foreground/60">Kliknij ołówek, aby dodać opis</span>}
+                      </p>
+                      {invoice?.bookkeeper_note && noteAuthorName && (
+                        <p className="text-[10px] text-muted-foreground/70 mt-1">
+                          Opisał(a): <span className="font-medium text-foreground/70">{noteAuthorName}</span>
+                          {noteAt && <> · {noteAt}</>}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

@@ -14,6 +14,8 @@ export interface Invoice {
   ksef_number?: string | null;
   project_id?: string | null;
   bookkeeper_note?: string | null;
+  bookkeeper_note_by?: string | null;
+  bookkeeper_note_at?: string | null;
   payment_status?: string;
   payment_due_date?: string | null;
   paid_at?: string | null;
