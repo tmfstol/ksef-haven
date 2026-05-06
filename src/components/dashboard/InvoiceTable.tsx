@@ -1,4 +1,4 @@
-import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion, Mail } from "lucide-react";
+import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion, Mail, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { motion, AnimatePresence } from "framer-motion";
@@ -327,6 +327,11 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
             const isNew = lastSeenTimestamp && invoice.created_at && invoice.created_at > lastSeenTimestamp;
             const isExpanded = expandedId === invoice.id;
 
+            const overdueDays = getOverdueDays(invoice);
+            const rowHighlight = overdueDays !== null
+              ? "bg-destructive/5 border-l-2 border-l-destructive"
+              : isNew ? "bg-primary/5 border-l-2 border-l-primary" : "";
+
             return (
               <AnimatePresence key={invoice.id}>
                 <motion.tr
@@ -334,7 +339,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.03 }}
-                  className={`border-b border-border/30 last:border-0 hover:bg-secondary/40 transition-colors cursor-pointer ${isNew ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
+                  className={`border-b border-border/30 last:border-0 hover:bg-secondary/40 transition-colors cursor-pointer ${rowHighlight}`}
                   onClick={() => setExpandedId(isExpanded ? null : invoice.id)}
                 >
                   <td className="px-2 py-3.5 text-center">
@@ -360,6 +365,10 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                       {invoice.payment_status === "paid" ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-success/10 text-success">
                           <CheckCircle2 className="h-2.5 w-2.5" /> Opłacone
+                        </span>
+                      ) : overdueDays !== null ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-destructive/15 text-destructive animate-pulse">
+                          <AlertTriangle className="h-2.5 w-2.5" /> {overdueDays}d po terminie
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-warning/10 text-warning">
