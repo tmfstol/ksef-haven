@@ -18,7 +18,7 @@ export const LEGAL_OPERATOR = {
 
 export const LEGAL_SERVICE = {
   productName: "e-KSEF.AI",
-  url: "https://e-ksefai.lovable.app",
+  url: "https://facturo.info",
   description:
     "Aplikacja webowa wspierająca obsługę faktur (w tym integrację z KSeF), zarządzanie kontrahentami, projektami, wydatkami oraz pracę z Google Workspace przez asystenta głosowego.",
 } as const;
