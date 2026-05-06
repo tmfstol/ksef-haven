@@ -18,7 +18,7 @@ type DownloadState = { id: string; format: "xml" | "upo" | "pdf" | "email" } | n
 
 interface InvoiceTableProps {
   invoices: Invoice[];
-  lastSeenTimestamp?: string | null;
+  latestSyncStartedAt?: string | null;
   clientPortalEmail?: string | null;
 }
 
@@ -63,7 +63,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail }: InvoiceTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
   const [downloading, setDownloading] = useState<DownloadState>(null);
@@ -327,7 +327,7 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
             const isDownloadingUpo = downloading?.id === invoice.id && downloading?.format === "upo";
             const isSendingEmail = downloading?.id === invoice.id && downloading?.format === "email";
             const isAnyDownloading = downloading !== null;
-            const isNew = isInvoiceNew(invoice, lastSeenTimestamp);
+            const isNew = isInvoiceNew(invoice, latestSyncStartedAt);
             const isExpanded = expandedId === invoice.id;
 
             const overdueDays = getOverdueDays(invoice);
