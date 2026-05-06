@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import type { Invoice } from "@/types/invoice";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useProfileNames } from "@/hooks/useProfileNames";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Select,
   SelectContent,
