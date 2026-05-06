@@ -34,6 +34,8 @@ export function useInvoices(companyId?: string | null) {
         bookkeeper_note: row.bookkeeper_note,
         bookkeeper_note_by: row.bookkeeper_note_by,
         bookkeeper_note_at: row.bookkeeper_note_at,
+        sent_to_portal_at: row.sent_to_portal_at,
+        sent_to_portal_by: row.sent_to_portal_by,
         payment_status: row.payment_status,
         payment_due_date: row.payment_due_date,
         paid_at: row.paid_at,

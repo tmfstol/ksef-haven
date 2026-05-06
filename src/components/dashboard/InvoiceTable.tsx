@@ -1,10 +1,12 @@
-import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion } from "lucide-react";
+import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 import { parseKsefXml, generateInvoicePdf, generateInvoicePdfBase64 } from "@/lib/invoice-pdf";
 import { InvoiceItemsRow } from "./InvoiceItemsRow";
 import { AdBanner, AdBannerPlaceholder } from "./AdBanner";
@@ -67,6 +69,8 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [qrInvoice, setQrInvoice] = useState<Invoice | null>(null);
   const [qrPaymentDetails, setQrPaymentDetails] = useState<InvoicePaymentDetails>(buildInvoicePaymentDetails({}));
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const handleMarkPaid = async (invoice: Invoice) => {
     const isPaid = invoice.payment_status === "paid";
@@ -245,6 +249,11 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      await supabase
+        .from("invoices")
+        .update({ sent_to_portal_at: new Date().toISOString(), sent_to_portal_by: user?.id ?? null })
+        .eq("id", invoice.id);
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Faktura wysłana do portalu przez Make");
     } catch (err) {
       console.error("Email send error:", err);
@@ -352,6 +361,14 @@ export function InvoiceTable({ invoices, lastSeenTimestamp, clientPortalEmail }:
                       )}
                       {invoice.vat_whitelist_status === "unknown" && (
                         <span title="Biała lista VAT: brak danych" className="text-muted-foreground"><ShieldQuestion className="h-3.5 w-3.5" /></span>
+                      )}
+                      {invoice.sent_to_portal_at && (
+                        <span
+                          title={`Wysłano do portalu: ${new Date(invoice.sent_to_portal_at).toLocaleString("pl-PL")}`}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary"
+                        >
+                          <Mail className="h-2.5 w-2.5" /> Wysłano
+                        </span>
                       )}
                     </div>
                   </td>
