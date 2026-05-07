@@ -185,6 +185,7 @@ const Timesheets = () => {
                       <TableRow>
                         <TableHead>Data</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Dodał</TableHead>
                         <TableHead className="text-right">Wierszy</TableHead>
                         <TableHead className="text-right">Zapisanych</TableHead>
                         <TableHead>Notatka / błąd</TableHead>
