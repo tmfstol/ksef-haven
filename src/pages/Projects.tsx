@@ -330,6 +330,19 @@ function ProjectDetail({
     [subprojects, hoursByProject]
   );
 
+  // All hours: own project + subprojects (for "Godziny pracy" tab)
+  const allHours = useMemo(() => {
+    const subIds = new Set(subprojects.map((s) => s.id));
+    return (companyHours || [])
+      .filter((h: any) => h.project_id === project.id || subIds.has(h.project_id))
+      .sort((a: any, b: any) => (a.work_date < b.work_date ? 1 : -1));
+  }, [companyHours, subprojects, project.id]);
+  const subprojectsById = useMemo(() => {
+    const m = new Map<string, Project>();
+    subprojects.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [subprojects]);
+
   const totalCost = ownTotalCost + subprojectsTotalCost;
   const totalHours = ownHoursTotal + subprojectsTotalHours;
 
@@ -681,12 +694,12 @@ function ProjectDetail({
         </TabsContent>
 
         <TabsContent value="hours">
-          {!ownHours?.length ? (
+          {!allHours.length ? (
             <div className="text-center py-10">
               <Clock className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-sm text-muted-foreground">Brak godzin przypisanych do tego projektu.</p>
               <p className="text-xs text-muted-foreground/70 mt-1">
-                Dodaj kartę pracy w module <span className="font-medium">Karty pracy</span> i przypisz godziny do tego projektu.
+                Dodaj kartę pracy w module <span className="font-medium">Karty pracy</span> i przypisz godziny do tego projektu lub subprojektu.
               </p>
             </div>
           ) : (
@@ -696,34 +709,49 @@ function ProjectDetail({
                   <TableRow>
                     <TableHead>Data</TableHead>
                     <TableHead>Pracownik</TableHead>
+                    <TableHead>Projekt</TableHead>
                     <TableHead>Opis</TableHead>
                     <TableHead className="text-right">Godziny</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {ownHours.map((h: any) => (
-                    <TableRow key={h.id}>
-                      <TableCell className="text-sm">{format(new Date(h.work_date), "dd.MM.yyyy")}</TableCell>
-                      <TableCell className="font-medium text-sm">
-                        <span className="inline-flex items-center gap-2">
-                          {h.employees?.color && (
-                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: h.employees.color }} />
+                  {allHours.map((h: any) => {
+                    const isSub = h.project_id !== project.id;
+                    const sp = subprojectsById.get(h.project_id);
+                    return (
+                      <TableRow key={h.id}>
+                        <TableCell className="text-sm">{format(new Date(h.work_date), "dd.MM.yyyy")}</TableCell>
+                        <TableCell className="font-medium text-sm">
+                          <span className="inline-flex items-center gap-2">
+                            {h.employees?.color && (
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: h.employees.color }} />
+                            )}
+                            {h.employees?.name || h.employee_name_raw || "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {isSub ? (
+                            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                              <span className="text-muted-foreground/60">↳</span>
+                              {sp?.name || "subprojekt"}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">— główny —</span>
                           )}
-                          {h.employees?.name || h.employee_name_raw || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground truncate max-w-[280px]">
-                        {h.description || "—"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm font-semibold">
-                        {Number(h.hours).toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground truncate max-w-[240px]">
+                          {h.description || "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm font-semibold">
+                          {Number(h.hours).toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   <TableRow className="bg-muted/30 font-semibold">
-                    <TableCell colSpan={3} className="text-sm">Razem (sam projekt)</TableCell>
+                    <TableCell colSpan={4} className="text-sm">Razem (projekt + subprojekty)</TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {ownHoursTotal.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h
+                      {totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h
                     </TableCell>
                   </TableRow>
                 </TableBody>
