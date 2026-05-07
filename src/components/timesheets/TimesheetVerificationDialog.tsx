@@ -392,6 +392,7 @@ export function TimesheetVerificationDialog({
                               {activeProjects.map((p) => (
                                 <SelectItem key={p.id} value={p.id}>
                                   <span className="inline-flex items-center gap-2">
+                                    {p.parent_id && <span className="text-muted-foreground">↳</span>}
                                     <span
                                       className="h-2 w-2 rounded-full"
                                       style={{ backgroundColor: p.color }}
