@@ -249,14 +249,29 @@ const Projects = () => {
   );
 };
 
-function ProjectDetail({ project, companyId }: { project: Project; companyId: string }) {
+function ProjectDetail({
+  project,
+  companyId,
+  subprojects,
+  onOpenSubproject,
+}: {
+  project: Project;
+  companyId: string;
+  subprojects: Project[];
+  onOpenSubproject: (p: Project) => void;
+}) {
   const { data: invoices, isLoading: invLoading } = useProjectInvoices(project.id);
   const { data: expenses, isLoading: expLoading } = useProjectExpenses(project.id);
   const { data: allInvoices } = useInvoices(companyId);
   const { data: projectCosts, isLoading: costsLoading } = useProjectCostsByProject(project.id);
+  const { data: ownHours } = useProjectEmployeeHours(project.id);
+  const { data: companyHours } = useCompanyEmployeeHours(companyId, 1000);
   const assignInvoice = useAssignInvoiceToProject();
+  const addProject = useAddProject();
   const [assignOpen, setAssignOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [subOpen, setSubOpen] = useState(false);
+  const [subName, setSubName] = useState("");
 
   const handleDownloadPdf = async (inv: any) => {
     setDownloadingId(inv.id);
@@ -280,13 +295,56 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
     [projectCosts]
   );
 
-  const totalCost = useMemo(
+  const ownTotalCost = useMemo(
     () =>
       (invoices || []).reduce((s, i: any) => s + Number(i.gross_amount), 0) +
       (expenses || []).reduce((s, e: any) => s + Number(e.amount), 0) +
       splitTotal,
     [invoices, expenses, splitTotal]
   );
+
+  // Hours sums per project (own + subprojects), from companyHours snapshot
+  const hoursByProject = useMemo(() => {
+    const m = new Map<string, number>();
+    (companyHours || []).forEach((h: any) => {
+      if (!h.project_id) return;
+      m.set(h.project_id, (m.get(h.project_id) || 0) + Number(h.hours));
+    });
+    return m;
+  }, [companyHours]);
+
+  const ownHoursTotal = useMemo(
+    () => (ownHours || []).reduce((s: number, h: any) => s + Number(h.hours), 0),
+    [ownHours]
+  );
+
+  const subprojectsTotalCost = useMemo(
+    () => subprojects.reduce(
+      (s, sp) => s + (sp.total_invoices || 0) + (sp.total_expenses || 0),
+      0
+    ),
+    [subprojects]
+  );
+  const subprojectsTotalHours = useMemo(
+    () => subprojects.reduce((s, sp) => s + (hoursByProject.get(sp.id) || 0), 0),
+    [subprojects, hoursByProject]
+  );
+
+  const totalCost = ownTotalCost + subprojectsTotalCost;
+  const totalHours = ownHoursTotal + subprojectsTotalHours;
+
+  const handleAddSub = () => {
+    if (!subName.trim()) return;
+    addProject.mutate(
+      { company_id: companyId, name: subName.trim(), color: project.color, parent_id: project.id },
+      {
+        onSuccess: () => {
+          setSubName("");
+          setSubOpen(false);
+        },
+      }
+    );
+  };
 
   return (
     <div>
