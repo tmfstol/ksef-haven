@@ -311,6 +311,9 @@ const Timesheets = () => {
                           <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
                             {h.description || "—"}
                           </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {hourCreators[h.id] ? (nameMap[hourCreators[h.id]!] || "—") : "—"}
+                          </TableCell>
                           <TableCell className="text-right font-mono">{h.hours}h</TableCell>
                         </TableRow>
                       ))}
