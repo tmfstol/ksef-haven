@@ -71,6 +71,30 @@ const Timesheets = () => {
   const [verifyScan, setVerifyScan] = useState<TimesheetScan | null>(null);
   const [scanToDelete, setScanToDelete] = useState<TimesheetScan | null>(null);
 
+  // Pobierz created_by dla wpisów godzin (do kolumny "Dodał")
+  const { data: hourCreators = {} } = useQuery({
+    queryKey: ["employee_hours_creators", companyId, hours.length],
+    enabled: !!companyId && hours.length > 0,
+    queryFn: async () => {
+      const ids = hours.map((h) => h.id);
+      const { data } = await supabase
+        .from("employee_hours")
+        .select("id, created_by")
+        .in("id", ids);
+      const map: Record<string, string | null> = {};
+      (data || []).forEach((r: any) => { map[r.id] = r.created_by; });
+      return map;
+    },
+  });
+
+  const userIds = useMemo(() => {
+    const set = new Set<string>();
+    scans.forEach((s: any) => s.uploaded_by && set.add(s.uploaded_by));
+    Object.values(hourCreators).forEach((v) => v && set.add(v));
+    return Array.from(set);
+  }, [scans, hourCreators]);
+  const { data: nameMap = {} } = useProfileNames(userIds);
+
   const totalHours = useMemo(
     () => hours.reduce((s, h) => s + Number(h.hours || 0), 0),
     [hours]
