@@ -112,13 +112,14 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-3.1-pro-preview",
+        temperature: 0,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {
             role: "user",
             content: [
-              { type: "text", text: "Odczytaj tę kartę pracy i zwróć wszystkie dni z godzinami." },
+              { type: "text", text: "Odczytaj tę kartę pracy METODYCZNIE wiersz po wierszu. Najpierw zidentyfikuj strukturę tabeli (kolumny), potem dla każdego dnia odczytaj DOKŁADNE godziny od-do oraz wszystkie dodatkowe adnotacje (dojazd, nadgodziny, miejsce). Nie pomiń żadnej kolumny. Bądź precyzyjny — od tych danych zależy rozliczenie pracownika." },
               { type: "image_url", image_url: { url: dataUrl } },
             ],
           },
