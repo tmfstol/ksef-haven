@@ -46,6 +46,9 @@ import {
 } from "@/hooks/useTimesheets";
 import { UploadTimesheetButton } from "@/components/timesheets/UploadTimesheetButton";
 import { TimesheetVerificationDialog } from "@/components/timesheets/TimesheetVerificationDialog";
+import { useProfileNames } from "@/hooks/useProfileNames";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const STATUS_META: Record<string, { label: string; variant: any }> = {
   pending: { label: "Oczekuje", variant: "secondary" },
