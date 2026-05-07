@@ -679,6 +679,58 @@ function ProjectDetail({
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="hours">
+          {!ownHours?.length ? (
+            <div className="text-center py-10">
+              <Clock className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Brak godzin przypisanych do tego projektu.</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                Dodaj kartę pracy w module <span className="font-medium">Karty pracy</span> i przypisz godziny do tego projektu.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border/50 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Pracownik</TableHead>
+                    <TableHead>Opis</TableHead>
+                    <TableHead className="text-right">Godziny</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ownHours.map((h: any) => (
+                    <TableRow key={h.id}>
+                      <TableCell className="text-sm">{format(new Date(h.work_date), "dd.MM.yyyy")}</TableCell>
+                      <TableCell className="font-medium text-sm">
+                        <span className="inline-flex items-center gap-2">
+                          {h.employees?.color && (
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: h.employees.color }} />
+                          )}
+                          {h.employees?.name || h.employee_name_raw || "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground truncate max-w-[280px]">
+                        {h.description || "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm font-semibold">
+                        {Number(h.hours).toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/30 font-semibold">
+                    <TableCell colSpan={3} className="text-sm">Razem (sam projekt)</TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {ownHoursTotal.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   );
