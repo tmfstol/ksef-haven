@@ -328,17 +328,46 @@ const Timesheets = () => {
                             )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
-                            {h.projects ? (
-                              <span className="inline-flex items-center gap-2">
-                                <span
-                                  className="h-2 w-2 rounded-full"
-                                  style={{ backgroundColor: h.projects.color }}
-                                />
-                                {h.projects.name}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                            <Select
+                              value={h.project_id ?? "_none"}
+                              onValueChange={(v) =>
+                                updateProject.mutate({
+                                  id: h.id,
+                                  project_id: v === "_none" ? null : v,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[200px]">
+                                <SelectValue placeholder="— brak —">
+                                  {h.projects ? (
+                                    <span className="inline-flex items-center gap-2">
+                                      <span
+                                        className="h-2 w-2 rounded-full"
+                                        style={{ backgroundColor: h.projects.color }}
+                                      />
+                                      {h.projects.name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">— brak —</span>
+                                  )}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="_none">— brak —</SelectItem>
+                                {orderedProjects.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    <span className="inline-flex items-center gap-2">
+                                      {p.parent_id && <span className="text-muted-foreground">↳</span>}
+                                      <span
+                                        className="h-2 w-2 rounded-full"
+                                        style={{ backgroundColor: p.color }}
+                                      />
+                                      {p.name}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
                             {h.description || "—"}
