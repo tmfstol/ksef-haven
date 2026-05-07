@@ -28,6 +28,7 @@ interface RawRow {
 
 interface DraftRow {
   uid: string;
+  id?: string;
   employee_name_raw: string;
   employee_id: string | null;
   work_date: string;
@@ -106,6 +107,7 @@ export function TimesheetVerificationDialog({
       const m = matchEmployee(r.employee_name_raw ?? r.employee_name ?? "", matchCandidates);
       return {
         uid: r.id ?? genUid(),
+        id: r.id,
         employee_name_raw: r.employee_name_raw ?? r.employee_name ?? "",
         employee_id: r.employee_id ?? m.match?.id ?? null,
         work_date: r.work_date ?? new Date().toISOString().slice(0, 10),
@@ -173,6 +175,7 @@ export function TimesheetVerificationDialog({
       return;
     }
     const payload: EmployeeHourInput[] = toSave.map((r) => ({
+      id: r.id,
       company_id: companyId,
       scan_id: scan.id,
       employee_id: r.employee_id,
