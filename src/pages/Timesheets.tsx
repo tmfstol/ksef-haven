@@ -97,6 +97,36 @@ const Timesheets = () => {
   }, [scans, hourCreators]);
   const { data: nameMap = {} } = useProfileNames(userIds);
 
+  // Projekty (do edycji przypisania w wierszach)
+  const { data: projects = [] } = useProjects(companyId);
+  const orderedProjects = useMemo(() => {
+    const all = projects.filter((p) => p.status === "active");
+    const top = all.filter((p) => !p.parent_id);
+    const ordered: typeof all = [];
+    for (const t of top) {
+      ordered.push(t);
+      all.filter((s) => s.parent_id === t.id).forEach((s) => ordered.push(s));
+    }
+    all.forEach((p) => { if (!ordered.includes(p)) ordered.push(p); });
+    return ordered;
+  }, [projects]);
+
+  const qc = useQueryClient();
+  const updateProject = useMutation({
+    mutationFn: async ({ id, project_id }: { id: string; project_id: string | null }) => {
+      const { error } = await supabase
+        .from("employee_hours")
+        .update({ project_id })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Projekt zaktualizowany");
+      qc.invalidateQueries({ queryKey: ["employee_hours"] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Nie udało się zapisać"),
+  });
+
   const totalHours = useMemo(
     () => hours.reduce((s, h) => s + Number(h.hours || 0), 0),
     [hours]
