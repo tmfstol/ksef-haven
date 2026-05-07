@@ -191,13 +191,28 @@ export function useSaveEmployeeHours() {
       rows: EmployeeHourInput[];
     }) => {
       if (rows.length === 0) return { inserted: 0 };
-      const payload = rows.map((r) => ({
-        ...r,
-        status: r.status ?? "confirmed",
-        scan_id: r.scan_id ?? scan_id,
-      }));
-      const { error } = await supabase.from("employee_hours").upsert(payload as any);
-      if (error) throw error;
+      const payload = rows.map((r) => {
+        const { id, ...rest } = r;
+        return {
+          ...rest,
+          ...(id ? { id } : {}),
+          status: r.status ?? "confirmed",
+          scan_id: r.scan_id ?? scan_id,
+        };
+      });
+
+      const existingRows = payload.filter((r) => "id" in r);
+      const newRows = payload.filter((r) => !("id" in r));
+
+      if (existingRows.length > 0) {
+        const { error } = await supabase.from("employee_hours").upsert(existingRows as any, { onConflict: "id" });
+        if (error) throw error;
+      }
+
+      if (newRows.length > 0) {
+        const { error } = await supabase.from("employee_hours").insert(newRows as any);
+        if (error) throw error;
+      }
 
       // Zaktualizuj licznik przypisanych wierszy w skanie
       const { count } = await supabase
