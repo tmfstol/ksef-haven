@@ -475,6 +475,14 @@ function ProjectDetail({
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="hours">
+              <Clock className="h-3.5 w-3.5 mr-1.5" /> Godziny pracy
+              {ownHours && ownHours.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px]">
+                  {ownHours.length}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="expenses">Wydatki</TabsTrigger>
             <TabsTrigger value="invoices">Pełne faktury</TabsTrigger>
           </TabsList>
