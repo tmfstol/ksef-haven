@@ -162,7 +162,12 @@ const Projects = () => {
 
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6 pb-24 lg:pb-6">
         {selectedProject ? (
-          <ProjectDetail project={selectedProject} companyId={activeCompanyId!} />
+          <ProjectDetail
+            project={selectedProject}
+            companyId={activeCompanyId!}
+            subprojects={subprojectsByParent.get(selectedProject.id) || []}
+            onOpenSubproject={(p) => setSelectedProject(p)}
+          />
         ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
