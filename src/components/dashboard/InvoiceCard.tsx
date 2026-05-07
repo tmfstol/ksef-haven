@@ -228,32 +228,42 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
       return;
     }
     setDownloading("email");
-    try {
-      const { data: xmlData, error: xmlError } = await supabase.functions.invoke("ksef-download", {
-        body: { invoice_id: invoice.id, format: "xml" },
-      });
-      if (xmlError) throw xmlError;
-      if (xmlData?.error) throw new Error(xmlData.error);
-      if (!xmlData?.xml) throw new Error("Brak XML faktury");
 
-      const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number || "");
-      const pdfBase64 = await generateInvoicePdfBase64(parsed, xmlData.xml);
+    // Optymistycznie oznacz jako wysłaną
+    const optimisticAt = new Date().toISOString();
+    queryClient.setQueryData<any>(["invoices", invoice.company_id], (old: any) =>
+      old?.map((i: any) => (i.id === invoice.id ? { ...i, sent_to_portal_at: optimisticAt } : i))
+    );
+    toast.success("Wysyłka rozpoczęta — kontynuuję w tle");
+
+    try {
+      let pdfBase64: string | undefined;
       const pdfFilename = `${invoice.ksef_number || invoice.vendor}.pdf`;
 
-      try {
+      // Szybka ścieżka — PDF już w storage, edge sam go pobierze
+      if (!invoice.pdf_path) {
+        const { data: xmlData, error: xmlError } = await supabase.functions.invoke("ksef-download", {
+          body: { invoice_id: invoice.id, format: "xml" },
+        });
+        if (xmlError) throw xmlError;
+        if (xmlData?.error) throw new Error(xmlData.error);
+        if (!xmlData?.xml) throw new Error("Brak XML faktury");
+
+        const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number || "");
+        pdfBase64 = await generateInvoicePdfBase64(parsed, xmlData.xml);
+
+        // Upload w tle (nie czekamy)
         const cleaned = pdfBase64.replace(/^data:application\/pdf;base64,/i, "").replace(/\s+/g, "");
         const binary = atob(cleaned);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         const blob = new Blob([bytes], { type: "application/pdf" });
         const storagePath = `${invoice.company_id}/${invoice.id}/${pdfFilename}`;
-        await supabase.storage.from("invoice-uploads").upload(storagePath, blob, {
-          upsert: true,
-          contentType: "application/pdf",
-        });
-        await supabase.from("invoices").update({ pdf_path: storagePath }).eq("id", invoice.id);
-      } catch (storageErr) {
-        console.warn("Failed to store PDF:", storageErr);
+        supabase.storage
+          .from("invoice-uploads")
+          .upload(storagePath, blob, { upsert: true, contentType: "application/pdf" })
+          .then(() => supabase.from("invoices").update({ pdf_path: storagePath }).eq("id", invoice.id))
+          .catch((e) => console.warn("Background PDF upload failed:", e));
       }
 
       const { data, error } = await supabase.functions.invoke("send-invoice-make", {
@@ -263,11 +273,11 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
       if (data?.error) throw new Error(data.error);
       await supabase
         .from("invoices")
-        .update({ sent_to_portal_at: new Date().toISOString(), sent_to_portal_by: currentUser?.id ?? null })
+        .update({ sent_to_portal_at: optimisticAt, sent_to_portal_by: currentUser?.id ?? null })
         .eq("id", invoice.id);
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      toast.success("Faktura wysłana do portalu");
     } catch (err) {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.error(`Błąd wysyłki: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
     } finally {
       setDownloading(null);

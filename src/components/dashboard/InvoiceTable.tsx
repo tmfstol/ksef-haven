@@ -236,22 +236,34 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
 
   const handleSendToPortal = async (invoice: Invoice) => {
     setDownloading({ id: invoice.id, format: "email" });
+
+    // Optymistycznie oznacz fakturę jako wysłaną od razu — UI nie czeka
+    const optimisticAt = new Date().toISOString();
+    queryClient.setQueryData<Invoice[] | undefined>(
+      ["invoices", invoice.company_id],
+      (old) => old?.map((i) => (i.id === invoice.id ? { ...i, sent_to_portal_at: optimisticAt, sent_to_portal_by: user?.id ?? null } : i))
+    );
+    toast.success("Wysyłka rozpoczęta — kontynuuję w tle");
+
     try {
-      // 1. Fetch XML from KSeF
-      const { data: xmlData, error: xmlError } = await supabase.functions.invoke("ksef-download", {
-        body: { invoice_id: invoice.id, format: "xml" },
-      });
-      if (xmlError) throw xmlError;
-      if (xmlData?.error) throw new Error(xmlData.error);
-      if (!xmlData?.xml) throw new Error("Brak XML faktury");
+      let pdfBase64: string | undefined;
+      let pdfFilename = `${invoice.ksef_number || invoice.vendor}.pdf`;
 
-      // 2. Generate PDF as base64
-      const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number || "");
-      const pdfBase64 = await generateInvoicePdfBase64(parsed, xmlData.xml);
-      const pdfFilename = `${invoice.ksef_number || invoice.vendor}.pdf`;
+      // Szybka ścieżka: jeśli PDF już jest w storage, edge function pobierze go sam
+      if (!invoice.pdf_path) {
+        // 1. Pobierz XML z KSeF
+        const { data: xmlData, error: xmlError } = await supabase.functions.invoke("ksef-download", {
+          body: { invoice_id: invoice.id, format: "xml" },
+        });
+        if (xmlError) throw xmlError;
+        if (xmlData?.error) throw new Error(xmlData.error);
+        if (!xmlData?.xml) throw new Error("Brak XML faktury");
 
-      // 3. Store PDF in storage for agent access
-      try {
+        // 2. Wygeneruj PDF lokalnie
+        const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number || "");
+        pdfBase64 = await generateInvoicePdfBase64(parsed, xmlData.xml);
+
+        // 3. Upload PDF do storage RÓWNOLEGLE z wysyłką do Make (nie czekamy)
         const cleanedBase64 = pdfBase64
           .replace(/^data:application\/pdf;base64,/i, "")
           .replace(/\s+/g, "");
@@ -260,33 +272,32 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         const pdfBlob = new Blob([bytes], { type: "application/pdf" });
         const storagePath = `${invoice.company_id}/${invoice.id}/${pdfFilename}`;
-        await supabase.storage.from("invoice-uploads").upload(storagePath, pdfBlob, {
-          upsert: true,
-          contentType: "application/pdf",
-        });
-        await supabase.from("invoices").update({ pdf_path: storagePath }).eq("id", invoice.id);
-      } catch (storageErr) {
-        console.warn("Failed to store PDF in storage:", storageErr);
+        // fire-and-forget upload
+        supabase.storage
+          .from("invoice-uploads")
+          .upload(storagePath, pdfBlob, { upsert: true, contentType: "application/pdf" })
+          .then(() => supabase.from("invoices").update({ pdf_path: storagePath }).eq("id", invoice.id))
+          .catch((e) => console.warn("Background PDF upload failed:", e));
       }
 
-      // 4. Send to Make with PDF
+      // 4. Wyślij do Make (z base64 jeśli świeżo wygenerowany, albo edge pobierze ze storage)
       const { data, error } = await supabase.functions.invoke("send-invoice-make", {
-        body: {
-          invoiceId: invoice.id,
-          pdfBase64,
-          pdfFilename,
-        },
+        body: { invoiceId: invoice.id, pdfBase64, pdfFilename },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      // Zapisz status w bazie (potwierdzenie)
       await supabase
         .from("invoices")
-        .update({ sent_to_portal_at: new Date().toISOString(), sent_to_portal_by: user?.id ?? null })
+        .update({ sent_to_portal_at: optimisticAt, sent_to_portal_by: user?.id ?? null })
         .eq("id", invoice.id);
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      toast.success("Faktura wysłana do portalu przez Make");
+      toast.success("Faktura wysłana do portalu");
     } catch (err) {
       console.error("Email send error:", err);
+      // Rollback optymistycznej zmiany
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.error(`Błąd wysyłki: ${err instanceof Error ? err.message : "Nieznany błąd"}`);
     } finally {
       setDownloading(null);
