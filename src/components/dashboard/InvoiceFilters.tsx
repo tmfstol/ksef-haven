@@ -69,7 +69,7 @@ export function InvoiceFilters({ filters, onChange, vendors }: InvoiceFiltersPro
 
   return (
     <div className="mb-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
           size="sm"
@@ -84,6 +84,55 @@ export function InvoiceFilters({ filters, onChange, vendors }: InvoiceFiltersPro
             </Badge>
           )}
         </Button>
+
+        {/* Quick inline date range — działa na fakturach już w systemie */}
+        <div className="flex items-center gap-1.5 ml-1">
+          <span className="text-xs text-muted-foreground">Data:</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn("h-8 justify-start text-left text-xs font-normal", !filters.dateFrom && "text-muted-foreground")}
+              >
+                <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                {filters.dateFrom ? format(filters.dateFrom, "dd.MM.yyyy") : "od"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={filters.dateFrom}
+                onSelect={(d) => update({ dateFrom: d })}
+                locale={pl}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+          <span className="text-xs text-muted-foreground">–</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn("h-8 justify-start text-left text-xs font-normal", !filters.dateTo && "text-muted-foreground")}
+              >
+                <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                {filters.dateTo ? format(filters.dateTo, "dd.MM.yyyy") : "do"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={filters.dateTo}
+                onSelect={(d) => update({ dateTo: d })}
+                locale={pl}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
         {activeCount > 0 && (
           <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground" onClick={clearAll}>
             <X className="h-3 w-3" />
