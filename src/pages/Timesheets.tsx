@@ -46,6 +46,9 @@ import {
 } from "@/hooks/useTimesheets";
 import { UploadTimesheetButton } from "@/components/timesheets/UploadTimesheetButton";
 import { TimesheetVerificationDialog } from "@/components/timesheets/TimesheetVerificationDialog";
+import { useProfileNames } from "@/hooks/useProfileNames";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const STATUS_META: Record<string, { label: string; variant: any }> = {
   pending: { label: "Oczekuje", variant: "secondary" },
@@ -67,6 +70,30 @@ const Timesheets = () => {
 
   const [verifyScan, setVerifyScan] = useState<TimesheetScan | null>(null);
   const [scanToDelete, setScanToDelete] = useState<TimesheetScan | null>(null);
+
+  // Pobierz created_by dla wpisów godzin (do kolumny "Dodał")
+  const { data: hourCreators = {} } = useQuery({
+    queryKey: ["employee_hours_creators", companyId, hours.length],
+    enabled: !!companyId && hours.length > 0,
+    queryFn: async () => {
+      const ids = hours.map((h) => h.id);
+      const { data } = await supabase
+        .from("employee_hours")
+        .select("id, created_by")
+        .in("id", ids);
+      const map: Record<string, string | null> = {};
+      (data || []).forEach((r: any) => { map[r.id] = r.created_by; });
+      return map;
+    },
+  });
+
+  const userIds = useMemo(() => {
+    const set = new Set<string>();
+    scans.forEach((s: any) => s.uploaded_by && set.add(s.uploaded_by));
+    Object.values(hourCreators).forEach((v) => v && set.add(v));
+    return Array.from(set);
+  }, [scans, hourCreators]);
+  const { data: nameMap = {} } = useProfileNames(userIds);
 
   const totalHours = useMemo(
     () => hours.reduce((s, h) => s + Number(h.hours || 0), 0),
@@ -158,6 +185,7 @@ const Timesheets = () => {
                       <TableRow>
                         <TableHead>Data</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Dodał</TableHead>
                         <TableHead className="text-right">Wierszy</TableHead>
                         <TableHead className="text-right">Zapisanych</TableHead>
                         <TableHead>Notatka / błąd</TableHead>
@@ -176,6 +204,9 @@ const Timesheets = () => {
                             </TableCell>
                             <TableCell>
                               <Badge variant={meta.variant}>{meta.label}</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                              {(s as any).uploaded_by ? (nameMap[(s as any).uploaded_by] || "—") : "—"}
                             </TableCell>
                             <TableCell className="text-right">{rowsCount}</TableCell>
                             <TableCell className="text-right">
@@ -239,6 +270,7 @@ const Timesheets = () => {
                         <TableHead>Pracownik</TableHead>
                         <TableHead>Projekt</TableHead>
                         <TableHead>Opis</TableHead>
+                        <TableHead>Dodał</TableHead>
                         <TableHead className="text-right">Godziny</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -278,6 +310,9 @@ const Timesheets = () => {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
                             {h.description || "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {hourCreators[h.id] ? (nameMap[hourCreators[h.id]!] || "—") : "—"}
                           </TableCell>
                           <TableCell className="text-right font-mono">{h.hours}h</TableCell>
                         </TableRow>
