@@ -10,6 +10,7 @@ export interface Project {
   color: string;
   status: string;
   budget: number | null;
+  parent_id: string | null;
   created_at: string;
   updated_at: string;
   invoice_count?: number;
@@ -78,7 +79,7 @@ export function useProjects(companyId?: string | null) {
 export function useAddProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (project: { company_id: string; name: string; description?: string; color?: string; budget?: number }) => {
+    mutationFn: async (project: { company_id: string; name: string; description?: string; color?: string; budget?: number; parent_id?: string | null }) => {
       const { data, error } = await supabase
         .from("projects")
         .insert(project as any)

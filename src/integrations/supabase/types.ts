@@ -1688,6 +1688,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          parent_id: string | null
           status: string
           updated_at: string
         }
@@ -1699,6 +1700,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          parent_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -1710,6 +1712,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          parent_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -1726,6 +1729,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]

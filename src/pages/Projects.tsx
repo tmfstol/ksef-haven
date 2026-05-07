@@ -8,6 +8,7 @@ import {
 } from "@/hooks/useProjects";
 import { useInvoices } from "@/hooks/useInvoices";
 import { useProjectCostsByProject } from "@/hooks/useProjectCosts";
+import { useProjectEmployeeHours, useCompanyEmployeeHours } from "@/hooks/useTimesheets";
 
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useIsTabletOrBelow } from "@/hooks/use-mobile";
@@ -22,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Loader2, Plus, FolderOpen, Trash2, FileText,
-  Receipt, ChevronRight, FolderPlus, Download, Split
+  Receipt, ChevronRight, FolderPlus, Download, Split, Clock, FolderTree
 } from "lucide-react";
 import { format } from "date-fns";
 import { downloadInvoicePdf } from "@/lib/invoice-pdf-download";
@@ -35,7 +36,17 @@ const Projects = () => {
   const isMobile = useIsTabletOrBelow();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
-  const { data: projects, isLoading } = useProjects(activeCompanyId);
+  const { data: allProjects, isLoading } = useProjects(activeCompanyId);
+  const projects = useMemo(() => (allProjects || []).filter((p) => !p.parent_id), [allProjects]);
+  const subprojectsByParent = useMemo(() => {
+    const m = new Map<string, Project[]>();
+    (allProjects || []).filter((p) => p.parent_id).forEach((s) => {
+      const arr = m.get(s.parent_id!) || [];
+      arr.push(s);
+      m.set(s.parent_id!, arr);
+    });
+    return m;
+  }, [allProjects]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState("");
@@ -151,7 +162,12 @@ const Projects = () => {
 
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6 pb-24 lg:pb-6">
         {selectedProject ? (
-          <ProjectDetail project={selectedProject} companyId={activeCompanyId!} />
+          <ProjectDetail
+            project={selectedProject}
+            companyId={activeCompanyId!}
+            subprojects={subprojectsByParent.get(selectedProject.id) || []}
+            onOpenSubproject={(p) => setSelectedProject(p)}
+          />
         ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -233,14 +249,29 @@ const Projects = () => {
   );
 };
 
-function ProjectDetail({ project, companyId }: { project: Project; companyId: string }) {
+function ProjectDetail({
+  project,
+  companyId,
+  subprojects,
+  onOpenSubproject,
+}: {
+  project: Project;
+  companyId: string;
+  subprojects: Project[];
+  onOpenSubproject: (p: Project) => void;
+}) {
   const { data: invoices, isLoading: invLoading } = useProjectInvoices(project.id);
   const { data: expenses, isLoading: expLoading } = useProjectExpenses(project.id);
   const { data: allInvoices } = useInvoices(companyId);
   const { data: projectCosts, isLoading: costsLoading } = useProjectCostsByProject(project.id);
+  const { data: ownHours } = useProjectEmployeeHours(project.id);
+  const { data: companyHours } = useCompanyEmployeeHours(companyId, 1000);
   const assignInvoice = useAssignInvoiceToProject();
+  const addProject = useAddProject();
   const [assignOpen, setAssignOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [subOpen, setSubOpen] = useState(false);
+  const [subName, setSubName] = useState("");
 
   const handleDownloadPdf = async (inv: any) => {
     setDownloadingId(inv.id);
@@ -264,7 +295,7 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
     [projectCosts]
   );
 
-  const totalCost = useMemo(
+  const ownTotalCost = useMemo(
     () =>
       (invoices || []).reduce((s, i: any) => s + Number(i.gross_amount), 0) +
       (expenses || []).reduce((s, e: any) => s + Number(e.amount), 0) +
@@ -272,31 +303,166 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
     [invoices, expenses, splitTotal]
   );
 
+  // Hours sums per project (own + subprojects), from companyHours snapshot
+  const hoursByProject = useMemo(() => {
+    const m = new Map<string, number>();
+    (companyHours || []).forEach((h: any) => {
+      if (!h.project_id) return;
+      m.set(h.project_id, (m.get(h.project_id) || 0) + Number(h.hours));
+    });
+    return m;
+  }, [companyHours]);
+
+  const ownHoursTotal = useMemo(
+    () => (ownHours || []).reduce((s: number, h: any) => s + Number(h.hours), 0),
+    [ownHours]
+  );
+
+  const subprojectsTotalCost = useMemo(
+    () => subprojects.reduce(
+      (s, sp) => s + (sp.total_invoices || 0) + (sp.total_expenses || 0),
+      0
+    ),
+    [subprojects]
+  );
+  const subprojectsTotalHours = useMemo(
+    () => subprojects.reduce((s, sp) => s + (hoursByProject.get(sp.id) || 0), 0),
+    [subprojects, hoursByProject]
+  );
+
+  const totalCost = ownTotalCost + subprojectsTotalCost;
+  const totalHours = ownHoursTotal + subprojectsTotalHours;
+
+  const handleAddSub = () => {
+    if (!subName.trim()) return;
+    addProject.mutate(
+      { company_id: companyId, name: subName.trim(), color: project.color, parent_id: project.id },
+      {
+        onSuccess: () => {
+          setSubName("");
+          setSubOpen(false);
+        },
+      }
+    );
+  };
+
   return (
     <div>
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="rounded-xl border border-border/50 bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Faktury</p>
           <p className="text-2xl font-bold text-foreground">{invoices?.length || 0}</p>
         </div>
         <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-          <p className="text-xs text-muted-foreground">Wydatki</p>
-          <p className="text-2xl font-bold text-foreground">{expenses?.length || 0}</p>
+          <p className="text-xs text-muted-foreground">Godziny pracy</p>
+          <p className="text-2xl font-bold text-foreground">
+            {totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 1 })} h
+          </p>
+          {subprojects.length > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              w tym {subprojectsTotalHours.toLocaleString("pl-PL", { maximumFractionDigits: 1 })} h z subprojektów
+            </p>
+          )}
         </div>
         <div className="rounded-xl border border-border/50 bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Łączny koszt</p>
           <p className="text-2xl font-bold text-foreground">{totalCost.toLocaleString("pl-PL", { style: "currency", currency: "PLN" })}</p>
+          {subprojects.length > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              w tym {subprojectsTotalCost.toLocaleString("pl-PL", { style: "currency", currency: "PLN" })} z subprojektów
+            </p>
+          )}
         </div>
-        {project.budget && (
+        {project.budget ? (
           <div className="rounded-xl border border-border/50 bg-card/50 p-4">
             <p className="text-xs text-muted-foreground">Budżet pozostały</p>
             <p className={`text-2xl font-bold ${project.budget - totalCost < 0 ? "text-destructive" : "text-foreground"}`}>
               {(project.budget - totalCost).toLocaleString("pl-PL", { style: "currency", currency: "PLN" })}
             </p>
           </div>
+        ) : (
+          <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+            <p className="text-xs text-muted-foreground">Subprojekty</p>
+            <p className="text-2xl font-bold text-foreground">{subprojects.length}</p>
+          </div>
         )}
       </div>
+
+      {/* Subprojekty (tylko dla projektów głównych) */}
+      {!project.parent_id && (
+        <div className="mb-6 rounded-xl border border-border/50 bg-card/30 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <FolderTree className="h-4 w-4 text-muted-foreground" />
+              <h3 className="font-semibold text-sm text-foreground">Subprojekty</h3>
+              <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{subprojects.length}</Badge>
+            </div>
+            <Dialog open={subOpen} onOpenChange={setSubOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Dodaj subprojekt
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader><DialogTitle>Nowy subprojekt</DialogTitle></DialogHeader>
+                <div className="space-y-3 mt-2">
+                  <div>
+                    <Label>Nazwa subprojektu *</Label>
+                    <Input
+                      value={subName}
+                      onChange={(e) => setSubName(e.target.value)}
+                      placeholder="np. Etap I — fundamenty"
+                      maxLength={100}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddSub()}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Powiązany z projektem: <span className="font-medium">{project.name}</span>
+                    </p>
+                  </div>
+                  <Button onClick={handleAddSub} disabled={!subName.trim() || addProject.isPending} className="w-full">
+                    {addProject.isPending ? "Tworzenie..." : "Utwórz subprojekt"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          {subprojects.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              Brak subprojektów. Rozbij projekt na etapy lub strefy, aby śledzić koszty i godziny osobno.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {subprojects.map((sp) => {
+                const cost = (sp.total_invoices || 0) + (sp.total_expenses || 0);
+                const hours = hoursByProject.get(sp.id) || 0;
+                return (
+                  <button
+                    key={sp.id}
+                    onClick={() => onOpenSubproject(sp)}
+                    className="text-left rounded-lg border border-border/50 bg-background hover:border-primary/40 transition-all p-3"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sp.color }} />
+                      <span className="text-sm font-medium text-foreground truncate flex-1">{sp.name}</span>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {hours.toLocaleString("pl-PL", { maximumFractionDigits: 1 })} h
+                      </span>
+                      <span className="font-mono font-medium text-foreground">
+                        {cost.toLocaleString("pl-PL", { style: "currency", currency: "PLN" })}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <Tabs defaultValue="costs">
         <div className="flex items-center justify-between mb-4">
@@ -306,6 +472,14 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
               {projectCosts && projectCosts.length > 0 && (
                 <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px]">
                   {projectCosts.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="hours">
+              <Clock className="h-3.5 w-3.5 mr-1.5" /> Godziny pracy
+              {ownHours && ownHours.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px]">
+                  {ownHours.length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -498,6 +672,58 @@ function ProjectDetail({ project, companyId }: { project: Project; companyId: st
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
                       {splitTotal.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="hours">
+          {!ownHours?.length ? (
+            <div className="text-center py-10">
+              <Clock className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Brak godzin przypisanych do tego projektu.</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                Dodaj kartę pracy w module <span className="font-medium">Karty pracy</span> i przypisz godziny do tego projektu.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border/50 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Pracownik</TableHead>
+                    <TableHead>Opis</TableHead>
+                    <TableHead className="text-right">Godziny</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ownHours.map((h: any) => (
+                    <TableRow key={h.id}>
+                      <TableCell className="text-sm">{format(new Date(h.work_date), "dd.MM.yyyy")}</TableCell>
+                      <TableCell className="font-medium text-sm">
+                        <span className="inline-flex items-center gap-2">
+                          {h.employees?.color && (
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: h.employees.color }} />
+                          )}
+                          {h.employees?.name || h.employee_name_raw || "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground truncate max-w-[280px]">
+                        {h.description || "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm font-semibold">
+                        {Number(h.hours).toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/30 font-semibold">
+                    <TableCell colSpan={3} className="text-sm">Razem (sam projekt)</TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {ownHoursTotal.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h
                     </TableCell>
                   </TableRow>
                 </TableBody>
