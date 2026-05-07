@@ -124,9 +124,11 @@ export function TimesheetVerificationDialog({
         return acc;
       }, {})
     );
-    // domyślny projekt = pierwszy aktywny
-    if (activeProjects[0]) setBulkProject(activeProjects[0].id);
-  }, [open, scan, initialRows, employees, activeProjects, savedHours]);
+  }, [open, scan?.id, initialRows, employees, savedHours]);
+
+  useEffect(() => {
+    if (open && !bulkProject && activeProjects[0]) setBulkProject(activeProjects[0].id);
+  }, [open, bulkProject, activeProjects]);
 
   const allSelected = rows.length > 0 && rows.every((r) => r.selected);
   const anySelected = rows.some((r) => r.selected);
