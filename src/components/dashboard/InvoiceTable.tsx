@@ -1,4 +1,5 @@
-import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion, Mail, AlertTriangle, Clock } from "lucide-react";
+import { FileText, FileCode, ArrowUpDown, Download, Loader2, Send, ChevronDown, ChevronRight, CheckCircle2, QrCode, ShieldCheck, ShieldAlert, ShieldQuestion, Mail, AlertTriangle, Clock, StickyNote } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/types/invoice";
 import { motion, AnimatePresence } from "framer-motion";
@@ -378,8 +379,24 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
                     )}
                   </td>
                   <td className="px-5 py-3.5 text-sm text-foreground">{formatDate(invoice.date)}</td>
-                  <td className="px-5 py-3.5 text-sm font-medium text-foreground max-w-[250px] truncate">
-                    {invoice.vendor}
+                  <td className="px-5 py-3.5 text-sm font-medium text-foreground max-w-[250px]">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate">{invoice.vendor}</span>
+                      {invoice.bookkeeper_note && (
+                        <TooltipProvider delayDuration={100}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
+                                <StickyNote className="h-3 w-3" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p className="text-xs whitespace-pre-wrap">{invoice.bookkeeper_note}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-3.5 text-sm text-muted-foreground font-mono">{invoice.nip}</td>
                   <td className="px-5 py-3.5 text-sm text-foreground text-right font-semibold tabular-nums">

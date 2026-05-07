@@ -351,7 +351,14 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
         >
           <div className="flex items-start justify-between mb-2 gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{invoice.vendor}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold text-foreground truncate">{invoice.vendor}</p>
+                {invoice.bookkeeper_note && (
+                  <span title={invoice.bookkeeper_note} className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
+                    <StickyNote className="h-3 w-3" />
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground font-mono">NIP: {invoice.nip}</p>
             </div>
             <div className="flex flex-col items-end gap-1">
