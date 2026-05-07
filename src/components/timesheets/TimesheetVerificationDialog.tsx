@@ -59,7 +59,17 @@ export function TimesheetVerificationDialog({
 }: Props) {
   const { data: employees = [] } = useEmployees(companyId);
   const { data: projects = [] } = useProjects(companyId);
-  const activeProjects = useMemo(() => projects.filter((p) => p.status === "active"), [projects]);
+  const activeProjects = useMemo(() => {
+    const all = projects.filter((p) => p.status === "active");
+    const top = all.filter((p) => !p.parent_id);
+    const ordered: typeof all = [];
+    for (const t of top) {
+      ordered.push(t);
+      all.filter((s) => s.parent_id === t.id).forEach((s) => ordered.push(s));
+    }
+    all.forEach((p) => { if (!ordered.includes(p)) ordered.push(p); });
+    return ordered;
+  }, [projects]);
   const saveMutation = useSaveEmployeeHours();
 
   const [imgUrl, setImgUrl] = useState<string | null>(null);
