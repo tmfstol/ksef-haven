@@ -330,6 +330,19 @@ function ProjectDetail({
     [subprojects, hoursByProject]
   );
 
+  // All hours: own project + subprojects (for "Godziny pracy" tab)
+  const allHours = useMemo(() => {
+    const subIds = new Set(subprojects.map((s) => s.id));
+    return (companyHours || [])
+      .filter((h: any) => h.project_id === project.id || subIds.has(h.project_id))
+      .sort((a: any, b: any) => (a.work_date < b.work_date ? 1 : -1));
+  }, [companyHours, subprojects, project.id]);
+  const subprojectsById = useMemo(() => {
+    const m = new Map<string, Project>();
+    subprojects.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [subprojects]);
+
   const totalCost = ownTotalCost + subprojectsTotalCost;
   const totalHours = ownHoursTotal + subprojectsTotalHours;
 
