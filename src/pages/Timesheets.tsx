@@ -47,8 +47,10 @@ import {
 import { UploadTimesheetButton } from "@/components/timesheets/UploadTimesheetButton";
 import { TimesheetVerificationDialog } from "@/components/timesheets/TimesheetVerificationDialog";
 import { useProfileNames } from "@/hooks/useProfileNames";
+import { useProjects } from "@/hooks/useProjects";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 const STATUS_META: Record<string, { label: string; variant: any }> = {
   pending: { label: "Oczekuje", variant: "secondary" },
@@ -94,6 +96,36 @@ const Timesheets = () => {
     return Array.from(set);
   }, [scans, hourCreators]);
   const { data: nameMap = {} } = useProfileNames(userIds);
+
+  // Projekty (do edycji przypisania w wierszach)
+  const { data: projects = [] } = useProjects(companyId);
+  const orderedProjects = useMemo(() => {
+    const all = projects.filter((p) => p.status === "active");
+    const top = all.filter((p) => !p.parent_id);
+    const ordered: typeof all = [];
+    for (const t of top) {
+      ordered.push(t);
+      all.filter((s) => s.parent_id === t.id).forEach((s) => ordered.push(s));
+    }
+    all.forEach((p) => { if (!ordered.includes(p)) ordered.push(p); });
+    return ordered;
+  }, [projects]);
+
+  const qc = useQueryClient();
+  const updateProject = useMutation({
+    mutationFn: async ({ id, project_id }: { id: string; project_id: string | null }) => {
+      const { error } = await supabase
+        .from("employee_hours")
+        .update({ project_id })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Projekt zaktualizowany");
+      qc.invalidateQueries({ queryKey: ["employee_hours"] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Nie udało się zapisać"),
+  });
 
   const totalHours = useMemo(
     () => hours.reduce((s, h) => s + Number(h.hours || 0), 0),
@@ -296,17 +328,46 @@ const Timesheets = () => {
                             )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
-                            {h.projects ? (
-                              <span className="inline-flex items-center gap-2">
-                                <span
-                                  className="h-2 w-2 rounded-full"
-                                  style={{ backgroundColor: h.projects.color }}
-                                />
-                                {h.projects.name}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                            <Select
+                              value={h.project_id ?? "_none"}
+                              onValueChange={(v) =>
+                                updateProject.mutate({
+                                  id: h.id,
+                                  project_id: v === "_none" ? null : v,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[200px]">
+                                <SelectValue placeholder="— brak —">
+                                  {h.projects ? (
+                                    <span className="inline-flex items-center gap-2">
+                                      <span
+                                        className="h-2 w-2 rounded-full"
+                                        style={{ backgroundColor: h.projects.color }}
+                                      />
+                                      {h.projects.name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">— brak —</span>
+                                  )}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="_none">— brak —</SelectItem>
+                                {orderedProjects.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    <span className="inline-flex items-center gap-2">
+                                      {p.parent_id && <span className="text-muted-foreground">↳</span>}
+                                      <span
+                                        className="h-2 w-2 rounded-full"
+                                        style={{ backgroundColor: p.color }}
+                                      />
+                                      {p.name}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
                             {h.description || "—"}
