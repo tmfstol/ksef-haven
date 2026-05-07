@@ -349,28 +349,120 @@ function ProjectDetail({
   return (
     <div>
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="rounded-xl border border-border/50 bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Faktury</p>
           <p className="text-2xl font-bold text-foreground">{invoices?.length || 0}</p>
         </div>
         <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-          <p className="text-xs text-muted-foreground">Wydatki</p>
-          <p className="text-2xl font-bold text-foreground">{expenses?.length || 0}</p>
+          <p className="text-xs text-muted-foreground">Godziny pracy</p>
+          <p className="text-2xl font-bold text-foreground">
+            {totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 1 })} h
+          </p>
+          {subprojects.length > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              w tym {subprojectsTotalHours.toLocaleString("pl-PL", { maximumFractionDigits: 1 })} h z subprojektów
+            </p>
+          )}
         </div>
         <div className="rounded-xl border border-border/50 bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Łączny koszt</p>
           <p className="text-2xl font-bold text-foreground">{totalCost.toLocaleString("pl-PL", { style: "currency", currency: "PLN" })}</p>
+          {subprojects.length > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              w tym {subprojectsTotalCost.toLocaleString("pl-PL", { style: "currency", currency: "PLN" })} z subprojektów
+            </p>
+          )}
         </div>
-        {project.budget && (
+        {project.budget ? (
           <div className="rounded-xl border border-border/50 bg-card/50 p-4">
             <p className="text-xs text-muted-foreground">Budżet pozostały</p>
             <p className={`text-2xl font-bold ${project.budget - totalCost < 0 ? "text-destructive" : "text-foreground"}`}>
               {(project.budget - totalCost).toLocaleString("pl-PL", { style: "currency", currency: "PLN" })}
             </p>
           </div>
+        ) : (
+          <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+            <p className="text-xs text-muted-foreground">Subprojekty</p>
+            <p className="text-2xl font-bold text-foreground">{subprojects.length}</p>
+          </div>
         )}
       </div>
+
+      {/* Subprojekty (tylko dla projektów głównych) */}
+      {!project.parent_id && (
+        <div className="mb-6 rounded-xl border border-border/50 bg-card/30 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <FolderTree className="h-4 w-4 text-muted-foreground" />
+              <h3 className="font-semibold text-sm text-foreground">Subprojekty</h3>
+              <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{subprojects.length}</Badge>
+            </div>
+            <Dialog open={subOpen} onOpenChange={setSubOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Dodaj subprojekt
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader><DialogTitle>Nowy subprojekt</DialogTitle></DialogHeader>
+                <div className="space-y-3 mt-2">
+                  <div>
+                    <Label>Nazwa subprojektu *</Label>
+                    <Input
+                      value={subName}
+                      onChange={(e) => setSubName(e.target.value)}
+                      placeholder="np. Etap I — fundamenty"
+                      maxLength={100}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddSub()}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Powiązany z projektem: <span className="font-medium">{project.name}</span>
+                    </p>
+                  </div>
+                  <Button onClick={handleAddSub} disabled={!subName.trim() || addProject.isPending} className="w-full">
+                    {addProject.isPending ? "Tworzenie..." : "Utwórz subprojekt"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          {subprojects.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              Brak subprojektów. Rozbij projekt na etapy lub strefy, aby śledzić koszty i godziny osobno.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {subprojects.map((sp) => {
+                const cost = (sp.total_invoices || 0) + (sp.total_expenses || 0);
+                const hours = hoursByProject.get(sp.id) || 0;
+                return (
+                  <button
+                    key={sp.id}
+                    onClick={() => onOpenSubproject(sp)}
+                    className="text-left rounded-lg border border-border/50 bg-background hover:border-primary/40 transition-all p-3"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sp.color }} />
+                      <span className="text-sm font-medium text-foreground truncate flex-1">{sp.name}</span>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {hours.toLocaleString("pl-PL", { maximumFractionDigits: 1 })} h
+                      </span>
+                      <span className="font-mono font-medium text-foreground">
+                        {cost.toLocaleString("pl-PL", { style: "currency", currency: "PLN" })}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <Tabs defaultValue="costs">
         <div className="flex items-center justify-between mb-4">
