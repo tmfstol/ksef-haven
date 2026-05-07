@@ -280,7 +280,18 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
   };
 
   const isLoading = projectsLoading || existingLoading || itemsLoading;
-  const activeProjects = (projects || []).filter((p) => p.status === "active");
+  const activeProjects = (() => {
+    const all = (projects || []).filter((p) => p.status === "active");
+    const top = all.filter((p) => !p.parent_id);
+    const ordered: typeof all = [];
+    for (const t of top) {
+      ordered.push(t);
+      all.filter((s) => s.parent_id === t.id).forEach((s) => ordered.push(s));
+    }
+    // Orphan subprojects (parent missing/inactive) — append at end
+    all.forEach((p) => { if (!ordered.includes(p)) ordered.push(p); });
+    return ordered;
+  })();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
