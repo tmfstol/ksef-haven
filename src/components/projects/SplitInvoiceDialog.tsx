@@ -405,6 +405,7 @@ export function SplitInvoiceDialog({ open, onOpenChange, invoice, companyId }: S
                               {activeProjects.map((p) => (
                                 <SelectItem key={p.id} value={p.id}>
                                   <div className="flex items-center gap-2">
+                                    {p.parent_id && <span className="text-muted-foreground">↳</span>}
                                     <span
                                       className="w-2.5 h-2.5 rounded-full"
                                       style={{ backgroundColor: p.color }}
