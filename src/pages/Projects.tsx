@@ -8,6 +8,7 @@ import {
 } from "@/hooks/useProjects";
 import { useInvoices } from "@/hooks/useInvoices";
 import { useProjectCostsByProject } from "@/hooks/useProjectCosts";
+import { useProjectEmployeeHours, useCompanyEmployeeHours } from "@/hooks/useTimesheets";
 
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useIsTabletOrBelow } from "@/hooks/use-mobile";
@@ -22,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Loader2, Plus, FolderOpen, Trash2, FileText,
-  Receipt, ChevronRight, FolderPlus, Download, Split
+  Receipt, ChevronRight, FolderPlus, Download, Split, Clock, FolderTree
 } from "lucide-react";
 import { format } from "date-fns";
 import { downloadInvoicePdf } from "@/lib/invoice-pdf-download";
