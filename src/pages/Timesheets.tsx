@@ -205,6 +205,9 @@ const Timesheets = () => {
                             <TableCell>
                               <Badge variant={meta.variant}>{meta.label}</Badge>
                             </TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                              {(s as any).uploaded_by ? (nameMap[(s as any).uploaded_by] || "—") : "—"}
+                            </TableCell>
                             <TableCell className="text-right">{rowsCount}</TableCell>
                             <TableCell className="text-right">
                               <span
