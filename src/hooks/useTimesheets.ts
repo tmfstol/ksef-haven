@@ -196,14 +196,19 @@ export function useSaveEmployeeHours() {
         status: r.status ?? "confirmed",
         scan_id: r.scan_id ?? scan_id,
       }));
-      const { error } = await supabase.from("employee_hours").insert(payload as any);
+      const { error } = await supabase.from("employee_hours").upsert(payload as any);
       if (error) throw error;
 
       // Zaktualizuj licznik przypisanych wierszy w skanie
-      await supabase
+      const { count } = await supabase
+        .from("employee_hours")
+        .select("id", { count: "exact", head: true })
+        .eq("scan_id", scan_id);
+      const { error: scanError } = await supabase
         .from("timesheet_scans")
-        .update({ rows_assigned: payload.length })
+        .update({ rows_assigned: count ?? payload.length })
         .eq("id", scan_id);
+      if (scanError) throw scanError;
 
       return { inserted: payload.length };
     },
