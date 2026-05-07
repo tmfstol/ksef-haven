@@ -10,6 +10,7 @@ import { Loader2, ImageOff, Wand2, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getScanImageUrl,
+  useCompanyEmployeeHours,
   useSaveEmployeeHours,
   type EmployeeHourInput,
   type TimesheetScan,
@@ -27,6 +28,7 @@ interface RawRow {
 
 interface DraftRow {
   uid: string;
+  id?: string;
   employee_name_raw: string;
   employee_id: string | null;
   work_date: string;
@@ -59,6 +61,7 @@ export function TimesheetVerificationDialog({
 }: Props) {
   const { data: employees = [] } = useEmployees(companyId);
   const { data: projects = [] } = useProjects(companyId);
+  const { data: savedHours = [] } = useCompanyEmployeeHours(companyId, 1000);
   const activeProjects = useMemo(() => {
     const all = projects.filter((p) => p.status === "active");
     const top = all.filter((p) => !p.parent_id);
@@ -99,23 +102,33 @@ export function TimesheetVerificationDialog({
         ? initialRows
         : (scan?.ai_response as any)?.rows ?? [];
     const matchCandidates = employees.map((e) => ({ id: e.id, name: e.name }));
-    const drafts: DraftRow[] = source.map((r) => {
-      const m = matchEmployee(r.employee_name ?? "", matchCandidates);
+    const existing = scan ? savedHours.filter((h) => h.scan_id === scan.id) : [];
+    const drafts: DraftRow[] = (existing.length > 0 ? existing : source).map((r: any) => {
+      const m = matchEmployee(r.employee_name_raw ?? r.employee_name ?? "", matchCandidates);
       return {
-        uid: genUid(),
-        employee_name_raw: r.employee_name ?? "",
-        employee_id: m.match?.id ?? null,
+        uid: r.id ?? genUid(),
+        id: r.id,
+        employee_name_raw: r.employee_name_raw ?? r.employee_name ?? "",
+        employee_id: r.employee_id ?? m.match?.id ?? null,
         work_date: r.work_date ?? new Date().toISOString().slice(0, 10),
         hours: Number(r.hours ?? 0) || 0,
         description: r.description ?? "",
-        selected: false,
+        selected: existing.length > 0,
         match_score: m.score,
       };
     });
     setRows(drafts);
-    // domyślny projekt = pierwszy aktywny
-    if (activeProjects[0]) setBulkProject(activeProjects[0].id);
-  }, [open, scan, initialRows, employees, activeProjects]);
+    setPerRowProject(
+      existing.reduce<Record<string, string>>((acc, h) => {
+        if (h.project_id) acc[h.id] = h.project_id;
+        return acc;
+      }, {})
+    );
+  }, [open, scan?.id, initialRows, employees, savedHours]);
+
+  useEffect(() => {
+    if (open && !bulkProject && activeProjects[0]) setBulkProject(activeProjects[0].id);
+  }, [open, bulkProject, activeProjects]);
 
   const allSelected = rows.length > 0 && rows.every((r) => r.selected);
   const anySelected = rows.some((r) => r.selected);
@@ -164,6 +177,7 @@ export function TimesheetVerificationDialog({
       return;
     }
     const payload: EmployeeHourInput[] = toSave.map((r) => ({
+      id: r.id,
       company_id: companyId,
       scan_id: scan.id,
       employee_id: r.employee_id,

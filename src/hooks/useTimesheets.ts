@@ -29,6 +29,7 @@ export interface EmployeeHour {
   description: string | null;
   status: "pending" | "confirmed";
   raw_data: any;
+  created_by?: string | null;
   created_at: string;
   updated_at: string;
   employees?: { name: string; color: string } | null;
@@ -36,6 +37,7 @@ export interface EmployeeHour {
 }
 
 export interface EmployeeHourInput {
+  id?: string;
   company_id: string;
   scan_id?: string | null;
   employee_id?: string | null;
@@ -45,6 +47,30 @@ export interface EmployeeHourInput {
   hours: number;
   description?: string | null;
   status?: "pending" | "confirmed";
+}
+
+async function enrichEmployeeHours(rows: any[]): Promise<EmployeeHour[]> {
+  const employeeIds = Array.from(new Set(rows.map((r) => r.employee_id).filter(Boolean)));
+  const projectIds = Array.from(new Set(rows.map((r) => r.project_id).filter(Boolean)));
+
+  const [{ data: employees }, { data: projects }] = await Promise.all([
+    employeeIds.length
+      ? supabase.from("employees").select("id, name, color").in("id", employeeIds)
+      : Promise.resolve({ data: [] as any[] }),
+    projectIds.length
+      ? supabase.from("projects").select("id, name, color").in("id", projectIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+
+  const employeeMap = new Map((employees || []).map((e: any) => [e.id, { name: e.name, color: e.color }]));
+  const projectMap = new Map((projects || []).map((p: any) => [p.id, { name: p.name, color: p.color }]));
+
+  return rows.map((r) => ({
+    ...r,
+    hours: Number(r.hours || 0),
+    employees: r.employee_id ? employeeMap.get(r.employee_id) ?? null : null,
+    projects: r.project_id ? projectMap.get(r.project_id) ?? null : null,
+  })) as EmployeeHour[];
 }
 
 /** Lista skanów firmy. */
@@ -72,12 +98,12 @@ export function useCompanyEmployeeHours(companyId?: string | null, limit = 200) 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_hours")
-        .select("*, employees(name, color), projects(name, color)")
+        .select("*")
         .eq("company_id", companyId!)
         .order("work_date", { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return data as any;
+      return enrichEmployeeHours(data || []);
     },
   });
 }
@@ -90,11 +116,11 @@ export function useProjectEmployeeHours(projectId?: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_hours")
-        .select("*, employees(name, color)")
+        .select("*")
         .eq("project_id", projectId!)
         .order("work_date", { ascending: false });
       if (error) throw error;
-      return data as any;
+      return enrichEmployeeHours(data || []);
     },
   });
 }
@@ -107,11 +133,11 @@ export function useEmployeeHoursByEmployee(employeeId?: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_hours")
-        .select("*, projects(name, color)")
+        .select("*")
         .eq("employee_id", employeeId!)
         .order("work_date", { ascending: false });
       if (error) throw error;
-      return data as any;
+      return enrichEmployeeHours(data || []);
     },
   });
 }
@@ -170,14 +196,19 @@ export function useSaveEmployeeHours() {
         status: r.status ?? "confirmed",
         scan_id: r.scan_id ?? scan_id,
       }));
-      const { error } = await supabase.from("employee_hours").insert(payload as any);
+      const { error } = await supabase.from("employee_hours").upsert(payload as any);
       if (error) throw error;
 
       // Zaktualizuj licznik przypisanych wierszy w skanie
-      await supabase
+      const { count } = await supabase
+        .from("employee_hours")
+        .select("id", { count: "exact", head: true })
+        .eq("scan_id", scan_id);
+      const { error: scanError } = await supabase
         .from("timesheet_scans")
-        .update({ rows_assigned: payload.length })
+        .update({ rows_assigned: count ?? payload.length })
         .eq("id", scan_id);
+      if (scanError) throw scanError;
 
       return { inserted: payload.length };
     },
