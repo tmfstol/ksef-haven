@@ -98,12 +98,12 @@ export function useCompanyEmployeeHours(companyId?: string | null, limit = 200) 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_hours")
-        .select("*, employees(name, color), projects(name, color)")
+        .select("*")
         .eq("company_id", companyId!)
         .order("work_date", { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return data as any;
+      return enrichEmployeeHours(data || []);
     },
   });
 }
@@ -116,11 +116,11 @@ export function useProjectEmployeeHours(projectId?: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_hours")
-        .select("*, employees(name, color)")
+        .select("*")
         .eq("project_id", projectId!)
         .order("work_date", { ascending: false });
       if (error) throw error;
-      return data as any;
+      return enrichEmployeeHours(data || []);
     },
   });
 }
@@ -133,11 +133,11 @@ export function useEmployeeHoursByEmployee(employeeId?: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_hours")
-        .select("*, projects(name, color)")
+        .select("*")
         .eq("employee_id", employeeId!)
         .order("work_date", { ascending: false });
       if (error) throw error;
-      return data as any;
+      return enrichEmployeeHours(data || []);
     },
   });
 }
