@@ -10,6 +10,7 @@ export interface Project {
   color: string;
   status: string;
   budget: number | null;
+  parent_id: string | null;
   created_at: string;
   updated_at: string;
   invoice_count?: number;
