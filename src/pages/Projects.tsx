@@ -36,7 +36,17 @@ const Projects = () => {
   const isMobile = useIsTabletOrBelow();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
-  const { data: projects, isLoading } = useProjects(activeCompanyId);
+  const { data: allProjects, isLoading } = useProjects(activeCompanyId);
+  const projects = useMemo(() => (allProjects || []).filter((p) => !p.parent_id), [allProjects]);
+  const subprojectsByParent = useMemo(() => {
+    const m = new Map<string, Project[]>();
+    (allProjects || []).filter((p) => p.parent_id).forEach((s) => {
+      const arr = m.get(s.parent_id!) || [];
+      arr.push(s);
+      m.set(s.parent_id!, arr);
+    });
+    return m;
+  }, [allProjects]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState("");
