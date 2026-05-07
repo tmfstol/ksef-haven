@@ -270,6 +270,7 @@ const Timesheets = () => {
                         <TableHead>Pracownik</TableHead>
                         <TableHead>Projekt</TableHead>
                         <TableHead>Opis</TableHead>
+                        <TableHead>Dodał</TableHead>
                         <TableHead className="text-right">Godziny</TableHead>
                       </TableRow>
                     </TableHeader>
