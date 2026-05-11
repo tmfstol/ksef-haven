@@ -1,7 +1,7 @@
 import { useLocation, Link } from "react-router-dom";
 import { 
   LayoutDashboard, FileText, Users, BarChart3, Settings, 
-  LogOut, ChevronLeft, ChevronRight, Zap, Receipt, FolderOpen, LayoutGrid, CalendarRange, Calculator, ScanLine, Wallet
+  LogOut, ChevronLeft, ChevronRight, Zap, Receipt, FolderOpen, LayoutGrid, CalendarRange, Calculator, ScanLine, Wallet, FileBox
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,6 +13,7 @@ const navItems = [
   { label: "Pulse", icon: LayoutDashboard, path: "/command-center" },
   { label: "Harmonogram", icon: CalendarRange, path: "/schedule" },
   { label: "Faktury", icon: FileText, path: "/dashboard" },
+  { label: "Dokumenty", icon: FileBox, path: "/documents" },
   { label: "Płatności", icon: Wallet, path: "/payments" },
   { label: "Kontrahenci", icon: Users, path: "/contacts" },
   { label: "Wydatki", icon: Receipt, path: "/expenses" },

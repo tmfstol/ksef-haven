@@ -47,6 +47,7 @@ const EstimateBuilder = lazy(() => import("./pages/EstimateBuilder"));
 const Catalog = lazy(() => import("./pages/Catalog"));
 const Timesheets = lazy(() => import("./pages/Timesheets"));
 const Payments = lazy(() => import("./pages/Payments"));
+const Documents = lazy(() => import("./pages/Documents"));
 
 const queryClient = new QueryClient();
 
@@ -118,6 +119,7 @@ const AppRoutes = () => {
           <Route path="/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
           <Route path="/timesheets" element={<ProtectedRoute><Timesheets /></ProtectedRoute>} />
           <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+          <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
           <Route path="/onboarding" element={<ProtectedRoute><Settings isOnboarding /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
