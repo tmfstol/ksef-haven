@@ -244,12 +244,13 @@ function UploadDocumentDialog({
     }
     setSaving(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Brak zalogowanego użytkownika");
       const ext = file.name.split(".").pop() || "pdf";
-      const filePath = `${companyId}/documents/${Date.now()}.${ext}`;
+      const filePath = `${user.id}/documents/${companyId}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("invoice-uploads").upload(filePath, file);
       if (upErr) throw upErr;
 
-      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase.from("documents").insert({
         company_id: companyId,
         name: name.trim(),
