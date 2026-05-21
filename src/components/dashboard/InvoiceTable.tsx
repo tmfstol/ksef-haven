@@ -362,15 +362,12 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
               : isNew ? "bg-primary/5 border-l-2 border-l-primary" : "";
 
             return (
-              <AnimatePresence key={invoice.id}>
-                <motion.tr
-                  key={`${invoice.id}-row`}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.03 }}
+              <Fragment key={invoice.id}>
+                <tr
                   className={`border-b border-border/30 last:border-0 hover:bg-secondary/40 transition-colors cursor-pointer ${rowHighlight}`}
                   onClick={() => setExpandedId(isExpanded ? null : invoice.id)}
                 >
+
                   <td className="px-2 py-3.5 text-center">
                     {isExpanded ? (
                       <ChevronDown className="h-4 w-4 text-muted-foreground" />
