@@ -522,7 +522,7 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
                       </Button>
                     </div>
                   </td>
-                </motion.tr>
+                </tr>
                 {isExpanded && (
                   <InvoiceItemsRow
                     key={`${invoice.id}-items`}
@@ -540,7 +540,8 @@ export function InvoiceTable({ invoices, latestSyncStartedAt, clientPortalEmail 
                     </td>
                   </tr>
                 )}
-              </AnimatePresence>
+              </Fragment>
+
             );
           })}
         </tbody>
