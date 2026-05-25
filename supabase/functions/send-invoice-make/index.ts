@@ -200,26 +200,27 @@ Deno.serve(async (req) => {
     if (pdfBase64) {
       finalBytes = decodePdfBase64(pdfBase64);
       finalName = pdfFilename;
+      console.log(`PDF from request body: ${finalName} (${finalBytes.length} bytes)`);
     } else if (invoice.pdf_path) {
       console.log(`Downloading PDF from storage: ${invoice.pdf_path}`);
       const { data: storedPdf, error: storageErr } = await supabase.storage
         .from("invoice-uploads")
         .download(invoice.pdf_path);
-      if (!storageErr && storedPdf) {
-        finalName = invoice.pdf_path.split("/").pop() || pdfFilename;
-        finalBytes = new Uint8Array(await storedPdf.arrayBuffer());
-        console.log(`PDF attached from storage: ${finalName}`);
-      } else {
-        console.warn(`Failed to download PDF from storage: ${storageErr?.message}`);
+      if (storageErr || !storedPdf) {
+        throw new HttpError(500, `Nie udało się pobrać PDF ze storage: ${storageErr?.message || "brak pliku"}`);
       }
+      finalName = invoice.pdf_path.split("/").pop() || pdfFilename;
+      finalBytes = new Uint8Array(await storedPdf.arrayBuffer());
+      console.log(`PDF attached from storage: ${finalName} (${finalBytes.length} bytes)`);
     }
 
-    // Always provide a PDF — fallback to a placeholder so Make never gets empty filename/data
-    if (!finalBytes) {
-      const label = `Faktura ${invoice.ksef_number || invoice.id} - ${invoice.vendor}`;
-      finalBytes = buildPlaceholderPdf(label);
-      finalName = `faktura-${(invoice.ksef_number || invoice.id).toString().replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
-      console.log(`Using placeholder PDF: ${finalName}`);
+    // NIGDY nie wysyłaj placeholdera — to powodowało wysyłkę "śmieciowego" PDF do klienta.
+    // Jeśli plik jest za mały (< 1 KB), traktujemy go jako uszkodzony / placeholder z poprzedniej wersji.
+    if (!finalBytes || finalBytes.length < 1024) {
+      throw new HttpError(
+        400,
+        "Brak prawidłowego pliku PDF dla tej faktury. Otwórz fakturę i pobierz PDF, aby został wygenerowany i zapisany, a następnie spróbuj wysyłki ponownie.",
+      );
     }
 
     const pdfFile = new File([finalBytes], finalName, { type: "application/pdf" });
