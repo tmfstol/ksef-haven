@@ -1,15 +1,16 @@
 // "Portal Dokumentów" style invoice PDF generator.
 // Mimics the Insert "Portal Dokumentów" layout (compact, cards, centered title, items table,
 // VAT table, payment section, KSeF QR box at the bottom).
+// @ts-expect-error - pdfmake has no bundled types
 import pdfMake from "pdfmake/build/pdfmake";
+// @ts-expect-error - pdfmake vfs_fonts has no bundled types
 import pdfFonts from "pdfmake/build/vfs_fonts";
 import QRCode from "qrcode";
 import type { ParsedInvoice } from "./invoice-pdf";
 
 // Register Roboto fonts (supports Polish characters).
-// vfs_fonts exports the vfs map as default in CommonJS.
-type PdfMakeAny = typeof pdfMake & { vfs?: Record<string, string>; addVirtualFileSystem?: (v: Record<string, string>) => void };
-const pm = pdfMake as PdfMakeAny;
+type PdfMakeAny = { vfs?: Record<string, string>; addVirtualFileSystem?: (v: Record<string, string>) => void; createPdf: (doc: unknown) => { getBase64: (cb: (b64: string) => void) => void } };
+const pm = pdfMake as unknown as PdfMakeAny;
 const vfsObj: Record<string, string> = (pdfFonts as unknown as { vfs?: Record<string, string> })?.vfs
   ?? (pdfFonts as unknown as Record<string, string>);
 if (typeof pm.addVirtualFileSystem === "function") {
