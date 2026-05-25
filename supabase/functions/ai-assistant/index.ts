@@ -699,7 +699,15 @@ serve(async (req) => {
     let supabase: ReturnType<typeof createClient>;
 
     if (voiceMode && voiceUserId) {
-      // Voice agent mode: use service role + impersonate user via header
+      // Voice agent mode: require shared webhook secret to prevent impersonation
+      const expectedSecret = Deno.env.get("ELEVENLABS_WEBHOOK_SECRET");
+      const providedSecret = req.headers.get("x-webhook-secret");
+      if (!expectedSecret || providedSecret !== expectedSecret) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const adminClient = createClient(supabaseUrl, SERVICE_ROLE_KEY);
       const { data: userData, error: userErr } = await adminClient.auth.admin.getUserById(voiceUserId);
       if (userErr || !userData?.user) {

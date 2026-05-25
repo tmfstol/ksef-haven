@@ -86,12 +86,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check if request is from cron (no auth header) or authenticated user
+    // Auth: cron via CRON_SECRET, otherwise require a valid JWT for a company owner
     const authHeader = req.headers.get("Authorization");
-    const isCron = !authHeader || authHeader.includes("eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjdWl6Y3lwdWN6dnFrYWVjdGZ1Iiwicm9sZSI6ImFub24i");
-    
+    const cronSecret = Deno.env.get("CRON_SECRET");
+    const providedCron = req.headers.get("x-cron-secret");
+    const isCron = !!cronSecret && providedCron === cronSecret;
+
     if (!isCron) {
-      // Verify the user is an admin (company owner)
       const token = authHeader?.replace("Bearer ", "");
       if (!token) {
         return new Response(JSON.stringify({ error: "Brak autoryzacji" }), {
@@ -104,7 +105,6 @@ serve(async (req) => {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // Check if user owns any company (is admin)
       const { data: companies } = await supabase
         .from("companies")
         .select("id")

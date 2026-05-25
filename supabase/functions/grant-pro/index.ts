@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SUPER_ADMIN_EMAIL = "patryk.kupczak1996@gmail.com";
+const SUPER_ADMIN_EMAIL = (Deno.env.get("SUPER_ADMIN_EMAIL") || "").toLowerCase();
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
       authHeader.replace("Bearer ", "")
     );
     if (userErr || !userData?.user) throw new Error("Nieautoryzowany");
-    if ((userData.user.email || "").toLowerCase() !== SUPER_ADMIN_EMAIL) {
+    if (!SUPER_ADMIN_EMAIL || (userData.user.email || "").toLowerCase() !== SUPER_ADMIN_EMAIL) {
       throw new Error("Brak uprawnień super-administratora");
     }
 
