@@ -354,99 +354,15 @@ async function generateKsefQrUrl(
   return `https://qr.ksef.mf.gov.pl/invoice/${cleanNip}/${dateFormatted}/${hashBase64Url}`;
 }
 
-async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Promise<string> {
-  // Dynamically import the CIRFMF library
-  const { generateFA3, generateFA1, generateFA2 } = await import("@/lib/ksef-pdf/index.js");
+// (poprzedni generator CIRFMF został zastąpiony przez generatePortalInvoicePdfBase64 w invoice-pdf-portal.ts)
 
-  // Parse XML with xml-js (same way CIRFMF does it)
-  const jsonDoc = xml2js(xmlString, {
-    compact: true,
-    cdataKey: "_text",
-    trim: true,
-    elementNameFn: stripPrefix,
-    attributeNameFn: stripPrefix,
-  }) as { Faktura?: Record<string, unknown> };
-
-  const invoice = jsonDoc.Faktura;
-  const getNestedText = (source: unknown, path: string[]): string => {
-    let current: unknown = source;
-    for (const key of path) {
-      if (!current || typeof current !== "object") return "";
-      current = (current as Record<string, unknown>)[key];
-    }
-    return typeof current === "string" ? current : "";
-  };
-  const wersja = getNestedText(invoice, ["Naglowek", "KodFormularza", "_attributes", "kodSystemowy"]);
-
-  // NIP sprzedawcy z Podmiot1 → DaneIdentyfikacyjne → NIP
-  const nipSprzedawcy =
-    getNestedText(invoice, ["Podmiot1", "DaneIdentyfikacyjne", "NIP", "_text"]) ||
-    getNestedText(invoice, ["Podmiot1", "DaneIdentyfikacyjne", "NIP"]) ||
-    "";
-  // Data wystawienia: FA → P_1 (YYYY-MM-DD)
-  const dataWystawienia =
-    getNestedText(invoice, ["Fa", "P_1", "_text"]) ||
-    getNestedText(invoice, ["Fa", "P_1"]) ||
-    "";
-
-  const qrUrl = await generateKsefQrUrl(
-    xmlString,
-    String(nipSprzedawcy),
-    String(dataWystawienia),
-  );
-
-  const additionalData = {
-    nrKSeF: ksefNumber,
-    qrCode: qrUrl,
-  };
-
-  let pdf: KsefPdfDocument;
-  switch (wersja) {
-    case "FA (1)":
-      pdf = generateFA1(invoice, additionalData);
-      break;
-    case "FA (2)":
-      pdf = generateFA2(invoice, additionalData);
-      break;
-    case "FA (3)":
-    default:
-      pdf = generateFA3(invoice, additionalData);
-      break;
-  }
-
-  return new Promise<string>((resolve, reject) => {
-    try {
-      pdf.getBase64((base64: string) => {
-        resolve(base64);
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
 
 /**
- * Download invoice PDF using official CIRFMF KSeF visualization
+ * Download invoice PDF — używa nowego layoutu "Portal Dokumentów" (kompaktowa karta).
  */
 export async function generateInvoicePdf(inv: ParsedInvoice, xmlString?: string): Promise<void> {
-  if (!xmlString) {
-    throw new Error("XML string is required for official KSeF PDF generation");
-  }
-  let pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
-  const paymentDetails = buildInvoicePaymentDetails({ iban: inv.nrRachunku, paymentMethodCode: inv.formaPlatnosci });
-  // Append polish payment QR only for transfer invoices with an account.
-  if (paymentDetails.kind === "transfer" && paymentDetails.iban) {
-    try {
-      const { appendPaymentQrToPdf } = await import("./pdf-payment-qr");
-      pdfBase64 = await appendPaymentQrToPdf(pdfBase64, {
-        nip: inv.sprzedawca?.nip,
-        iban: paymentDetails.iban,
-        amount: parseFloat(inv.doZaplaty || inv.sumaBrutto || "0") || 0,
-        recipientName: inv.sprzedawca?.nazwa || "",
-        title: inv.nrFaktury || inv.ksefNumber,
-      });
-    } catch (e) { console.warn("QR overlay skipped:", e); }
-  }
+  if (!xmlString) throw new Error("XML string is required for PDF generation");
+  const pdfBase64 = await generateInvoicePdfBase64(inv, xmlString);
   const anchor = document.createElement("a");
   anchor.href = `data:application/pdf;base64,${pdfBase64}`;
   anchor.download = `${inv.ksefNumber}.pdf`;
@@ -456,13 +372,13 @@ export async function generateInvoicePdf(inv: ParsedInvoice, xmlString?: string)
 }
 
 /**
- * Generate invoice PDF as base64 using official CIRFMF KSeF visualization
+ * Generate invoice PDF as base64 — layout "Portal Dokumentów" (kompaktowa karta z QR KSeF).
+ * Opcjonalnie dokleja overlay QR do szybkiej płatności PL (Bankomat 2D) na pierwszej stronie.
  */
 export async function generateInvoicePdfBase64(inv: ParsedInvoice, xmlString?: string): Promise<string> {
-  if (!xmlString) {
-    throw new Error("XML string is required for official KSeF PDF generation");
-  }
-  let pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
+  if (!xmlString) throw new Error("XML string is required for PDF generation");
+  const { generatePortalInvoicePdfBase64 } = await import("./invoice-pdf-portal");
+  let pdfBase64 = await generatePortalInvoicePdfBase64(inv, xmlString);
   const paymentDetails = buildInvoicePaymentDetails({ iban: inv.nrRachunku, paymentMethodCode: inv.formaPlatnosci });
   if (paymentDetails.kind === "transfer" && paymentDetails.iban) {
     try {
@@ -474,7 +390,10 @@ export async function generateInvoicePdfBase64(inv: ParsedInvoice, xmlString?: s
         recipientName: inv.sprzedawca?.nazwa || "",
         title: inv.nrFaktury || inv.ksefNumber,
       });
-    } catch (e) { console.warn("QR overlay skipped:", e); }
+    } catch (e) {
+      console.warn("QR overlay skipped:", e);
+    }
   }
   return pdfBase64;
 }
+
