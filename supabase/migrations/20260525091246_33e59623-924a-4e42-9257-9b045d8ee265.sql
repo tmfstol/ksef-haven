@@ -1,0 +1,1 @@
+ALTER VIEW public.companies_safe SET (security_invoker = on);
