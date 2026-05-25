@@ -354,76 +354,8 @@ async function generateKsefQrUrl(
   return `https://qr.ksef.mf.gov.pl/invoice/${cleanNip}/${dateFormatted}/${hashBase64Url}`;
 }
 
-async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Promise<string> {
-  // Dynamically import the CIRFMF library
-  const { generateFA3, generateFA1, generateFA2 } = await import("@/lib/ksef-pdf/index.js");
+// (poprzedni generator CIRFMF został zastąpiony przez generatePortalInvoicePdfBase64 w invoice-pdf-portal.ts)
 
-  // Parse XML with xml-js (same way CIRFMF does it)
-  const jsonDoc = xml2js(xmlString, {
-    compact: true,
-    cdataKey: "_text",
-    trim: true,
-    elementNameFn: stripPrefix,
-    attributeNameFn: stripPrefix,
-  }) as { Faktura?: Record<string, unknown> };
-
-  const invoice = jsonDoc.Faktura;
-  const getNestedText = (source: unknown, path: string[]): string => {
-    let current: unknown = source;
-    for (const key of path) {
-      if (!current || typeof current !== "object") return "";
-      current = (current as Record<string, unknown>)[key];
-    }
-    return typeof current === "string" ? current : "";
-  };
-  const wersja = getNestedText(invoice, ["Naglowek", "KodFormularza", "_attributes", "kodSystemowy"]);
-
-  // NIP sprzedawcy z Podmiot1 → DaneIdentyfikacyjne → NIP
-  const nipSprzedawcy =
-    getNestedText(invoice, ["Podmiot1", "DaneIdentyfikacyjne", "NIP", "_text"]) ||
-    getNestedText(invoice, ["Podmiot1", "DaneIdentyfikacyjne", "NIP"]) ||
-    "";
-  // Data wystawienia: FA → P_1 (YYYY-MM-DD)
-  const dataWystawienia =
-    getNestedText(invoice, ["Fa", "P_1", "_text"]) ||
-    getNestedText(invoice, ["Fa", "P_1"]) ||
-    "";
-
-  const qrUrl = await generateKsefQrUrl(
-    xmlString,
-    String(nipSprzedawcy),
-    String(dataWystawienia),
-  );
-
-  const additionalData = {
-    nrKSeF: ksefNumber,
-    qrCode: qrUrl,
-  };
-
-  let pdf: KsefPdfDocument;
-  switch (wersja) {
-    case "FA (1)":
-      pdf = generateFA1(invoice, additionalData);
-      break;
-    case "FA (2)":
-      pdf = generateFA2(invoice, additionalData);
-      break;
-    case "FA (3)":
-    default:
-      pdf = generateFA3(invoice, additionalData);
-      break;
-  }
-
-  return new Promise<string>((resolve, reject) => {
-    try {
-      pdf.getBase64((base64: string) => {
-        resolve(base64);
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
 
 /**
  * Download invoice PDF — używa nowego layoutu "Portal Dokumentów" (kompaktowa karta).
