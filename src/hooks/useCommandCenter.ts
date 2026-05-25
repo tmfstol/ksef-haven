@@ -191,7 +191,7 @@ export function useCommandCenter(companyId: string | null) {
     queryFn: async () => {
       if (!companyId) return null;
       const { data, error } = await supabase
-        .from("companies")
+        .from("companies_safe")
         .select("id, name, nip, tax_type, default_vat_rate")
         .eq("id", companyId)
         .single();
