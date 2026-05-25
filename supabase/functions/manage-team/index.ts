@@ -87,7 +87,19 @@ Deno.serve(async (req) => {
         if (createError) throw new Error(`Nie udało się utworzyć konta: ${createError.message}`);
         targetUser = createData.user;
       } else {
-        // Update password for existing user
+        // Existing user — only allow password update if they're already a member of one of caller's companies
+        const { data: existingMembership } = await adminClient
+          .from("user_roles")
+          .select("id")
+          .eq("user_id", targetUser.id)
+          .in("company_id", companyIds)
+          .limit(1);
+        if (!existingMembership || existingMembership.length === 0) {
+          throw new Error(
+            "Użytkownik o tym e-mailu już istnieje. Poproś go o zalogowanie się — nie można zresetować hasła osoby spoza Twojego zespołu."
+          );
+        }
+        // Member of one of our companies — safe to update password
         const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUser.id, {
           password,
           email_confirm: true,

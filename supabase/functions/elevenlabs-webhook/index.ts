@@ -35,14 +35,16 @@ serve(async (req) => {
     return json({ response: "Nie udało mi się odczytać żądania (błędny JSON)." }, 200);
   }
 
-  // Opcjonalna walidacja shared secret
+  // Wymagana walidacja shared secret (zapobiega anonimowemu dostępowi do firmowych danych)
   const expectedSecret = Deno.env.get("ELEVENLABS_WEBHOOK_SECRET");
-  if (expectedSecret) {
-    const provided = req.headers.get("x-webhook-secret");
-    if (provided !== expectedSecret) {
-      console.warn("Nieprawidłowy webhook secret");
-      return json({ response: "Brak autoryzacji." }, 403);
-    }
+  if (!expectedSecret) {
+    console.error("ELEVENLABS_WEBHOOK_SECRET nie jest skonfigurowany");
+    return json({ response: "Webhook nieskonfigurowany." }, 500);
+  }
+  const provided = req.headers.get("x-webhook-secret");
+  if (provided !== expectedSecret) {
+    console.warn("Nieprawidłowy webhook secret");
+    return json({ response: "Brak autoryzacji." }, 403);
   }
 
   const p = parsedBody.parameters ?? {};

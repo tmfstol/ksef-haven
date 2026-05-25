@@ -26,6 +26,30 @@ serve(async (req) => {
     const { file_path, company_id } = await req.json();
     if (!file_path || !company_id) throw new Error("Brak file_path lub company_id");
 
+    // Verify caller has access to this company (owner or team member)
+    const { data: ownership } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("id", company_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    let hasAccess = !!ownership;
+    if (!hasAccess) {
+      const { data: role } = await supabase
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("company_id", company_id)
+        .maybeSingle();
+      hasAccess = !!role;
+    }
+    if (!hasAccess) throw new Error("Brak dostępu do tej firmy");
+
+    // Verify file_path belongs to this company (path must start with companyId/)
+    if (!file_path.startsWith(`${company_id}/`)) {
+      throw new Error("Ścieżka pliku nie należy do tej firmy");
+    }
+
     // Download file from storage
     const { data: fileData, error: downloadError } = await supabase.storage
       .from("invoice-uploads")
