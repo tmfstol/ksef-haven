@@ -1,9 +1,7 @@
 // "Portal Dokumentów" style invoice PDF generator.
 // Mimics the Insert "Portal Dokumentów" layout (compact, cards, centered title, items table,
 // VAT table, payment section, KSeF QR box at the bottom).
-// @ts-expect-error - pdfmake has no bundled types
 import pdfMake from "pdfmake/build/pdfmake";
-// @ts-expect-error - pdfmake vfs_fonts has no bundled types
 import pdfFonts from "pdfmake/build/vfs_fonts";
 import QRCode from "qrcode";
 import type { ParsedInvoice } from "./invoice-pdf";
