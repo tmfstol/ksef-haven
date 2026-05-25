@@ -426,27 +426,11 @@ async function generatePdfWithCirfmf(xmlString: string, ksefNumber: string): Pro
 }
 
 /**
- * Download invoice PDF using official CIRFMF KSeF visualization
+ * Download invoice PDF — używa nowego layoutu "Portal Dokumentów" (kompaktowa karta).
  */
 export async function generateInvoicePdf(inv: ParsedInvoice, xmlString?: string): Promise<void> {
-  if (!xmlString) {
-    throw new Error("XML string is required for official KSeF PDF generation");
-  }
-  let pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
-  const paymentDetails = buildInvoicePaymentDetails({ iban: inv.nrRachunku, paymentMethodCode: inv.formaPlatnosci });
-  // Append polish payment QR only for transfer invoices with an account.
-  if (paymentDetails.kind === "transfer" && paymentDetails.iban) {
-    try {
-      const { appendPaymentQrToPdf } = await import("./pdf-payment-qr");
-      pdfBase64 = await appendPaymentQrToPdf(pdfBase64, {
-        nip: inv.sprzedawca?.nip,
-        iban: paymentDetails.iban,
-        amount: parseFloat(inv.doZaplaty || inv.sumaBrutto || "0") || 0,
-        recipientName: inv.sprzedawca?.nazwa || "",
-        title: inv.nrFaktury || inv.ksefNumber,
-      });
-    } catch (e) { console.warn("QR overlay skipped:", e); }
-  }
+  if (!xmlString) throw new Error("XML string is required for PDF generation");
+  const pdfBase64 = await generateInvoicePdfBase64(inv, xmlString);
   const anchor = document.createElement("a");
   anchor.href = `data:application/pdf;base64,${pdfBase64}`;
   anchor.download = `${inv.ksefNumber}.pdf`;
@@ -456,13 +440,13 @@ export async function generateInvoicePdf(inv: ParsedInvoice, xmlString?: string)
 }
 
 /**
- * Generate invoice PDF as base64 using official CIRFMF KSeF visualization
+ * Generate invoice PDF as base64 — layout "Portal Dokumentów" (kompaktowa karta z QR KSeF).
+ * Opcjonalnie dokleja overlay QR do szybkiej płatności PL (Bankomat 2D) na pierwszej stronie.
  */
 export async function generateInvoicePdfBase64(inv: ParsedInvoice, xmlString?: string): Promise<string> {
-  if (!xmlString) {
-    throw new Error("XML string is required for official KSeF PDF generation");
-  }
-  let pdfBase64 = await generatePdfWithCirfmf(xmlString, inv.ksefNumber);
+  if (!xmlString) throw new Error("XML string is required for PDF generation");
+  const { generatePortalInvoicePdfBase64 } = await import("./invoice-pdf-portal");
+  let pdfBase64 = await generatePortalInvoicePdfBase64(inv, xmlString);
   const paymentDetails = buildInvoicePaymentDetails({ iban: inv.nrRachunku, paymentMethodCode: inv.formaPlatnosci });
   if (paymentDetails.kind === "transfer" && paymentDetails.iban) {
     try {
@@ -474,7 +458,10 @@ export async function generateInvoicePdfBase64(inv: ParsedInvoice, xmlString?: s
         recipientName: inv.sprzedawca?.nazwa || "",
         title: inv.nrFaktury || inv.ksefNumber,
       });
-    } catch (e) { console.warn("QR overlay skipped:", e); }
+    } catch (e) {
+      console.warn("QR overlay skipped:", e);
+    }
   }
   return pdfBase64;
 }
+
