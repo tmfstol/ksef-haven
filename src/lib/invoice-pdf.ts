@@ -363,12 +363,20 @@ async function generateKsefQrUrl(
 export async function generateInvoicePdf(inv: ParsedInvoice, xmlString?: string): Promise<void> {
   if (!xmlString) throw new Error("XML string is required for PDF generation");
   const pdfBase64 = await generateInvoicePdfBase64(inv, xmlString);
+  const cleaned = pdfBase64.replace(/^data:application\/pdf;base64,/i, "").replace(/\s+/g, "");
+  const binary = atob(cleaned);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
-  anchor.href = `data:application/pdf;base64,${pdfBase64}`;
+  anchor.href = url;
   anchor.download = `${inv.ksefNumber}.pdf`;
+  anchor.rel = "noopener";
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 /**

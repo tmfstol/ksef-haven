@@ -1,10 +1,22 @@
 import { supabase } from "@/integrations/supabase/client";
 import { generateInvoicePdfBase64, parseKsefXml } from "@/lib/invoice-pdf";
 
+function triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 /**
  * Downloads a PDF for an invoice. Strategy:
- * 1. If `pdf_path` exists in storage → create signed URL.
- * 2. Otherwise generate PDF on-the-fly from KSeF XML and trigger browser download.
+ * 1. If `pdf_path` exists in storage → download as Blob (działa na mobile).
+ * 2. Otherwise generate PDF on-the-fly from KSeF XML.
  */
 export async function downloadInvoicePdf(invoice: {
   id: string;
@@ -13,13 +25,15 @@ export async function downloadInvoicePdf(invoice: {
   vendor: string;
   pdf_path?: string | null;
 }): Promise<void> {
-  // 1. Try existing stored PDF
+  const filename = `${invoice.ksef_number || invoice.vendor}.pdf`;
+
+  // 1. Try existing stored PDF — pobierz jako Blob (window.open blokowane na mobile jako popup)
   if (invoice.pdf_path) {
     const { data, error } = await supabase.storage
       .from("invoice-uploads")
-      .createSignedUrl(invoice.pdf_path, 60 * 10);
-    if (!error && data?.signedUrl) {
-      window.open(data.signedUrl, "_blank");
+      .download(invoice.pdf_path);
+    if (!error && data) {
+      triggerBlobDownload(data, filename);
       return;
     }
   }
@@ -39,23 +53,16 @@ export async function downloadInvoicePdf(invoice: {
 
   const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number);
   const pdfBase64 = await generateInvoicePdfBase64(parsed, xmlData.xml);
-  const filename = `${invoice.ksef_number || invoice.vendor}.pdf`;
 
-  // Trigger download
-  const a = document.createElement("a");
-  a.href = `data:application/pdf;base64,${pdfBase64}`;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const cleaned = pdfBase64.replace(/^data:application\/pdf;base64,/i, "").replace(/\s+/g, "");
+  const binary = atob(cleaned);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  triggerBlobDownload(blob, filename);
 
   // Persist to storage for future quick access
   try {
-    const cleaned = pdfBase64.replace(/^data:application\/pdf;base64,/i, "").replace(/\s+/g, "");
-    const binary = atob(cleaned);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: "application/pdf" });
     const storagePath = `${invoice.company_id}/${invoice.id}/${filename}`;
     await supabase.storage.from("invoice-uploads").upload(storagePath, blob, {
       upsert: true,
