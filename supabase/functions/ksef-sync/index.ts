@@ -499,8 +499,31 @@ function parseInvoiceXml(xml: string) {
       return v ? parseFloat(v.replace(",", ".")) : 0;
     };
 
-    const vendor = getTag("Nazwa") || "Nieznany kontrahent";
-    const nip = getTag("NrNIP") || getTag("NIP") || "";
+    // Extract seller (Podmiot1) and buyer (Podmiot2) separately
+    const extractPartyFrom = (root: Element | null) => {
+      if (!root) return { name: "", nip: "" };
+      const sub: Element[] = [];
+      const walkSub = (n: any) => {
+        if (n && n.nodeType === 1) sub.push(n as Element);
+        if (n?.childNodes) for (const c of n.childNodes) walkSub(c);
+      };
+      walkSub(root);
+      const find = (tag: string) => {
+        const t = tag.toLowerCase();
+        const el = sub.find((e) => localName(e) === t);
+        return el?.textContent?.trim() || "";
+      };
+      return {
+        name: find("Nazwa") || find("ImieNazwisko") || "",
+        nip: find("NIP") || find("NrNIP") || "",
+      };
+    };
+    const podmiot1El = findFirst("Podmiot1");
+    const podmiot2El = findFirst("Podmiot2");
+    const seller = extractPartyFrom(podmiot1El);
+    const buyer = extractPartyFrom(podmiot2El);
+    const vendor = seller.name || getTag("Nazwa") || "Nieznany kontrahent";
+    const nip = seller.nip || getTag("NrNIP") || getTag("NIP") || "";
     const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
     const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
 
@@ -607,12 +630,14 @@ function parseInvoiceXml(xml: string) {
       });
     }
 
-    return { vendor, nip, date, grossAmount, items, paymentMethod, paymentDueDate, isPaidInXml, dataZaplaty };
+    return { vendor, nip, seller, buyer, date, grossAmount, items, paymentMethod, paymentDueDate, isPaidInXml, dataZaplaty };
   } catch (err) {
     console.error("[ksef-sync][XML] Parse error:", err instanceof Error ? err.message : err);
     return {
       vendor: "Nieznany kontrahent",
       nip: "",
+      seller: { name: "", nip: "" },
+      buyer: { name: "", nip: "" },
       date: new Date().toISOString().split("T")[0],
       grossAmount: 0,
       items: [],
@@ -803,11 +828,12 @@ async function syncCompany(
             continue;
           }
 
-          let vendor = ref.seller?.name || ref.subjectName || ref.vendorName || "Nieznany";
-          let nip = ref.seller?.nip || ref.subjectNip || ref.nip || company.nip;
+          const invoiceType = ref._invoiceType || "kosztowa";
+          const isIncomeRef = invoiceType === "przychodowa";
+          let vendor = (isIncomeRef ? (ref.buyer?.name || ref.buyerName) : (ref.seller?.name || ref.subjectName || ref.vendorName)) || "Nieznany";
+          let nip = (isIncomeRef ? (ref.buyer?.nip || ref.buyerNip) : (ref.seller?.nip || ref.subjectNip || ref.nip)) || "";
           let date = ref.issueDate || ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
           let grossAmount = ref.grossAmount || ref.grossValue || ref.grossAmount || 0;
-          const invoiceType = ref._invoiceType || "kosztowa";
 
           let parsedItems: any[] = [];
           let paymentMethod: string | null = null;
@@ -822,8 +848,15 @@ async function syncCompany(
               xmlFetches++;
               const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
               const parsed = parseInvoiceXml(xml);
-              if (parsed.vendor) vendor = parsed.vendor;
-              if (parsed.nip) nip = parsed.nip;
+              const isIncome = invoiceType === "przychodowa";
+              const parsedVendor = isIncome
+                ? (parsed.buyer?.name || parsed.vendor)
+                : (parsed.seller?.name || parsed.vendor);
+              const parsedNip = isIncome
+                ? (parsed.buyer?.nip || parsed.nip)
+                : (parsed.seller?.nip || parsed.nip);
+              if (parsedVendor) vendor = parsedVendor;
+              if (parsedNip) nip = parsedNip;
               if (parsed.date) date = parsed.date;
               if (parsed.grossAmount) grossAmount = parsed.grossAmount;
               parsedItems = parsed.items || [];
