@@ -47,6 +47,18 @@ export default function TeamManagement() {
   const [inviting, setInviting] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [canManage, setCanManage] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      if (!user) { setCanManage(false); return; }
+      const [{ data: owned }, { data: adminRoles }] = await Promise.all([
+        supabase.from("companies").select("id").eq("user_id", user.id).limit(1),
+        supabase.from("user_roles").select("company_id").eq("user_id", user.id).eq("role", "admin").limit(1),
+      ]);
+      setCanManage((owned?.length ?? 0) > 0 || (adminRoles?.length ?? 0) > 0);
+    })();
+  }, [user]);
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -65,8 +77,12 @@ export default function TeamManagement() {
   };
 
   useEffect(() => {
-    fetchMembers();
-  }, []);
+    if (canManage) fetchMembers();
+    else if (canManage === false) setLoading(false);
+  }, [canManage]);
+
+  if (canManage === null) return null;
+  if (canManage === false) return null;
 
   const handleInvite = async () => {
     if (!inviteEmail.trim() || !invitePassword.trim()) return;
