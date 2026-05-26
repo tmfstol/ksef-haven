@@ -107,6 +107,15 @@ export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: st
   const qrPng = await QRCode.toDataURL(qrUrl, { width: 320, margin: 1, errorCorrectionLevel: "M" });
 
   const currency = inv.kodWaluty || "PLN";
+  const isEur = currency === "EUR";
+  const withPrefix = (val: string | undefined, prefix: string) => {
+    const v = (val || "").trim();
+    if (!v) return "—";
+    return /^[A-Z]{2}/i.test(v) ? v : `${prefix}${v}`;
+  };
+  const sellerNip = isEur ? withPrefix(inv.sprzedawca?.nip, "PL") : (inv.sprzedawca?.nip || "—");
+  const buyerNip = isEur ? withPrefix(inv.nabywca?.nip, "DE") : (inv.nabywca?.nip || "—");
+  const accountNr = isEur ? withPrefix(inv.nrRachunku, "PL") : (inv.nrRachunku || "");
   const itemsBody = [
     [
       { text: "LP", style: "thHead", alignment: "center" },
