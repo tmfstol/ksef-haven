@@ -5,6 +5,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseKsefXml, generateInvoicePdf, generateInvoicePdfBase64 } from "@/lib/invoice-pdf";
+import { downloadInvoicePdf } from "@/lib/invoice-pdf-download";
 import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrBlockReason, type InvoicePaymentDetails } from "@/lib/invoice-payment";
 import { useSwipeable } from "@/hooks/useSwipeable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -199,20 +200,24 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
     }
     setDownloading(format);
     try {
-      const { data, error } = await supabase.functions.invoke("ksef-download", {
-        body: { invoice_id: invoice.id, format: "xml" },
-      });
-      if (error || data?.error) throw new Error(data?.error || error?.message);
-
       if (format === "xml") {
+        const { data, error } = await supabase.functions.invoke("ksef-download", {
+          body: { invoice_id: invoice.id, format: "xml" },
+        });
+        if (error || data?.error) throw new Error(data?.error || error?.message);
         const blob = new Blob([data.xml], { type: "application/xml" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url; a.download = `${invoice.ksef_number}.xml`;
         a.click(); URL.revokeObjectURL(url);
       } else {
-        const parsed = parseKsefXml(data.xml, invoice.ksef_number);
-        await generateInvoicePdf(parsed, data.xml);
+        await downloadInvoicePdf({
+          id: invoice.id,
+          company_id: invoice.company_id,
+          ksef_number: invoice.ksef_number,
+          vendor: invoice.vendor,
+          pdf_path: invoice.pdf_path,
+        });
       }
       toast.success(`Pobrano ${format.toUpperCase()}`);
     } catch (err) {
