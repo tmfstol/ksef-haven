@@ -390,11 +390,23 @@ export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: st
     },
   };
 
+  console.log("[invoice-pdf-portal] createPdf… items:", inv.pozycje?.length);
   const pdf = pm.createPdf(docDefinition as Parameters<typeof pdfMake.createPdf>[0]) as unknown as PdfDoc;
+  console.log("[invoice-pdf-portal] pdf object ready, calling getBase64");
   return new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      console.error("[invoice-pdf-portal] getBase64 TIMEOUT after 30s");
+      reject(new Error("PDF generation timeout (30s)"));
+    }, 30_000);
     try {
-      pdf.getBase64((b64) => resolve(b64));
+      pdf.getBase64((b64) => {
+        clearTimeout(timer);
+        console.log("[invoice-pdf-portal] getBase64 OK length:", b64?.length);
+        resolve(b64);
+      });
     } catch (e) {
+      clearTimeout(timer);
+      console.error("[invoice-pdf-portal] getBase64 threw:", e);
       reject(e);
     }
   });
