@@ -2095,6 +2095,10 @@ export type Database = {
       }
     }
     Functions: {
+      can_access_invoice_file: {
+        Args: { _name: string; _user_id: string }
+        Returns: boolean
+      }
       get_user_company_role: {
         Args: { _company_id: string; _user_id: string }
         Returns: string
