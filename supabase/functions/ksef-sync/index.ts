@@ -499,8 +499,31 @@ function parseInvoiceXml(xml: string) {
       return v ? parseFloat(v.replace(",", ".")) : 0;
     };
 
-    const vendor = getTag("Nazwa") || "Nieznany kontrahent";
-    const nip = getTag("NrNIP") || getTag("NIP") || "";
+    // Extract seller (Podmiot1) and buyer (Podmiot2) separately
+    const extractPartyFrom = (root: Element | null) => {
+      if (!root) return { name: "", nip: "" };
+      const sub: Element[] = [];
+      const walkSub = (n: any) => {
+        if (n && n.nodeType === 1) sub.push(n as Element);
+        if (n?.childNodes) for (const c of n.childNodes) walkSub(c);
+      };
+      walkSub(root);
+      const find = (tag: string) => {
+        const t = tag.toLowerCase();
+        const el = sub.find((e) => localName(e) === t);
+        return el?.textContent?.trim() || "";
+      };
+      return {
+        name: find("Nazwa") || find("ImieNazwisko") || "",
+        nip: find("NIP") || find("NrNIP") || "",
+      };
+    };
+    const podmiot1El = findFirst("Podmiot1");
+    const podmiot2El = findFirst("Podmiot2");
+    const seller = extractPartyFrom(podmiot1El);
+    const buyer = extractPartyFrom(podmiot2El);
+    const vendor = seller.name || getTag("Nazwa") || "Nieznany kontrahent";
+    const nip = seller.nip || getTag("NrNIP") || getTag("NIP") || "";
     const date = getTag("P_1") || getTag("DataWystawienia") || new Date().toISOString().split("T")[0];
     const grossAmount = getAmount("P_15") || getAmount("KwotaBrutto") || 0;
 
