@@ -828,11 +828,12 @@ async function syncCompany(
             continue;
           }
 
-          let vendor = ref.seller?.name || ref.subjectName || ref.vendorName || "Nieznany";
-          let nip = ref.seller?.nip || ref.subjectNip || ref.nip || company.nip;
+          const invoiceType = ref._invoiceType || "kosztowa";
+          const isIncomeRef = invoiceType === "przychodowa";
+          let vendor = (isIncomeRef ? (ref.buyer?.name || ref.buyerName) : (ref.seller?.name || ref.subjectName || ref.vendorName)) || "Nieznany";
+          let nip = (isIncomeRef ? (ref.buyer?.nip || ref.buyerNip) : (ref.seller?.nip || ref.subjectNip || ref.nip)) || "";
           let date = ref.issueDate || ref.invoicingDate || ref.date || new Date().toISOString().split("T")[0];
           let grossAmount = ref.grossAmount || ref.grossValue || ref.grossAmount || 0;
-          const invoiceType = ref._invoiceType || "kosztowa";
 
           let parsedItems: any[] = [];
           let paymentMethod: string | null = null;
