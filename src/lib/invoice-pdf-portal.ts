@@ -7,7 +7,15 @@ import QRCode from "qrcode";
 import type { ParsedInvoice } from "./invoice-pdf";
 
 // Register Roboto fonts (supports Polish characters).
-type PdfMakeAny = { vfs?: Record<string, string>; addVirtualFileSystem?: (v: Record<string, string>) => void; createPdf: (doc: unknown) => { getBase64: (cb: (b64: string) => void) => void } };
+type PdfDocInst = {
+  getBase64: (cb: (b64: string) => void) => void;
+  getBlob?: (cb: (blob: Blob) => void) => void;
+};
+type PdfMakeAny = {
+  vfs?: Record<string, string>;
+  addVirtualFileSystem?: (v: Record<string, string>) => void;
+  createPdf: (doc: unknown) => PdfDocInst;
+};
 const pm = pdfMake as unknown as PdfMakeAny;
 const vfsObj: Record<string, string> = (pdfFonts as unknown as { vfs?: Record<string, string> })?.vfs
   ?? (pdfFonts as unknown as Record<string, string>);
@@ -16,6 +24,7 @@ if (typeof pm.addVirtualFileSystem === "function") {
 } else {
   pm.vfs = vfsObj;
 }
+console.log("[invoice-pdf-portal] vfs files:", Object.keys(vfsObj || {}).length);
 
 const GRAY_HEADER = "#e5e7ec";
 const BORDER = "#cfd4dc";
@@ -91,7 +100,7 @@ function titleForInvoice(inv: ParsedInvoice): string {
   return `${base} ${inv.nrFaktury || inv.ksefNumber || ""}`.trim();
 }
 
-interface PdfDoc { getBase64: (cb: (b64: string) => void) => void }
+interface PdfDoc extends PdfDocInst {}
 
 export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: string): Promise<string> {
   const qrUrl = await buildKsefQrUrl(xml, inv.sprzedawca?.nip || "", inv.dataWystawienia || "");
@@ -381,11 +390,23 @@ export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: st
     },
   };
 
+  console.log("[invoice-pdf-portal] createPdf… items:", inv.pozycje?.length);
   const pdf = pm.createPdf(docDefinition as Parameters<typeof pdfMake.createPdf>[0]) as unknown as PdfDoc;
+  console.log("[invoice-pdf-portal] pdf object ready, calling getBase64");
   return new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      console.error("[invoice-pdf-portal] getBase64 TIMEOUT after 30s");
+      reject(new Error("PDF generation timeout (30s)"));
+    }, 30_000);
     try {
-      pdf.getBase64((b64) => resolve(b64));
+      pdf.getBase64((b64) => {
+        clearTimeout(timer);
+        console.log("[invoice-pdf-portal] getBase64 OK length:", b64?.length);
+        resolve(b64);
+      });
     } catch (e) {
+      clearTimeout(timer);
+      console.error("[invoice-pdf-portal] getBase64 threw:", e);
       reject(e);
     }
   });
