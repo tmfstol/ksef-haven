@@ -8,8 +8,8 @@ import type { ParsedInvoice } from "./invoice-pdf";
 
 // Register Roboto fonts (supports Polish characters).
 type PdfDocInst = {
-  getBase64: (cb: (b64: string) => void) => void;
-  getBlob?: (cb: (blob: Blob) => void) => void;
+  getBase64: () => Promise<string>;
+  getBlob?: () => Promise<Blob>;
 };
 type PdfMakeAny = {
   vfs?: Record<string, string>;
