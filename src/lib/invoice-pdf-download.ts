@@ -67,6 +67,7 @@ export async function downloadInvoicePdf(invoice: {
     throw new Error("Brak PDF i numeru KSeF — nie można wygenerować pliku.");
   }
 
+  console.log("[downloadInvoicePdf] invoking ksef-download for", invoice.id);
   const { data: xmlData, error: xmlError } = await supabase.functions.invoke(
     "ksef-download",
     { body: { invoice_id: invoice.id, format: "xml" } }
@@ -75,8 +76,11 @@ export async function downloadInvoicePdf(invoice: {
   if (xmlData?.error) throw new Error(xmlData.error);
   if (!xmlData?.xml) throw new Error("Brak XML faktury w KSeF.");
 
+  console.log("[downloadInvoicePdf] got XML, parsing");
   const parsed = parseKsefXml(xmlData.xml, invoice.ksef_number);
+  console.log("[downloadInvoicePdf] parsed, generating PDF base64");
   const pdfBase64 = await generateInvoicePdfBase64(parsed, xmlData.xml);
+  console.log("[downloadInvoicePdf] base64 ready", pdfBase64?.length);
 
   const cleaned = pdfBase64.replace(/^data:application\/pdf;base64,/i, "").replace(/\s+/g, "");
   const binary = atob(cleaned);
