@@ -107,6 +107,15 @@ export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: st
   const qrPng = await QRCode.toDataURL(qrUrl, { width: 320, margin: 1, errorCorrectionLevel: "M" });
 
   const currency = inv.kodWaluty || "PLN";
+  const isEur = currency === "EUR";
+  const withPrefix = (val: string | undefined, prefix: string) => {
+    const v = (val || "").trim();
+    if (!v) return "—";
+    return /^[A-Z]{2}/i.test(v) ? v : `${prefix}${v}`;
+  };
+  const sellerNip = isEur ? withPrefix(inv.sprzedawca?.nip, "PL") : (inv.sprzedawca?.nip || "—");
+  const buyerNip = isEur ? withPrefix(inv.nabywca?.nip, "DE") : (inv.nabywca?.nip || "—");
+  const accountNr = isEur ? withPrefix(inv.nrRachunku, "PL") : (inv.nrRachunku || "");
   const itemsBody = [
     [
       { text: "LP", style: "thHead", alignment: "center" },
@@ -182,7 +191,7 @@ export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: st
   const paymentInfoLines: string[] = [];
   if (inv.opisPlatnosci) paymentInfoLines.push(inv.opisPlatnosci);
   if (inv.terminPlatnosci) paymentInfoLines.push(`Termin płatności: ${inv.terminPlatnosci}`);
-  if (inv.nrRachunku) paymentInfoLines.push(`Nr rachunku: ${inv.nrRachunku}${inv.nazwaBanku ? ` (${inv.nazwaBanku})` : ""}`);
+  if (inv.nrRachunku) paymentInfoLines.push(`Nr rachunku: ${accountNr}${inv.nazwaBanku ? ` (${inv.nazwaBanku})` : ""}`);
   const paymentInfo = paymentInfoLines.join("\n") || "—";
 
   const docDefinition = {
@@ -250,7 +259,7 @@ export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: st
                   {
                     stack: [
                       { text: inv.sprzedawca?.nazwa || "—", bold: true, fontSize: 9 },
-                      { text: `NIP: ${inv.sprzedawca?.nip || "—"}`, fontSize: 8, margin: [0, 2, 0, 0] },
+                      { text: `NIP: ${sellerNip}`, fontSize: 8, margin: [0, 2, 0, 0] },
                       { text: inv.sprzedawca?.adres || "", fontSize: 8, margin: [0, 2, 0, 0] },
                     ],
                   },
@@ -269,7 +278,7 @@ export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: st
                   {
                     stack: [
                       { text: inv.nabywca?.nazwa || "—", bold: true, fontSize: 9 },
-                      { text: `NIP: ${inv.nabywca?.nip || "—"}`, fontSize: 8, margin: [0, 2, 0, 0] },
+                      { text: `NIP: ${buyerNip}`, fontSize: 8, margin: [0, 2, 0, 0] },
                       { text: inv.nabywca?.adres || "", fontSize: 8, margin: [0, 2, 0, 0] },
                     ],
                   },
