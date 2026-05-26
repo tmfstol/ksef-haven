@@ -200,11 +200,6 @@ export function InvoiceCard({ invoice, isNew }: InvoiceCardProps) {
     }
     setDownloading(format);
     try {
-      const { data, error } = await supabase.functions.invoke("ksef-download", {
-        body: { invoice_id: invoice.id, format: "xml" },
-      });
-      if (error || data?.error) throw new Error(data?.error || error?.message);
-
       if (format === "xml") {
         const { data, error } = await supabase.functions.invoke("ksef-download", {
           body: { invoice_id: invoice.id, format: "xml" },
