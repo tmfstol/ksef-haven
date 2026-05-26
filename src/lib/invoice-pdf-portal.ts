@@ -191,7 +191,7 @@ export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: st
   const paymentInfoLines: string[] = [];
   if (inv.opisPlatnosci) paymentInfoLines.push(inv.opisPlatnosci);
   if (inv.terminPlatnosci) paymentInfoLines.push(`Termin płatności: ${inv.terminPlatnosci}`);
-  if (inv.nrRachunku) paymentInfoLines.push(`Nr rachunku: ${inv.nrRachunku}${inv.nazwaBanku ? ` (${inv.nazwaBanku})` : ""}`);
+  if (inv.nrRachunku) paymentInfoLines.push(`Nr rachunku: ${accountNr}${inv.nazwaBanku ? ` (${inv.nazwaBanku})` : ""}`);
   const paymentInfo = paymentInfoLines.join("\n") || "—";
 
   const docDefinition = {
