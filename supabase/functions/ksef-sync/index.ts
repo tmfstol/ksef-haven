@@ -847,8 +847,15 @@ async function syncCompany(
               xmlFetches++;
               const xml = await getInvoice(baseUrl, accessToken, ksefNumber);
               const parsed = parseInvoiceXml(xml);
-              if (parsed.vendor) vendor = parsed.vendor;
-              if (parsed.nip) nip = parsed.nip;
+              const isIncome = invoiceType === "przychodowa";
+              const parsedVendor = isIncome
+                ? (parsed.buyer?.name || parsed.vendor)
+                : (parsed.seller?.name || parsed.vendor);
+              const parsedNip = isIncome
+                ? (parsed.buyer?.nip || parsed.nip)
+                : (parsed.seller?.nip || parsed.nip);
+              if (parsedVendor) vendor = parsedVendor;
+              if (parsedNip) nip = parsedNip;
               if (parsed.date) date = parsed.date;
               if (parsed.grossAmount) grossAmount = parsed.grossAmount;
               parsedItems = parsed.items || [];
