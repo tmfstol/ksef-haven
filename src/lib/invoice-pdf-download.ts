@@ -1,46 +1,49 @@
 import { supabase } from "@/integrations/supabase/client";
 import { generateInvoicePdfBase64, parseKsefXml } from "@/lib/invoice-pdf";
 
-const isMobile = () =>
-  typeof navigator !== "undefined" &&
-  /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const isIos = () =>
+  typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 /**
- * Otwiera plik tak, by działało też na iOS Safari:
- * - mobile: `window.location.href = url` (działa po async bez user-gesture)
- * - desktop: anchor.click z atrybutem download
+ * Pobiera plik z danego URL jako blob i wywołuje anchor download.
+ * Działa na desktopie (Chrome/Firefox/Edge/Safari) bez problemów z cross-origin.
+ * Na iOS Safari (gdzie anchor.click po async nie działa) — fallback: window.location.href.
  */
-function openOrDownload(url: string, filename: string) {
-  if (isMobile()) {
-    // iOS ignoruje "download" — i tak otworzy PDF w przeglądarce, ale przynajmniej zadziała
+async function downloadFromUrl(url: string, filename: string) {
+  if (isIos()) {
+    // iOS Safari nie wykona anchor.click() po await — nawigujemy bezpośrednio.
+    // Signed URL ma już content-disposition: attachment, więc pobierze plik.
     window.location.href = url;
     return;
   }
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.rel = "noopener";
-  a.target = "_blank";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+  } catch {
+    // Fallback: bezpośrednia nawigacja
+    window.location.href = url;
+  }
 }
 
-async function signedUrlFor(path: string): Promise<string | null> {
+async function signedUrlFor(path: string, filename: string): Promise<string | null> {
   const { data, error } = await supabase.storage
     .from("invoice-uploads")
-    .createSignedUrl(path, 60 * 10);
+    .createSignedUrl(path, 60 * 10, { download: filename });
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
 }
 
-/**
- * Downloads a PDF for an invoice. Strategy:
- * 1. Jeśli `pdf_path` istnieje → utwórz signed URL i nawiguj/pobierz.
- * 2. W przeciwnym razie wygeneruj PDF z XML KSeF, wgraj do storage, otwórz signed URL.
- *
- * Signed URL działa na mobile (iOS Safari blokuje blob: po async await z anchor.click).
- */
 export async function downloadInvoicePdf(invoice: {
   id: string;
   company_id: string;
@@ -50,11 +53,11 @@ export async function downloadInvoicePdf(invoice: {
 }): Promise<void> {
   const filename = `${invoice.ksef_number || invoice.vendor}.pdf`;
 
-  // 1. Istniejący PDF w storage
+  // 1. Jeśli PDF już w storage — szybka ścieżka
   if (invoice.pdf_path) {
-    const url = await signedUrlFor(invoice.pdf_path);
+    const url = await signedUrlFor(invoice.pdf_path, filename);
     if (url) {
-      openOrDownload(url, filename);
+      await downloadFromUrl(url, filename);
       return;
     }
   }
@@ -81,23 +84,34 @@ export async function downloadInvoicePdf(invoice: {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   const blob = new Blob([bytes], { type: "application/pdf" });
 
-  // Wgraj do storage — wymagane do signed URL
+  // Spróbuj wgrać do storage (cache na przyszłość)
   const storagePath = `${invoice.company_id}/${invoice.id}/${filename}`;
   const { error: uploadError } = await supabase.storage
     .from("invoice-uploads")
     .upload(storagePath, blob, { upsert: true, contentType: "application/pdf" });
-  if (uploadError) {
-    // Fallback: bezpośredni blob (na desktopie zadziała, na mobile może nie)
-    const blobUrl = URL.createObjectURL(blob);
-    openOrDownload(blobUrl, filename);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
-    return;
+
+  if (!uploadError) {
+    // Zapisz pdf_path (nie blokuj)
+    supabase.from("invoices").update({ pdf_path: storagePath }).eq("id", invoice.id).then(() => {});
+    const url = await signedUrlFor(storagePath, filename);
+    if (url) {
+      await downloadFromUrl(url, filename);
+      return;
+    }
   }
 
-  // Zapisz pdf_path (nie blokuj)
-  supabase.from("invoices").update({ pdf_path: storagePath }).eq("id", invoice.id).then(() => {});
-
-  const url = await signedUrlFor(storagePath);
-  if (!url) throw new Error("Nie udało się utworzyć linku do pobrania.");
-  openOrDownload(url, filename);
+  // Fallback: bezpośrednio blob (gdy upload/signed URL zawiódł)
+  const blobUrl = URL.createObjectURL(blob);
+  if (isIos()) {
+    window.location.href = blobUrl;
+  } else {
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
 }
