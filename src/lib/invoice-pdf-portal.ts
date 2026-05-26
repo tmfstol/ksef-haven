@@ -100,7 +100,7 @@ function titleForInvoice(inv: ParsedInvoice): string {
   return `${base} ${inv.nrFaktury || inv.ksefNumber || ""}`.trim();
 }
 
-interface PdfDoc { getBase64: (cb: (b64: string) => void) => void }
+interface PdfDoc extends PdfDocInst {}
 
 export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: string): Promise<string> {
   const qrUrl = await buildKsefQrUrl(xml, inv.sprzedawca?.nip || "", inv.dataWystawienia || "");
