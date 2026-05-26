@@ -5,6 +5,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseKsefXml, generateInvoicePdf, generateInvoicePdfBase64 } from "@/lib/invoice-pdf";
+import { downloadInvoicePdf } from "@/lib/invoice-pdf-download";
 import { buildInvoicePaymentDetails, extractPaymentDetailsFromXml, getPaymentQrBlockReason, type InvoicePaymentDetails } from "@/lib/invoice-payment";
 import { useSwipeable } from "@/hooks/useSwipeable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
