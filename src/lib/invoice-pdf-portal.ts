@@ -400,4 +400,3 @@ export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: st
   console.log("[invoice-pdf-portal] getBase64 OK length:", b64?.length);
   return b64;
 }
-}
