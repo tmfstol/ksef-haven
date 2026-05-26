@@ -7,7 +7,15 @@ import QRCode from "qrcode";
 import type { ParsedInvoice } from "./invoice-pdf";
 
 // Register Roboto fonts (supports Polish characters).
-type PdfMakeAny = { vfs?: Record<string, string>; addVirtualFileSystem?: (v: Record<string, string>) => void; createPdf: (doc: unknown) => { getBase64: (cb: (b64: string) => void) => void } };
+type PdfDocInst = {
+  getBase64: (cb: (b64: string) => void) => void;
+  getBlob?: (cb: (blob: Blob) => void) => void;
+};
+type PdfMakeAny = {
+  vfs?: Record<string, string>;
+  addVirtualFileSystem?: (v: Record<string, string>) => void;
+  createPdf: (doc: unknown) => PdfDocInst;
+};
 const pm = pdfMake as unknown as PdfMakeAny;
 const vfsObj: Record<string, string> = (pdfFonts as unknown as { vfs?: Record<string, string> })?.vfs
   ?? (pdfFonts as unknown as Record<string, string>);
@@ -16,6 +24,7 @@ if (typeof pm.addVirtualFileSystem === "function") {
 } else {
   pm.vfs = vfsObj;
 }
+console.log("[invoice-pdf-portal] vfs files:", Object.keys(vfsObj || {}).length);
 
 const GRAY_HEADER = "#e5e7ec";
 const BORDER = "#cfd4dc";
