@@ -278,7 +278,7 @@ export async function generatePortalInvoicePdfBase64(inv: ParsedInvoice, xml: st
                   {
                     stack: [
                       { text: inv.nabywca?.nazwa || "—", bold: true, fontSize: 9 },
-                      { text: `NIP: ${inv.nabywca?.nip || "—"}`, fontSize: 8, margin: [0, 2, 0, 0] },
+                      { text: `NIP: ${buyerNip}`, fontSize: 8, margin: [0, 2, 0, 0] },
                       { text: inv.nabywca?.adres || "", fontSize: 8, margin: [0, 2, 0, 0] },
                     ],
                   },
