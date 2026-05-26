@@ -630,12 +630,14 @@ function parseInvoiceXml(xml: string) {
       });
     }
 
-    return { vendor, nip, date, grossAmount, items, paymentMethod, paymentDueDate, isPaidInXml, dataZaplaty };
+    return { vendor, nip, seller, buyer, date, grossAmount, items, paymentMethod, paymentDueDate, isPaidInXml, dataZaplaty };
   } catch (err) {
     console.error("[ksef-sync][XML] Parse error:", err instanceof Error ? err.message : err);
     return {
       vendor: "Nieznany kontrahent",
       nip: "",
+      seller: { name: "", nip: "" },
+      buyer: { name: "", nip: "" },
       date: new Date().toISOString().split("T")[0],
       grossAmount: 0,
       items: [],
