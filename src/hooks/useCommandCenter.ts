@@ -212,16 +212,18 @@ export function useCommandCenter(companyId: string | null) {
   // VAT forecast
   const vatForecast = useMemo(() => {
     if (!invoiceItems || !invoices) return { vatDue: 0, vatDeductible: 0, vatBalance: 0 };
+    // Build invoice map once (O(N) instead of O(N²) lookups)
+    const invMap = new Map(invoices.map((i) => [i.id, i]));
     const currentInvoiceIds = new Set(
       invoices.filter((i) => i.date?.startsWith(currentMonthKey)).map((i) => i.id)
     );
-    const currentItems = invoiceItems.filter((it) => currentInvoiceIds.has(it.invoice_id));
 
-    let vatDue = 0; // VAT from sales (przychodowe)
-    let vatDeductible = 0; // VAT from purchases (kosztowe)
+    let vatDue = 0;
+    let vatDeductible = 0;
 
-    for (const item of currentItems) {
-      const inv = invoices.find((i) => i.id === item.invoice_id);
+    for (const item of invoiceItems) {
+      if (!currentInvoiceIds.has(item.invoice_id)) continue;
+      const inv = invMap.get(item.invoice_id);
       if (!inv) continue;
       const vat = Number(item.vat_amount) || 0;
       if (inv.invoice_type === "przychodowa") vatDue += vat;

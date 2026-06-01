@@ -3,13 +3,12 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { ConversationProvider } from "@elevenlabs/react";
 import { useAuth } from "@/hooks/useAuth";
 import { lazy, Suspense } from "react";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import { Loader2 } from "lucide-react";
-import { VoiceAgentWidget } from "@/components/dashboard/VoiceAgentWidget";
+import { VoiceAgentLauncher } from "@/components/dashboard/VoiceAgentLauncher";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useHaviRealtime } from "@/hooks/useHaviRealtime";
 import { LegalAcceptanceGate } from "@/components/legal/LegalAcceptanceGate";
@@ -75,7 +74,7 @@ function AuthenticatedOverlay() {
   return (
     <>
       <LegalAcceptanceGate />
-      <VoiceAgentWidget />
+      <VoiceAgentLauncher />
     </>
   );
 }
@@ -135,11 +134,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <ConversationProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </ConversationProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );

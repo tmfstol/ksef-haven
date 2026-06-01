@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useConversation } from "@elevenlabs/react";
+import { useConversation, ConversationProvider } from "@elevenlabs/react";
 import { Bot, Mic, MicOff, X, Volume2, Loader2, AlertCircle, MessageCircle, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,8 @@ function shouldUseWebSocket(): boolean {
   return isIOS || isSafari;
 }
 
-export function VoiceAgentWidget() {
-  const [open, setOpen] = useState(false);
+function VoiceAgentWidgetInner({ defaultOpen = false }: { defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
@@ -405,5 +405,13 @@ export function VoiceAgentWidget() {
         )}
       </div>
     </div>
+  );
+}
+
+export function VoiceAgentWidget(props: { defaultOpen?: boolean } = {}) {
+  return (
+    <ConversationProvider>
+      <VoiceAgentWidgetInner {...props} />
+    </ConversationProvider>
   );
 }
