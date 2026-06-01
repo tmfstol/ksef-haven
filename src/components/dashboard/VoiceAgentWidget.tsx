@@ -26,7 +26,7 @@ function shouldUseWebSocket(): boolean {
   return isIOS || isSafari;
 }
 
-export function VoiceAgentWidget({ defaultOpen = false }: { defaultOpen?: boolean } = {}) {
+function VoiceAgentWidgetInner({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
