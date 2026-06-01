@@ -74,7 +74,7 @@ function AuthenticatedOverlay() {
   return (
     <>
       <LegalAcceptanceGate />
-      <VoiceAgentWidget />
+      <VoiceAgentLauncher />
     </>
   );
 }
