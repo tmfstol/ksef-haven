@@ -13,7 +13,7 @@ export function VoiceAgentLauncher() {
   if (activated) {
     return (
       <Suspense fallback={null}>
-        <VoiceAgentWidget />
+        <VoiceAgentWidget defaultOpen />
       </Suspense>
     );
   }
