@@ -134,11 +134,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <ConversationProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </ConversationProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
