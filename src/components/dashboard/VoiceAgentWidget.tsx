@@ -407,3 +407,11 @@ function VoiceAgentWidgetInner({ defaultOpen = false }: { defaultOpen?: boolean 
     </div>
   );
 }
+
+export function VoiceAgentWidget(props: { defaultOpen?: boolean } = {}) {
+  return (
+    <ConversationProvider>
+      <VoiceAgentWidgetInner {...props} />
+    </ConversationProvider>
+  );
+}
