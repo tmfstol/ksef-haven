@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,11 +28,12 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     
+    // getUser() waliduje token bezpośrednio z Auth-serwerem — niezależne od JWKS w env
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) throw new Error("Nieautoryzowany");
-    
-    const user = { id: claimsData.claims.sub, email: claimsData.claims.email };
+    const { data: userData, error: userError } = await userClient.auth.getUser(token);
+    if (userError || !userData?.user?.id) throw new Error("Nieautoryzowany");
+
+    const user = { id: userData.user.id, email: userData.user.email };
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
