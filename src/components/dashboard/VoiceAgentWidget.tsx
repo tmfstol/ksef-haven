@@ -111,8 +111,28 @@ function VoiceAgentWidgetInner({ defaultOpen = false }: { defaultOpen?: boolean 
       fallbackInProgressRef.current = false;
       toast.success("Połączono z asystentem głosowym");
     },
-    onDisconnect: () => {
+    onDisconnect: (details: any) => {
       setAudioLevel(0);
+      // Loguj powód rozłączenia (diagnostyka „Havi pada po kilku sekundach")
+      console.warn("[Havi] disconnect details:", details);
+      const reason = details?.reason;
+      const closeCode = details?.closeCode;
+      const closeReason = details?.closeReason || details?.message;
+
+      // Reason "error" = problem techniczny (WebRTC/WS padło). Spróbuj fallbacku.
+      if (reason === "error" && !fallbackInProgressRef.current && sessionParamsRef.current) {
+        console.warn("[Havi] disconnect reason=error → próbuję WebSocket fallback");
+        startWebSocketFallback();
+        return;
+      }
+      // Reason "agent" = ElevenLabs zakończył sesję sam (timeout, limit, błąd konfiguracji)
+      if (reason === "agent") {
+        const msg = closeReason
+          ? `Agent zakończył rozmowę: ${closeReason}${closeCode ? ` (kod ${closeCode})` : ""}`
+          : "Agent zakończył rozmowę. Sprawdź konfigurację agenta w ElevenLabs (first_message, limity, język).";
+        setError(msg);
+        toast.error(msg);
+      }
       // Po zakończeniu rozmowy: odśwież dane, jeśli było coś do odświeżenia
       if (pendingRefreshRef.current) {
         lastRefreshAtRef.current = 0;
