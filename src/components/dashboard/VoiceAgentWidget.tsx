@@ -36,6 +36,31 @@ function VoiceAgentWidgetInner({ defaultOpen = false }: { defaultOpen?: boolean 
   const animationRef = useRef<number | null>(null);
   const fallbackInProgressRef = useRef(false);
   const sessionParamsRef = useRef<{ token: string; userId?: string; accessToken: string } | null>(null);
+  const pendingRefreshRef = useRef(false);
+  const lastRefreshAtRef = useRef(0);
+
+  // Odświeżenie danych po wypowiedzi agenta — ZDEBOUNCE'OWANE, max raz na 10s.
+  // Wcześniej invalidateQueries leciał na KAŻDĄ wiadomość → blokował UI thread,
+  // przez co WebRTC tracił połączenie i Havi się rozłączał.
+  const refreshQueriesDebounced = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefreshAtRef.current < 10000) {
+      pendingRefreshRef.current = true;
+      return;
+    }
+    lastRefreshAtRef.current = now;
+    pendingRefreshRef.current = false;
+    // Odpalamy w requestIdleCallback, żeby nie zarzynać głównego wątku
+    const run = () => {
+      ["projects", "invoices", "expenses", "command-center", "contacts", "project-invoices", "project-expenses"]
+        .forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+    };
+    if ("requestIdleCallback" in window) {
+      (window as any).requestIdleCallback(run, { timeout: 2000 });
+    } else {
+      setTimeout(run, 0);
+    }
+  }, [queryClient]);
 
   const startWebSocketFallback = useCallback(async () => {
     if (fallbackInProgressRef.current) return;
