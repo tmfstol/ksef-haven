@@ -113,6 +113,11 @@ function VoiceAgentWidgetInner({ defaultOpen = false }: { defaultOpen?: boolean 
     },
     onDisconnect: () => {
       setAudioLevel(0);
+      // Po zakończeniu rozmowy: odśwież dane, jeśli było coś do odświeżenia
+      if (pendingRefreshRef.current) {
+        lastRefreshAtRef.current = 0;
+        refreshQueriesDebounced();
+      }
     },
     onError: (err: any) => {
       console.error("ElevenLabs error:", err);
@@ -139,9 +144,9 @@ function VoiceAgentWidgetInner({ defaultOpen = false }: { defaultOpen?: boolean 
           ...prev,
           { id: crypto.randomUUID(), role: "agent", text: message.message },
         ]);
-        // Po wypowiedzi agenta — odśwież dane (mogło coś się zmienić w bazie)
-        ["projects", "invoices", "expenses", "command-center", "contacts", "project-invoices", "project-expenses"]
-          .forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+        // Odśwież cache — ale DEBOUNCE'OWANE (max raz na 10s, idle callback)
+        // żeby nie zablokować WebRTC i nie spowodować rozłączenia.
+        refreshQueriesDebounced();
       }
     },
   });
