@@ -26,6 +26,116 @@ function shouldUseWebSocket(): boolean {
   return isIOS || isSafari;
 }
 
+// Mapowanie znanych błędów ElevenLabs → czytelny komunikat PL + instrukcja naprawy.
+// Używane zarówno w onError, jak i onDisconnect (closeReason/closeCode).
+type FriendlyError = { title: string; hint: string };
+
+function mapElevenLabsError(rawMessage: string, closeCode?: number): FriendlyError {
+  const msg = (rawMessage || "").toLowerCase();
+
+  // --- LIMITY / BALANCE / KWOTA ---
+  if (/quota|exceeded|insufficient (balance|credit|funds)|out of (credits|quota)|payment required/.test(msg)
+      || closeCode === 1008 || closeCode === 4001) {
+    return {
+      title: "Wyczerpany limit ElevenLabs",
+      hint: "Konto ElevenLabs nie ma wystarczających kredytów lub przekroczyłeś limit miesięczny. Wejdź na elevenlabs.io → Subscription, doładuj plan lub kup pakiet znaków.",
+    };
+  }
+
+  // --- AUTORYZACJA / KLUCZ API ---
+  if (/unauthorized|invalid api key|api[_ ]?key|authentication|auth_error|401|403/.test(msg)) {
+    return {
+      title: "Błąd autoryzacji ElevenLabs",
+      hint: "ELEVENLABS_API_KEY jest nieprawidłowy lub wygasł. Wygeneruj nowy klucz na elevenlabs.io → Profile → API Keys i zaktualizuj sekret w ustawieniach projektu.",
+    };
+  }
+
+  // --- AGENT NIE ISTNIEJE ---
+  if (/agent.{0,20}(not found|does not exist|invalid agent)/i.test(msg) || /404/.test(msg)) {
+    return {
+      title: "Nie znaleziono agenta",
+      hint: "ELEVENLABS_AGENT_ID jest pusty lub wskazuje na usuniętego agenta. Utwórz agenta na elevenlabs.io → Conversational AI → Agents i wklej jego ID jako sekret ELEVENLABS_AGENT_ID.",
+    };
+  }
+
+  // --- CLIENT TOOLS MISMATCH ---
+  if (/client[_ ]?tool|tool.{0,20}(not (found|registered|defined)|mismatch|unknown)|unhandled.{0,10}tool/i.test(msg)) {
+    return {
+      title: "Niezgodność narzędzi (client tools)",
+      hint: "Agent w ElevenLabs woła narzędzie, którego nie zarejestrowała aplikacja. W panelu agenta (Tools → Client Tools) muszą istnieć DOKŁADNIE te nazwy: create_sheet, search_files, create_doc, add_event. Sprawdź pisownię i parametry.",
+    };
+  }
+
+  // --- KONFIGURACJA AGENTA (brak first_message / promptu / języka) ---
+  if (/first[_ ]?message|prompt.{0,20}(empty|missing|required)|language.{0,20}(invalid|unsupported)|configuration/i.test(msg)) {
+    return {
+      title: "Błąd konfiguracji agenta",
+      hint: "Agent w ElevenLabs nie ma ustawionego pierwszego komunikatu (First message), system promptu lub język jest niepoprawny. Otwórz agenta → Agent settings i uzupełnij First message + Language: Polish.",
+    };
+  }
+
+  // --- LIMIT CZASU SESJI ---
+  if (/session.{0,20}(time.?limit|too long|expired|timeout)|max.{0,10}duration/i.test(msg)) {
+    return {
+      title: "Limit czasu rozmowy",
+      hint: "Sesja przekroczyła maksymalny czas. W panelu agenta (Agent → Advanced → Max conversation duration) zwiększ limit (domyślnie 5 min, można do 60 min).",
+    };
+  }
+
+  // --- BRAK AKTYWNOŚCI AUDIO ---
+  if (/insufficient.{0,10}audio|no audio|silence|inactive/i.test(msg)) {
+    return {
+      title: "Brak dźwięku z mikrofonu",
+      hint: "ElevenLabs nie odbiera żadnego głosu. Sprawdź mikrofon (Ustawienia systemu → Prywatność → Mikrofon), zezwól przeglądarce, i upewnij się że żadna inna aplikacja go nie blokuje.",
+    };
+  }
+
+  // --- RATE LIMIT ---
+  if (/rate.?limit|429|too many requests/i.test(msg)) {
+    return {
+      title: "Zbyt wiele prób",
+      hint: "Przekroczono limit zapytań do ElevenLabs. Odczekaj 30–60 sekund i spróbuj ponownie.",
+    };
+  }
+
+  // --- WebRTC / SIEĆ ---
+  if (/pc connection|peer connection|ice|webrtc|stun|turn/i.test(msg)) {
+    return {
+      title: "Problem z połączeniem WebRTC",
+      hint: "Twoja sieć (firewall / VPN / korpo-proxy) blokuje WebRTC. Spróbuję automatycznie przełączyć się na WebSocket. Jeśli nie zadziała — wyłącz VPN/proxy lub użyj innej sieci.",
+    };
+  }
+
+  // --- WebSocket close codes ---
+  if (closeCode === 1006) {
+    return {
+      title: "Połączenie zerwane",
+      hint: "WebSocket został zamknięty nieprawidłowo (zwykle problem sieciowy). Sprawdź połączenie internetowe i spróbuj ponownie.",
+    };
+  }
+  if (closeCode === 1011) {
+    return {
+      title: "Błąd po stronie ElevenLabs",
+      hint: "Serwer ElevenLabs zwrócił błąd wewnętrzny. Spróbuj ponownie za chwilę — jeśli problem się powtarza, sprawdź status na status.elevenlabs.io.",
+    };
+  }
+
+  // --- FALLBACK ---
+  return {
+    title: rawMessage || "Błąd asystenta głosowego",
+    hint: closeCode
+      ? `Połączenie zostało zamknięte (kod ${closeCode}). Spróbuj ponownie lub odśwież stronę.`
+      : "Spróbuj ponownie. Jeśli błąd się powtarza, otwórz konsolę przeglądarki i prześlij log [Havi] disconnect details.",
+  };
+}
+
+function showFriendlyError(err: FriendlyError) {
+  toast.error(err.title, {
+    description: err.hint,
+    duration: 10000,
+  });
+}
+
 function VoiceAgentWidgetInner({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const [isStarting, setIsStarting] = useState(false);
