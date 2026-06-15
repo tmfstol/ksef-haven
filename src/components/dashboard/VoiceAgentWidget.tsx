@@ -237,11 +237,9 @@ function VoiceAgentWidgetInner({ defaultOpen = false }: { defaultOpen?: boolean 
       }
       // Reason "agent" = ElevenLabs zakończył sesję sam (timeout, limit, błąd konfiguracji)
       if (reason === "agent") {
-        const msg = closeReason
-          ? `Agent zakończył rozmowę: ${closeReason}${closeCode ? ` (kod ${closeCode})` : ""}`
-          : "Agent zakończył rozmowę. Sprawdź konfigurację agenta w ElevenLabs (first_message, limity, język).";
-        setError(msg);
-        toast.error(msg);
+        const friendly = mapElevenLabsError(closeReason || "", closeCode);
+        setError(friendly.title);
+        showFriendlyError(friendly);
       }
       // Po zakończeniu rozmowy: odśwież dane, jeśli było coś do odświeżenia
       if (pendingRefreshRef.current) {
@@ -250,15 +248,17 @@ function VoiceAgentWidgetInner({ defaultOpen = false }: { defaultOpen?: boolean 
       }
     },
     onError: (err: any) => {
-      console.error("ElevenLabs error:", err);
+      console.error("[Havi] ElevenLabs error:", err);
       const msg = typeof err === "string" ? err : (err?.message || "Błąd połączenia z agentem");
-      // Auto-fallback gdy WebRTC zawiedzie (typowo na iOS Safari)
+      // Auto-fallback gdy WebRTC zawiedzie (typowo na iOS Safari) — bez toasta
       if (/pc connection|peer connection|ice|webrtc/i.test(msg) && !fallbackInProgressRef.current) {
-        console.warn("WebRTC error wykryty — uruchamiam fallback WebSocket");
+        console.warn("[Havi] WebRTC error → uruchamiam fallback WebSocket");
         startWebSocketFallback();
         return;
       }
-      setError(msg);
+      const friendly = mapElevenLabsError(msg);
+      setError(friendly.title);
+      showFriendlyError(friendly);
     },
     onMessage: (message: any) => {
       // Transkrypcja użytkownika (finalna)
