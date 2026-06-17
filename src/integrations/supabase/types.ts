@@ -1430,6 +1430,211 @@ export type Database = {
           },
         ]
       }
+      mail_accounts: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          display_name: string | null
+          email: string
+          encrypted_access_token: string | null
+          encrypted_password: string | null
+          encrypted_refresh_token: string | null
+          id: string
+          imap_host: string | null
+          imap_port: number | null
+          imap_secure: boolean | null
+          last_error: string | null
+          last_sync_at: string | null
+          provider: string
+          smtp_host: string | null
+          smtp_port: number | null
+          smtp_secure: boolean | null
+          status: string
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          display_name?: string | null
+          email: string
+          encrypted_access_token?: string | null
+          encrypted_password?: string | null
+          encrypted_refresh_token?: string | null
+          id?: string
+          imap_host?: string | null
+          imap_port?: number | null
+          imap_secure?: boolean | null
+          last_error?: string | null
+          last_sync_at?: string | null
+          provider: string
+          smtp_host?: string | null
+          smtp_port?: number | null
+          smtp_secure?: boolean | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          encrypted_access_token?: string | null
+          encrypted_password?: string | null
+          encrypted_refresh_token?: string | null
+          id?: string
+          imap_host?: string | null
+          imap_port?: number | null
+          imap_secure?: boolean | null
+          last_error?: string | null
+          last_sync_at?: string | null
+          provider?: string
+          smtp_host?: string | null
+          smtp_port?: number | null
+          smtp_secure?: boolean | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mail_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_attachments: {
+        Row: {
+          content_id: string | null
+          created_at: string
+          filename: string
+          id: string
+          message_id: string
+          mime_type: string | null
+          size: number | null
+          storage_path: string | null
+        }
+        Insert: {
+          content_id?: string | null
+          created_at?: string
+          filename: string
+          id?: string
+          message_id: string
+          mime_type?: string | null
+          size?: number | null
+          storage_path?: string | null
+        }
+        Update: {
+          content_id?: string | null
+          created_at?: string
+          filename?: string
+          id?: string
+          message_id?: string
+          mime_type?: string | null
+          size?: number | null
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "mail_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_messages: {
+        Row: {
+          account_id: string
+          body_html: string | null
+          body_text: string | null
+          cc_addrs: string[] | null
+          created_at: string
+          folder: string
+          from_addr: string | null
+          has_attachments: boolean
+          id: string
+          is_read: boolean
+          is_starred: boolean
+          message_id: string | null
+          raw_size: number | null
+          received_at: string | null
+          snippet: string | null
+          subject: string | null
+          thread_id: string | null
+          to_addrs: string[] | null
+          uid: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          body_html?: string | null
+          body_text?: string | null
+          cc_addrs?: string[] | null
+          created_at?: string
+          folder?: string
+          from_addr?: string | null
+          has_attachments?: boolean
+          id?: string
+          is_read?: boolean
+          is_starred?: boolean
+          message_id?: string | null
+          raw_size?: number | null
+          received_at?: string | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id?: string | null
+          to_addrs?: string[] | null
+          uid: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          body_html?: string | null
+          body_text?: string | null
+          cc_addrs?: string[] | null
+          created_at?: string
+          folder?: string
+          from_addr?: string | null
+          has_attachments?: boolean
+          id?: string
+          is_read?: boolean
+          is_starred?: boolean
+          message_id?: string | null
+          raw_size?: number | null
+          received_at?: string | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id?: string | null
+          to_addrs?: string[] | null
+          uid?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_messages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "mail_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       master_catalog: {
         Row: {
           active: boolean
